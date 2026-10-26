@@ -1,0 +1,677 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "railLengthsUnits": [
+        24,
+        24
+      ],
+      "railPitchesMm": [
+        150
+      ],
+      "railLabels": [
+        "Incoming",
+        "Final circuits"
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "main-switch-4p-63"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "Main switch"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcd-4p-63-30"
+          },
+          "rail": 0,
+          "slot": 4,
+          "label": "RCD 30 mA"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "n-bar-12"
+          },
+          "rail": 0,
+          "slot": 9,
+          "label": "N"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pe-bar-12"
+          },
+          "rail": 0,
+          "slot": 15,
+          "label": "PE"
+        },
+        {
+          "id": "p5",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-3p-c32"
+          },
+          "rail": 1,
+          "slot": 0,
+          "label": "Oven"
+        },
+        {
+          "id": "p6",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-c16"
+          },
+          "rail": 1,
+          "slot": 3,
+          "label": "Kitchen"
+        },
+        {
+          "id": "p7",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-c16"
+          },
+          "rail": 1,
+          "slot": 4,
+          "label": "Living room"
+        },
+        {
+          "id": "p8",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-c16"
+          },
+          "rail": 1,
+          "slot": 5,
+          "label": "Garden"
+        },
+        {
+          "id": "p9",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-b10"
+          },
+          "rail": 1,
+          "slot": 6,
+          "label": "Hall light"
+        },
+        {
+          "id": "p10",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-b10"
+          },
+          "rail": 1,
+          "slot": 7,
+          "label": "Rooms light"
+        },
+        {
+          "id": "p11",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-b10"
+          },
+          "rail": 1,
+          "slot": 8,
+          "label": "Outdoor light"
+        }
+      ],
+      "combs": [
+        {
+          "id": "c1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "comb-3ph-12"
+          },
+          "rail": 1,
+          "slot": 0
+        }
+      ],
+      "shelf": [],
+      "title": "House panel"
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "Main switch 4P 63A",
+          "x": 560,
+          "y": 160,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "RCD 4P 63A 30mA",
+          "x": 560,
+          "y": 320,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "Neutral bar 12 terminals",
+          "x": 160,
+          "y": 330,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "Earth bar 12 terminals",
+          "x": 940,
+          "y": 330,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 3P C32",
+          "x": 560,
+          "y": 520,
+          "placementId": "p5",
+          "id": "n5"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P C16",
+          "x": 200,
+          "y": 640,
+          "placementId": "p6",
+          "id": "n6"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P C16",
+          "x": 800,
+          "y": 520,
+          "placementId": "p7",
+          "id": "n7"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P C16",
+          "x": 930,
+          "y": 520,
+          "placementId": "p8",
+          "id": "n8"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P B10",
+          "x": 340,
+          "y": 640,
+          "placementId": "p9",
+          "id": "n9"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P B10",
+          "x": 1060,
+          "y": 520,
+          "placementId": "p10",
+          "id": "n10"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P B10",
+          "x": 1190,
+          "y": 520,
+          "placementId": "p11",
+          "id": "n11"
+        },
+        {
+          "kind": "source",
+          "label": "Mains 3-phase",
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "x": 560,
+          "y": 0,
+          "id": "n12"
+        },
+        {
+          "kind": "load",
+          "label": "Kitchen sockets",
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "x": 200,
+          "y": 800,
+          "id": "n13"
+        },
+        {
+          "kind": "load",
+          "label": "Hall light",
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "x": 340,
+          "y": 800,
+          "id": "n14"
+        },
+        {
+          "kind": "load",
+          "label": "Oven socket",
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "x": 560,
+          "y": 800,
+          "id": "n15"
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n12",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n12",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n12",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n12",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:N1"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n12",
+            "terminal": "bottom:PE"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:PE1"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n13",
+            "terminal": "top:L"
+          },
+          "label": "3x2.5 mm2"
+        },
+        {
+          "id": "w15",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:Nb1"
+          },
+          "b": {
+            "node": "n13",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w16",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:PEb1"
+          },
+          "b": {
+            "node": "n13",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w17",
+          "a": {
+            "node": "n9",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w18",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:Nb2"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w19",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:PEb2"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w20",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w21",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w22",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w23",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:Nb3"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w24",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:PEb3"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:PE"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/main-switch-4p-63": {
+      "id": "main-switch-4p-63",
+      "kind": "switch",
+      "name": "Main switch 4P 63A",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 63
+    },
+    "generic-iec/rcd-4p-63-30": {
+      "id": "rcd-4p-63-30",
+      "kind": "rcd",
+      "name": "RCD 4P 63A 30mA",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 63,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/n-bar-12": {
+      "id": "n-bar-12",
+      "kind": "busbar",
+      "name": "Neutral bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "N",
+          "conductor": "N",
+          "side": "top",
+          "net": "N",
+          "count": 6
+        },
+        {
+          "name": "Nb",
+          "conductor": "N",
+          "side": "bottom",
+          "net": "N",
+          "count": 6
+        }
+      ]
+    },
+    "generic-iec/pe-bar-12": {
+      "id": "pe-bar-12",
+      "kind": "busbar",
+      "name": "Earth bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "PE",
+          "conductor": "PE",
+          "side": "top",
+          "net": "PE",
+          "count": 6
+        },
+        {
+          "name": "PEb",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PE",
+          "count": 6
+        }
+      ]
+    },
+    "generic-iec/mcb-3p-c32": {
+      "id": "mcb-3p-c32",
+      "kind": "breaker",
+      "name": "MCB 3P C32",
+      "widthUnits": 3,
+      "poles": 3,
+      "ratedCurrentA": 32,
+      "curve": "C",
+      "breakingCapacityKA": 6
+    },
+    "generic-iec/mcb-1p-c16": {
+      "id": "mcb-1p-c16",
+      "kind": "breaker",
+      "name": "MCB 1P C16",
+      "widthUnits": 1,
+      "poles": 1,
+      "ratedCurrentA": 16,
+      "curve": "C",
+      "breakingCapacityKA": 6
+    },
+    "generic-iec/mcb-1p-b10": {
+      "id": "mcb-1p-b10",
+      "kind": "breaker",
+      "name": "MCB 1P B10",
+      "widthUnits": 1,
+      "poles": 1,
+      "ratedCurrentA": 10,
+      "curve": "B",
+      "breakingCapacityKA": 6
+    },
+    "generic-iec/comb-3ph-12": {
+      "id": "comb-3ph-12",
+      "kind": "comb",
+      "name": "Comb 3-phase, 12 units",
+      "widthUnits": 12,
+      "poles": 3,
+      "comb": {
+        "pattern": [
+          "L1",
+          "L2",
+          "L3"
+        ],
+        "side": "top"
+      },
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 54
+      }
+    }
+  }
+}
