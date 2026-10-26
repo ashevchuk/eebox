@@ -227,6 +227,13 @@ export function render(
   ctx.strokeStyle = COLORS.frame;
   ctx.lineWidth = 2;
   ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
+  if (panel.title) {
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = COLORS.label;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(fitText(ctx, panel.title, frame.width - 28), 14, 24);
+  }
 
   panel.railLengthsUnits.forEach((_length, rail) => {
     const r = railRect(panel, rail);

@@ -17,8 +17,7 @@ const TERMINAL_PITCH = 26;
 const SIDE_MARGIN = 12;
 const MIN_WIDTH = 110;
 const NODE_HEIGHT: Record<NodeKind, number> = { source: 44, load: 44, module: 56 };
-const WIRE_STUB = 18;
-const CHANNEL_PITCH = 6;
+export const WIRE_STUB = 18;
 const BOUNDS_PADDING = 40;
 const FREE_SPOT_GAP = 20;
 const FREE_SPOT_STEP = 60;
@@ -99,20 +98,6 @@ export function hitPort(
   return undefined;
 }
 
-/** Wires between the same two nodes get parallel channels so they do not lie on top of each other. */
-export function wireChannels(schematic: Schematic): Map<string, number> {
-  const groups = new Map<string, Wire[]>();
-  for (const wire of schematic.wires) {
-    const key = [wire.a.node, wire.b.node].sort().join('|');
-    groups.set(key, [...(groups.get(key) ?? []), wire]);
-  }
-  const channels = new Map<string, number>();
-  for (const wires of groups.values()) {
-    wires.forEach((wire, i) => channels.set(wire.id, (i - (wires.length - 1) / 2) * CHANNEL_PITCH));
-  }
-  return channels;
-}
-
 /** Orthogonal route that leaves and enters each terminal straight out of its side. */
 export function wirePath(a: Endpoint, b: Endpoint, channel: number): Point[] {
   const dirA = a.side === 'bottom' ? 1 : -1;
@@ -129,17 +114,6 @@ export function wirePath(a: Endpoint, b: Endpoint, channel: number): Point[] {
   }
   const x = (a.point.x + b.point.x) / 2 + channel;
   return [a.point, stubA, { x, y: stubA.y }, { x, y: stubB.y }, stubB, b.point];
-}
-
-export function wireGeometry(layout: Layout, wire: Wire, channel: number): Point[] | undefined {
-  const a = portOf(layout, wire.a);
-  const b = portOf(layout, wire.b);
-  if (!a || !b) return undefined;
-  return wirePath(
-    { point: a.point, side: a.terminal.side },
-    { point: b.point, side: b.terminal.side },
-    channel,
-  );
 }
 
 function distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -175,10 +149,14 @@ export function pathMidpoint(path: Point[]): Point {
   return path[0] ?? { x: 0, y: 0 };
 }
 
-export function hitWire(schematic: Schematic, layout: Layout, p: Point, tolerance: number): Wire | undefined {
-  const channels = wireChannels(schematic);
+export function hitWire(
+  schematic: Schematic,
+  routes: Map<string, Point[]>,
+  p: Point,
+  tolerance: number,
+): Wire | undefined {
   return [...schematic.wires].reverse().find((wire) => {
-    const path = wireGeometry(layout, wire, channels.get(wire.id) ?? 0);
+    const path = routes.get(wire.id);
     return path !== undefined && distanceToPath(p, path) <= tolerance;
   });
 }

@@ -5,7 +5,9 @@ import {
   removePlacement,
   type ModuleRef,
   type Panel,
+  type ShelfItem,
 } from '../layout/placement';
+import { placeFromShelf } from '../layout/shelf';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
@@ -22,6 +24,8 @@ interface Drag {
   module: ModuleRef;
   anchorUnits: number;
   movingId: string | null;
+  /** Set when the drag started on the shelf, so the module keeps its id and properties. */
+  shelfId: string | null;
   newId: string;
   ghost: Ghost | null;
   next: Panel | null;
@@ -61,6 +65,18 @@ export class PanelView implements View {
   startPaletteDrag(e: PointerEvent, def: ModuleDef, module: ModuleRef, world: Point): void {
     this.session.selection = {};
     this.startDrag(def.kind === 'comb' ? 'comb' : 'placement', def, module, def.widthUnits, def.widthUnits / 2, null);
+    this.pointerMove(e, world, false);
+  }
+
+  startShelfDrag(e: PointerEvent, item: ShelfItem, world: Point): void {
+    const def = this.session.resolve(item.module);
+    if (!def) {
+      this.session.notify('That module is missing from the libraries, so it cannot be placed.', true);
+      return;
+    }
+    this.session.selection = {};
+    const width = item.widthUnits ?? def.widthUnits;
+    this.startDrag('placement', def, item.module, width, width / 2, null, item.id);
     this.pointerMove(e, world, false);
   }
 
@@ -145,6 +161,7 @@ export class PanelView implements View {
 
   private tryDrop(drag: Drag, panel: Panel, snap: { rail: number; slot: number }) {
     const id = drag.movingId ?? drag.newId;
+    if (drag.shelfId) return placeFromShelf(panel, this.session.widthOf, drag.shelfId, snap.rail, snap.slot);
     if (drag.kind === 'comb') {
       const { combLookup } = this.session;
       return drag.movingId
@@ -163,6 +180,7 @@ export class PanelView implements View {
     widthUnits: number,
     anchorUnits: number,
     movingId: string | null,
+    shelfId: string | null = null,
   ): void {
     const panel = this.session.project.panel;
     this.drag = {
@@ -172,7 +190,8 @@ export class PanelView implements View {
       module,
       anchorUnits,
       movingId,
-      newId: kind === 'comb' ? nextCombId(panel) : nextPlacementId(panel),
+      shelfId,
+      newId: shelfId ?? (kind === 'comb' ? nextCombId(panel) : nextPlacementId(panel)),
       ghost: null,
       next: null,
     };

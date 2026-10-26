@@ -58,7 +58,7 @@
         border-left: 1px solid var(--border);
       }
       #inspector h3 { margin: 0 0 8px; font-size: 13px; }
-      .inspector-empty { color: var(--text-dim); margin: 0; }
+      .inspector-actions { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
       .inspector-field { display: grid; grid-template-columns: 88px 1fr; gap: 6px; margin: 5px 0; align-items: start; }
       .inspector-field > label { color: var(--text-dim); padding-top: 3px; }
       .inspector-control input[type='text'],
@@ -110,6 +110,11 @@
       .module small { color: var(--text-dim); }
       #palette .hint { color: var(--text-dim); }
       #panel-settings { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+      #shelf { padding: 8px 0; border-bottom: 1px solid var(--border); }
+      #shelf h3 { margin: 0 0 6px; font-size: 13px; }
+      #shelf .hint { flex-basis: auto; }
+      .shelf-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+      .shelf-item button { padding: 0 6px; }
       #panel-settings h3 { margin: 0 0 6px; font-size: 13px; }
       .settings-line { display: flex; align-items: center; gap: 4px; margin: 3px 0; }
       .settings-line input { width: 64px; font: inherit; color: var(--text); background: var(--bg);
@@ -169,6 +174,7 @@
       <button id="save-project">Save</button>
       <button id="share-link">Share link</button>
       <button id="export-png">PNG</button>
+      <button id="export-svg">SVG</button>
       <button id="export-bom">BOM CSV</button>
       <label class="file-button">
         Import library…
@@ -180,6 +186,7 @@
     <main>
       <aside id="sidebar">
         <section id="panel-settings"></section>
+        <section id="shelf"></section>
         <div id="palette"></div>
       </aside>
       <div id="stage-wrap"><canvas id="stage"></canvas></div>

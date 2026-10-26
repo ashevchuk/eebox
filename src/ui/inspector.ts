@@ -1,15 +1,25 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { lookupsOf } from '../layout/lookups';
 import {
+  MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_PITCH_MM,
   MIN_RAIL_PITCH_MM,
 } from '../layout/limits';
-import { moveRail, setRailLabel, setRailLength, setRailPitch } from '../layout/panel';
+import {
+  moveRail,
+  setPanelTitle,
+  setRailCount,
+  setRailLabel,
+  setRailLength,
+  setRailPitch,
+} from '../layout/panel';
+import { takeOff } from '../layout/shelf';
 import {
   movePlacement,
   setPlacementLabel,
   setPlacementWidth,
+  setTerminalLabel,
   type CombPlacement,
   type ModuleRef,
   type Placement,
@@ -43,9 +53,16 @@ export interface InspectorField {
   hint?: string;
 }
 
+/** A button for something that is not the edit of one value, such as taking a module off its rail. */
+export interface InspectorAction {
+  key: string;
+  label: string;
+}
+
 export interface InspectorView {
   title: string;
   fields: InspectorField[];
+  actions: InspectorAction[];
 }
 
 type Resolve = (ref: ModuleRef) => ModuleDef | undefined;
@@ -62,6 +79,7 @@ export type EditResult =
   | { ok: false; message: string; needsConfirm?: { message: string } };
 
 type Target =
+  | { kind: 'panel' }
   | { kind: 'comb'; comb: CombPlacement }
   | { kind: 'placement'; placement: Placement; node?: SchematicNode }
   | { kind: 'rail'; rail: number }
@@ -72,13 +90,13 @@ const LABEL_MESSAGE = 'Labels are 1 to 60 characters, without line breaks.';
 const NOT_A_NUMBER = 'Enter a whole number.';
 
 /** What the selection points at, given which view is showing: a module node stands for its placement. */
-function targetOf({ project, selection, mode }: InspectContext): Target | null {
+function targetOf({ project, selection, mode }: InspectContext): Target {
   const { panel, schematic } = project;
   if (mode === 'schematic') {
     const wire = schematic.wires.find((w) => w.id === selection.wireId);
     if (wire) return { kind: 'wire', wire };
     const node = schematic.nodes.find((n) => n.id === selection.nodeId);
-    if (!node) return null;
+    if (!node) return { kind: 'panel' };
     const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
     return placement ? { kind: 'placement', placement, node } : { kind: 'node', node };
   }
@@ -89,7 +107,7 @@ function targetOf({ project, selection, mode }: InspectContext): Target | null {
   if (selection.rail !== undefined && selection.rail < panel.railLengthsUnits.length) {
     return { kind: 'rail', rail: selection.rail };
   }
-  return null;
+  return { kind: 'panel' };
 }
 
 const text = (key: string, label: string, value: string, placeholder?: string): InspectorField => ({
@@ -137,13 +155,39 @@ function positionFields(
   ];
 }
 
-export function inspect(ctx: InspectContext): InspectorView | null {
+function terminalLabelFields(placement: Placement, def: ModuleDef | undefined, width: number): InspectorField[] {
+  if (!def) return [];
+  return terminalsOf(def, width).map((t) =>
+    text(`terminal:${t.id}`, `${t.name} (${t.side})`, placement.terminalLabels?.[t.id] ?? '', t.name),
+  );
+}
+
+const TAKE_OFF: InspectorAction = { key: 'takeOff', label: 'Take off the rail' };
+
+export function inspect(ctx: InspectContext): InspectorView {
   const target = targetOf(ctx);
-  if (!target) return null;
   const { project, resolve } = ctx;
   const { widthOf } = lookupsOf(resolve);
 
   switch (target.kind) {
+    case 'panel': {
+      const { panel } = project;
+      const longest = Math.max(0, ...panel.railLengthsUnits);
+      return {
+        title: 'Panel',
+        actions: [],
+        fields: [
+          text('title', 'Title', panel.title ?? '', 'Untitled panel'),
+          integer('rows', 'Rows', panel.railLengthsUnits.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
+          readonly('size', 'Size', `longest row ${longest} units`),
+          readonly(
+            'contents',
+            'Contents',
+            `${panel.placements.length} modules, ${panel.combs.length} combs, ${panel.shelf.length} on the shelf`,
+          ),
+        ],
+      };
+    }
     case 'placement': {
       const { placement, node } = target;
       const def = resolve(placement.module);
@@ -153,12 +197,14 @@ export function inspect(ctx: InspectContext): InspectorView | null {
         : [];
       return {
         title: node ? 'Module node' : 'Module',
+        actions: [TAKE_OFF],
         fields: [
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
           ...positionFields(placement, def, project, width),
           ...nodeFields,
           ...moduleDetails(def, width),
+          ...terminalLabelFields(placement, def, width),
           readonly('id', 'Id', placement.id),
         ],
       };
@@ -169,6 +215,7 @@ export function inspect(ctx: InspectContext): InspectorView | null {
       const width = widthOf(comb) ?? 1;
       return {
         title: 'Comb',
+        actions: [],
         fields: [
           readonly('module', 'Module', def?.name ?? `${comb.module.moduleId} (missing)`),
           text('label', 'Label', comb.label ?? '', def?.name),
@@ -187,6 +234,7 @@ export function inspect(ctx: InspectContext): InspectorView | null {
       const combsOnRail = panel.combs.filter((c) => c.rail === rail).length;
       return {
         title: `Row ${rail + 1}`,
+        actions: [],
         fields: [
           text('label', 'Label', panel.railLabels[rail] ?? '', `Row ${rail + 1}`),
           integer('position', 'Position', rail + 1, 1, panel.railLengthsUnits.length),
@@ -211,6 +259,7 @@ export function inspect(ctx: InspectContext): InspectorView | null {
       const conductor = first && terminals(first)?.find((t) => t.id === wire.a.terminal)?.conductor;
       return {
         title: 'Wire',
+        actions: [],
         fields: [
           text('label', 'Label', wire.label ?? ''),
           readonly('from', 'From', end(wire.a)),
@@ -224,6 +273,7 @@ export function inspect(ctx: InspectContext): InspectorView | null {
       const { node } = target;
       return {
         title: node.kind === 'source' ? 'Source' : node.kind === 'load' ? 'Load' : 'Module node',
+        actions: [],
         fields: [
           text('label', 'Label', node.label),
           ...(node.conductors
@@ -284,7 +334,6 @@ export function applyEdit(
   options: { confirmed?: boolean } = {},
 ): EditResult {
   const target = targetOf(ctx);
-  if (!target) return fail('Nothing is selected.');
   const { project, resolve } = ctx;
   const { panel, schematic } = project;
   const { widthOf, resizeOf, combLookup } = lookupsOf(resolve);
@@ -300,10 +349,27 @@ export function applyEdit(
   };
 
   switch (target.kind) {
+    case 'panel': {
+      if (key === 'title') {
+        const result = setPanelTitle(panel, text);
+        return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
+      }
+      if (key === 'rows') {
+        const value = integerOf(raw);
+        if (value === null) return fail(NOT_A_NUMBER);
+        const result = setRailCount(panel, value);
+        return result.ok ? withPanel(result.panel) : fail(result.error === 'invalid-value' ? `Rows: 1 to ${MAX_RAILS}.` : describeError(result.error));
+      }
+      return fail('That property cannot be edited.');
+    }
     case 'placement': {
       const { placement, node } = target;
       if (key === 'label') {
         const result = setPlacementLabel(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key.startsWith('terminal:')) {
+        const result = setTerminalLabel(panel, placement.id, key.slice('terminal:'.length), text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if ((key === 'nodeX' || key === 'nodeY') && node) return moveNodeTo(node);
@@ -404,3 +470,18 @@ export function applyEdit(
   }
 }
 
+
+/** Runs an inspector action; returns the project to commit and what should be selected afterwards. */
+export function applyAction(ctx: InspectContext, key: string): EditResult {
+  const target = targetOf(ctx);
+  if (key === 'takeOff' && target.kind === 'placement') {
+    const result = takeOff(ctx.project.panel, target.placement.id);
+    if (!result.ok) return fail('That module is no longer on the rail.');
+    return {
+      ok: true,
+      project: { ...ctx.project, panel: result.panel },
+      selection: target.node ? { nodeId: target.node.id } : {},
+    };
+  }
+  return fail('That action is not available here.');
+}

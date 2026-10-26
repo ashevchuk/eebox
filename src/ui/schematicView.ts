@@ -10,10 +10,9 @@ import {
   pathMidpoint,
   portOf,
   schematicBounds,
-  wireChannels,
-  wireGeometry,
   type Layout,
 } from '../schematic/geometry';
+import { routeWires } from '../schematic/router';
 import {
   addNode,
   connect,
@@ -65,6 +64,15 @@ const COLORS = {
 };
 const NODE_FILL = { module: '#e5e7eb', source: '#f5c518', load: '#a7f3d0' } as const;
 
+const TERMINAL_LABEL_WIDTH = 24;
+
+function fitToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let shortened = text;
+  while (shortened.length > 1 && ctx.measureText(`${shortened}…`).width > maxWidth) shortened = shortened.slice(0, -1);
+  return `${shortened}…`;
+}
+
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 
 interface Frame {
@@ -97,14 +105,14 @@ export class SchematicView implements View {
     const frame = this.frame();
     const { wireId, nodeId, placementId } = this.session.selection;
     this.drawCombLinks(ctx, frame);
-    const channels = wireChannels(frame.schematic);
+    const routes = routeWires(frame.schematic, frame.layout);
     for (const wire of frame.schematic.wires) {
-      const path = wireGeometry(frame.layout, wire, channels.get(wire.id) ?? 0);
+      const path = routes.get(wire.id);
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
       if (path && conductor) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : CONDUCTOR_COLORS[conductor], 2.5);
     }
     for (const wire of frame.schematic.wires) {
-      const path = wireGeometry(frame.layout, wire, channels.get(wire.id) ?? 0);
+      const path = routes.get(wire.id);
       if (path && wire.label) this.drawWireLabel(ctx, wire.label, pathMidpoint(path));
     }
     for (const { node } of frame.layout.values()) {
@@ -133,7 +141,7 @@ export class SchematicView implements View {
       this.selectNode(node);
       return true;
     }
-    const wire = hitWire(frame.schematic, frame.layout, world, WIRE_HIT_TOLERANCE);
+    const wire = hitWire(frame.schematic, routeWires(frame.schematic, frame.layout), world, WIRE_HIT_TOLERANCE);
     this.session.select(wire ? { wireId: wire.id } : {});
     return wire !== undefined;
   }
@@ -310,8 +318,9 @@ export class SchematicView implements View {
     const layout = frame.layout.get(node.id);
     if (!layout) return;
     const r = layout.rect;
-    const placement =
-      node.kind === 'module' ? this.session.project.panel.placements.find((p) => p.id === node.placementId) : undefined;
+    const { panel } = this.session.project;
+    const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
+    const shelved = node.kind === 'module' ? panel.shelf.find((s) => s.id === node.placementId) : undefined;
     const def = placement && this.session.resolve(placement.module);
     const orphan = node.kind === 'module' && !placement;
 
@@ -332,7 +341,9 @@ export class SchematicView implements View {
     ctx.fillStyle = COLORS.text;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const label = orphan ? `${node.label} (missing)` : (placement?.label ?? node.label);
+    const label = orphan
+      ? `${shelved?.label ?? node.label} (${shelved ? 'on the shelf' : 'missing'})`
+      : (placement?.label ?? node.label);
     let fontSize = 12;
     ctx.font = `${fontSize}px sans-serif`;
     while (fontSize > MIN_LABEL_FONT && ctx.measureText(label).width > r.width - 16) {
@@ -342,7 +353,8 @@ export class SchematicView implements View {
     ctx.fillText(label, r.x + r.width / 2 + 3, r.y + r.height / 2);
     ctx.font = '8px sans-serif';
     for (const { terminal, point } of layout.ports) {
-      ctx.fillText(terminal.name, point.x, point.y + (terminal.side === 'top' ? 9 : -9));
+      const custom = placement?.terminalLabels?.[terminal.id];
+      ctx.fillText(custom ? fitToWidth(ctx, custom, TERMINAL_LABEL_WIDTH) : terminal.name, point.x, point.y + (terminal.side === 'top' ? 9 : -9));
     }
     ctx.restore();
 

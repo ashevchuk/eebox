@@ -8,7 +8,7 @@ import {
   syncModuleNodes,
   type Schematic,
 } from '../src/schematic/model';
-import { applyEdit, inspect, type InspectContext, type InspectorField } from '../src/ui/inspector';
+import { applyAction, applyEdit, inspect, type InspectContext, type InspectorField } from '../src/ui/inspector';
 import type { Mode, Selection } from '../src/ui/session';
 import { combAt, panelOf, place, resolve } from './fixtures';
 
@@ -50,11 +50,23 @@ function message(result: ReturnType<typeof applyEdit>): string {
 }
 
 describe('inspect: what is shown', () => {
-  it('shows nothing when nothing is selected or the selection is stale', () => {
-    expect(inspect(ctx({}))).toBeNull();
-    expect(inspect(ctx({}, 'schematic'))).toBeNull();
-    expect(inspect(ctx({ placementId: 'gone', combId: 'gone', rail: 9 }))).toBeNull();
-    expect(inspect(ctx({ nodeId: 'gone', wireId: 'gone' }, 'schematic'))).toBeNull();
+  it('shows the panel itself when nothing is selected or the selection is stale', () => {
+    for (const c of [
+      ctx({}),
+      ctx({}, 'schematic'),
+      ctx({ placementId: 'gone', combId: 'gone', rail: 9 }),
+      ctx({ nodeId: 'gone', wireId: 'gone' }, 'schematic'),
+    ]) {
+      expect(inspect(c).title).toBe('Panel');
+    }
+  });
+
+  it('describes the panel: title, rows and what is on it', () => {
+    const c = ctx({});
+    expect(field(c, 'title')).toMatchObject({ kind: 'text', value: '', placeholder: 'Untitled panel' });
+    expect(field(c, 'rows')).toMatchObject({ kind: 'integer', value: 2, min: 1, max: 20 });
+    expect(field(c, 'size')?.value).toBe('longest row 24 units');
+    expect(field(c, 'contents')?.value).toBe('3 modules, 1 combs, 0 on the shelf');
   });
 
   it('describes a module with its position, details and a label placeholder', () => {
@@ -292,7 +304,7 @@ describe('applyEdit: guards', () => {
   it('refuses an unknown property, a read-only one, and an empty selection', () => {
     expect(message(applyEdit(ctx({ placementId: 'p1' }), 'poles', '3'))).toBe('That property cannot be edited.');
     expect(message(applyEdit(ctx({ placementId: 'p1' }), 'nope', 'x'))).toBe('That property cannot be edited.');
-    expect(message(applyEdit(ctx({}), 'label', 'x'))).toBe('Nothing is selected.');
+    expect(message(applyEdit(ctx({}), 'label', 'x'))).toBe('That property cannot be edited.');
   });
 
   it('never mutates the project it was given', () => {
@@ -302,5 +314,92 @@ describe('applyEdit: guards', () => {
     applyEdit(ctx({ rail: 0 }, 'panel', project), 'position', '2');
     applyEdit(ctx({ nodeId: 'n4' }, 'schematic', project), 'conductors', ['L1'], { confirmed: true });
     expect(project).toEqual(snapshot);
+  });
+});
+
+describe('panel properties', () => {
+  it('sets and clears the title, and refuses an invalid one', () => {
+    expect(ok(applyEdit(ctx({}), 'title', ' Flat 12 ')).panel.title).toBe('Flat 12');
+    const titled = ok(applyEdit(ctx({}), 'title', 'Flat 12'));
+    expect('title' in ok(applyEdit(ctx({}, 'panel', titled), 'title', '')).panel).toBe(false);
+    expect(message(applyEdit(ctx({}), 'title', 'x'.repeat(61)))).toMatch(/1 to 60 characters/);
+  });
+
+  it('changes the number of rows, refusing one that still holds modules', () => {
+    expect(ok(applyEdit(ctx({}), 'rows', '3')).panel.railLengthsUnits).toHaveLength(3);
+    expect(ok(applyEdit(ctx({}), 'rows', '1')).panel.railLengthsUnits).toHaveLength(1);
+    expect(message(applyEdit(ctx({}), 'rows', '0'))).toBe('Rows: 1 to 20.');
+    expect(message(applyEdit(ctx({}), 'rows', 'abc'))).toBe('Enter a whole number.');
+    const withModuleOnSecondRow = ok(applyEdit(ctx({ placementId: 'p1' }), 'row', '2'));
+    expect(message(applyEdit(ctx({}, 'panel', withModuleOnSecondRow), 'rows', '1'))).toBe(
+      'Move the modules off the rows you remove first.',
+    );
+  });
+});
+
+describe('terminal labels', () => {
+  it('lists a field for every terminal of a module, named after the terminal', () => {
+    const terminals = fieldsOf(ctx({ placementId: 'p2' })).filter((f) => f.key.startsWith('terminal:'));
+    expect(terminals.map((f) => f.key)).toEqual([
+      'terminal:top:L1', 'terminal:top:L2', 'terminal:top:L3',
+      'terminal:bottom:L1', 'terminal:bottom:L2', 'terminal:bottom:L3',
+    ]);
+    expect(terminals[0]).toMatchObject({ label: 'L1 (top)', kind: 'text', value: '', placeholder: 'L1' });
+  });
+
+  it('follows the width of a bar: a wider copy has more terminals to label', () => {
+    const count = (c: InspectContext) => fieldsOf(c).filter((f) => f.key.startsWith('terminal:')).length;
+    expect(count(ctx({ placementId: 'p3' }))).toBe(6);
+    const wide = ok(applyEdit(ctx({ placementId: 'p3' }), 'width', '6'));
+    expect(count(ctx({ placementId: 'p3' }, 'panel', wide))).toBe(12);
+  });
+
+  it('labels and clears one terminal, and shows the label in the field', () => {
+    const labelled = ok(applyEdit(ctx({ placementId: 'p3' }), 'terminal:top:N2', 'Kitchen'));
+    expect(labelled.panel.placements[2]?.terminalLabels).toEqual({ 'top:N2': 'Kitchen' });
+    expect(field(ctx({ placementId: 'p3' }, 'panel', labelled), 'terminal:top:N2')?.value).toBe('Kitchen');
+    const cleared = ok(applyEdit(ctx({ placementId: 'p3' }, 'panel', labelled), 'terminal:top:N2', ''));
+    expect('terminalLabels' in cleared.panel.placements[2]!).toBe(false);
+  });
+
+  it('refuses an invalid terminal label', () => {
+    expect(message(applyEdit(ctx({ placementId: 'p3' }), 'terminal:top:N2', 'a\nb'))).toMatch(/1 to 60 characters/);
+  });
+
+  it('is available on a module node too, where it edits the placement', () => {
+    const next = ok(applyEdit(ctx({ nodeId: 'n3', placementId: 'p3' }, 'schematic'), 'terminal:top:N1', 'Hall'));
+    expect(next.panel.placements[2]?.terminalLabels).toEqual({ 'top:N1': 'Hall' });
+  });
+});
+
+describe('take off', () => {
+  const actions = (c: InspectContext) => inspect(c).actions.map((a) => a.key);
+
+  it('is offered for a module and a module node, and for nothing else', () => {
+    expect(actions(ctx({ placementId: 'p1' }))).toEqual(['takeOff']);
+    expect(actions(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'))).toEqual(['takeOff']);
+    for (const c of [ctx({ combId: 'c1' }), ctx({ rail: 0 }), ctx({}), ctx({ wireId: 'w1' }, 'schematic'), ctx({ nodeId: 'n4' }, 'schematic')]) {
+      expect(actions(c)).toEqual([]);
+    }
+  });
+
+  it('moves the module to the shelf and clears the selection on the panel', () => {
+    const result = applyAction(ctx({ placementId: 'p1' }), 'takeOff');
+    if (!result.ok) throw new Error(result.message);
+    expect(result.project.panel.placements.map((p) => p.id)).toEqual(['p2', 'p3']);
+    expect(result.project.panel.shelf.map((s) => s.id)).toEqual(['p1']);
+    expect(result.selection).toEqual({});
+  });
+
+  it('keeps the node selected in the schematic, and its wires, ready for when the module returns', () => {
+    const result = applyAction(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'), 'takeOff');
+    if (!result.ok) throw new Error(result.message);
+    expect(result.selection).toEqual({ nodeId: 'n1' });
+    expect(result.project.schematic).toEqual(build().schematic);
+  });
+
+  it('refuses an unknown action', () => {
+    const result = applyAction(ctx({ placementId: 'p1' }), 'explode');
+    expect(result.ok).toBe(false);
   });
 });

@@ -24,6 +24,7 @@ export function createPanel(railLengthsUnits: number[], pitchMm = DEFAULT_RAIL_P
     railLabels: railLengthsUnits.map(() => ''),
     placements: [],
     combs: [],
+    shelf: [],
   };
 }
 
@@ -75,6 +76,13 @@ export function moveRail(panel: Panel, from: number, to: number): PanelEditResul
   const placements = panel.placements.map((p) => ({ ...p, rail: newIndex(p.rail) }));
   const combs = panel.combs.map((c) => ({ ...c, rail: newIndex(c.rail) }));
   return { ok: true, panel: { ...panel, railLengthsUnits, railLabels, placements, combs } };
+}
+
+export function setPanelTitle(panel: Panel, text: string): PanelEditResult {
+  const parsed = normalizeLabel(text);
+  if (!parsed.ok) return failure('invalid-value');
+  const { title: _previous, ...rest } = panel;
+  return { ok: true, panel: parsed.label === undefined ? rest : { ...rest, title: parsed.label } };
 }
 
 export function setRailLabel(panel: Panel, rail: number, text: string): PanelEditResult {

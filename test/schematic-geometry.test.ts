@@ -10,9 +10,9 @@ import {
   pathMidpoint,
   portOf,
   schematicBounds,
-  wireChannels,
   wirePath,
 } from '../src/schematic/geometry';
+import { routeWires } from '../src/schematic/router';
 import { addNode, connect, connectAll, emptySchematic, syncModuleNodes, type Schematic } from '../src/schematic/model';
 import { panelOf, place, resolve } from './fixtures';
 
@@ -90,8 +90,9 @@ describe('hit testing', () => {
     if (!wired.ok) throw new Error(wired.error.kind);
     const layout = computeLayout(wired.schematic, terminalsOf);
     const start = portOf(layout, { node: 'n3', terminal: 'bottom:L1' })!.point;
-    expect(hitWire(wired.schematic, layout, { x: start.x, y: start.y + 8 }, 6)?.id).toBe('w1');
-    expect(hitWire(wired.schematic, layout, { x: start.x + 300, y: start.y + 8 }, 6)).toBeUndefined();
+    const routes = routeWires(wired.schematic, layout);
+    expect(hitWire(wired.schematic, routes, { x: start.x, y: start.y + 8 }, 6)?.id).toBe('w1');
+    expect(hitWire(wired.schematic, routes, { x: start.x + 300, y: start.y + 8 }, 6)).toBeUndefined();
   });
 });
 
@@ -119,16 +120,6 @@ describe('wire routing', () => {
     expect(topToTop[1]!.y).toBeLessThan(100);
     const bottomToBottom = wirePath(bottom(0, 100), bottom(100, 120), 0);
     expect(bottomToBottom[1]!.y).toBeGreaterThan(120);
-  });
-
-  it('spreads wires of one bundle over distinct channels, centred on zero', () => {
-    const { schematic, terminalsOf } = scene();
-    const result = connectAll(schematic, terminalsOf, 'n3', 'n1');
-    if (!result.ok) throw new Error(result.error.kind);
-    const values = [...wireChannels(result.schematic).values()];
-    expect(values).toHaveLength(3);
-    expect(new Set(values).size).toBe(3);
-    expect(values.reduce((a, b) => a + b, 0)).toBeCloseTo(0);
   });
 
   it('measures the distance from a point to a path', () => {

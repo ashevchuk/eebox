@@ -12,6 +12,7 @@ import {
   type CombPlacement,
   type ModuleRef,
   type Placement,
+  type ShelfItem,
 } from '../layout/placement';
 import {
   MODULE_SPEC,
@@ -92,6 +93,14 @@ const railLabelsCheck = (v: unknown) =>
   Array.isArray(v) && v.length <= MAX_RAILS && v.every((l) => l === '' || labelCheck(l) === null)
     ? null
     : 'must be a list with one entry per rail, each empty or a valid label';
+const MAX_TERMINAL_LABELS = 64;
+const terminalLabelsCheck = (v: unknown) =>
+  isRecord(v) &&
+  Object.keys(v).length >= 1 &&
+  Object.keys(v).length <= MAX_TERMINAL_LABELS &&
+  Object.entries(v).every(([id, label]) => id.length > 0 && id.length <= 40 && labelCheck(label) === null)
+    ? null
+    : `must map terminal ids to valid labels, at most ${MAX_TERMINAL_LABELS}`;
 const moduleRefCheck = (v: unknown) =>
   isRecord(v) &&
   Object.keys(v).length === 2 &&
@@ -114,13 +123,15 @@ const PROJECT_SPEC: FieldSpec = {
   schematic: { required: true, check: objectCheck },
 };
 const PANEL_SPEC: FieldSpec = {
+  title: { required: false, check: labelCheck },
   railLengthsUnits: { required: true, check: railLengthsCheck },
   railPitchesMm: { required: true, check: pitchListCheck },
   railLabels: { required: true, check: railLabelsCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
+  shelf: { required: true, check: arrayCheck },
 };
-const PLACEMENT_SPEC: FieldSpec = {
+const COMB_PLACEMENT_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
   rail: { required: true, check: nonNegativeInteger },
@@ -128,7 +139,17 @@ const PLACEMENT_SPEC: FieldSpec = {
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
 };
-const COMB_PLACEMENT_SPEC: FieldSpec = PLACEMENT_SPEC;
+const SHELF_ITEM_SPEC: FieldSpec = {
+  id: { required: true, check: identifier },
+  module: { required: true, check: moduleRefCheck },
+  label: { required: false, check: labelCheck },
+  widthUnits: { required: false, check: unitsCheck },
+  terminalLabels: { required: false, check: terminalLabelsCheck },
+};
+const PLACEMENT_SPEC: FieldSpec = {
+  ...COMB_PLACEMENT_SPEC,
+  terminalLabels: { required: false, check: terminalLabelsCheck },
+};
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },
   wires: { required: true, check: arrayCheck },
@@ -196,18 +217,23 @@ export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => M
     widthOf,
     sideOf: (ref) => resolve(ref)?.comb?.side,
   }).map((p) => `comb ${p.combId}: ${describe(p.error)}`);
+  const onShelf = (nodeId: string) => {
+    const placementId = project.schematic.nodes.find((n) => n.id === nodeId)?.placementId;
+    return project.panel.shelf.some((s) => s.id === placementId);
+  };
   const schematic = findSchematicProblems(
     project.schematic,
     project.panel,
     nodeTerminalsLookup(project.panel, resolve),
   ).map((p) =>
     p.kind === 'orphan-module'
-      ? `node ${p.nodeId}: its module is not on the panel`
+      ? `node ${p.nodeId}: its module is ${onShelf(p.nodeId) ? 'on the shelf' : 'not on the panel'}`
       : `wire ${p.wireId}: connects a missing node or terminal`,
   );
   const widths = [
     ...project.panel.placements.map((p) => ({ kind: 'placement', item: p })),
     ...project.panel.combs.map((c) => ({ kind: 'comb', item: c })),
+    ...project.panel.shelf.map((s) => ({ kind: 'shelf item', item: s })),
   ].flatMap(({ kind, item }) => {
     if (item.widthUnits === undefined) return [];
     const allowed = resolve(item.module)?.resizable;
@@ -238,6 +264,13 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const schematicRaw = child(project, 'schematic', SCHEMATIC_SPEC, 'project.schematic', errors);
   const placements = validateList<Placement>(panelRaw?.placements, PLACEMENT_SPEC, 'project.panel.placements', errors);
   const combs = validateList<CombPlacement>(panelRaw?.combs, COMB_PLACEMENT_SPEC, 'project.panel.combs', errors);
+  const shelf = validateList<ShelfItem>(panelRaw?.shelf, SHELF_ITEM_SPEC, 'project.panel.shelf', errors);
+  const placedIds = new Set(placements.map((p) => p.id));
+  shelf.forEach((item, index) => {
+    if (placedIds.has(item.id)) {
+      errors.push({ path: `project.panel.shelf[${index}].id`, message: `duplicate id "${item.id}"` });
+    }
+  });
   const nodes = validateList<SchematicNode>(
     schematicRaw?.nodes,
     NODE_SPEC,
@@ -265,7 +298,15 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   if (!root || !panelRaw || !schematicRaw || errors.length > 0) return { ok: false, errors };
 
   const parsed: Project = {
-    panel: { railLengthsUnits, railPitchesMm, railLabels, placements, combs },
+    panel: {
+      ...(panelRaw.title !== undefined ? { title: panelRaw.title as string } : {}),
+      railLengthsUnits,
+      railPitchesMm,
+      railLabels,
+      placements,
+      combs,
+      shelf,
+    },
     schematic: { nodes, wires },
   };
   return {

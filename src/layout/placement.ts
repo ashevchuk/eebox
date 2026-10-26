@@ -15,7 +15,12 @@ export interface Placement {
   label?: string;
   /** Own width of this copy; only for modules that are resizable in the library. */
   widthUnits?: number;
+  /** Labels of single terminals, keyed by terminal id (e.g. `top:N3`). */
+  terminalLabels?: Record<string, string>;
 }
+
+/** A module taken off its rail: it keeps its id, so a schematic node and wires find it again. */
+export type ShelfItem = Omit<Placement, 'rail' | 'slot'>;
 
 /** A comb bus bar lying over the terminals of the modules on one side of a rail. */
 export interface CombPlacement {
@@ -28,6 +33,8 @@ export interface CombPlacement {
 }
 
 export interface Panel {
+  /** Name of the whole panel, shown on the drawing and used for file names. */
+  title?: string;
   /** Snapshot of the enclosure rails, so later library edits cannot move placed modules. */
   railLengthsUnits: number[];
   /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */
@@ -36,6 +43,8 @@ export interface Panel {
   railLabels: string[];
   placements: Placement[];
   combs: CombPlacement[];
+  /** Modules that are off the rails for now; not part of the bill of materials. */
+  shelf: ShelfItem[];
 }
 
 /** The width of a placed item: its own override, else the width its module has in the library. */
@@ -96,7 +105,7 @@ function checkFit(
 }
 
 export function addPlacement(panel: Panel, widthOf: WidthOf, placement: Placement): PlacementResult {
-  if (panel.placements.some((p) => p.id === placement.id)) {
+  if (panel.placements.some((p) => p.id === placement.id) || panel.shelf.some((s) => s.id === placement.id)) {
     return { ok: false, error: { kind: 'duplicate-id' } };
   }
   const error = checkFit(panel, widthOf, placement);
@@ -202,6 +211,22 @@ export function setPlacementWidth(
   return { ok: true, panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? next : p)) } };
 }
 
+/** Labels one terminal of a placed module; blank text removes the label. */
+export function setTerminalLabel(panel: Panel, id: string, terminalId: string, text: string): PlacementResult {
+  const parsed = normalizeLabel(text);
+  if (!parsed.ok) return { ok: false, error: { kind: 'invalid-label' } };
+  if (!panel.placements.some((p) => p.id === id)) return { ok: false, error: { kind: 'unknown-placement' } };
+  const placements = panel.placements.map((p) => {
+    if (p.id !== id) return p;
+    const { terminalLabels: previous, ...rest } = p;
+    const labels = { ...previous };
+    if (parsed.label === undefined) delete labels[terminalId];
+    else labels[terminalId] = parsed.label;
+    return Object.keys(labels).length === 0 ? rest : { ...rest, terminalLabels: labels };
+  });
+  return { ok: true, panel: { ...panel, placements } };
+}
+
 export function setPlacementLabel(panel: Panel, id: string, text: string): PlacementResult {
   const parsed = normalizeLabel(text);
   if (!parsed.ok) return { ok: false, error: { kind: 'invalid-label' } };
@@ -233,7 +258,7 @@ export function findProblems(panel: Panel, widthOf: WidthOf): PanelProblem[] {
 }
 
 export function nextPlacementId(panel: Panel): string {
-  const used = panel.placements
+  const used = [...panel.placements, ...panel.shelf]
     .map((p) => /^p(\d+)$/.exec(p.id))
     .map((m) => (m ? Number(m[1]) : 0));
   return `p${Math.max(0, ...used) + 1}`;

@@ -19,8 +19,10 @@ import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
+import { ShelfView } from './ui/shelfView';
+import { fileStem } from './project/names';
 import { downloadBlob } from './ui/download';
-import { renderToPng } from './ui/exportImage';
+import { renderToPng, renderToSvg } from './ui/exportImage';
 import { PanelEditor } from './ui/panelEditor';
 import { PanelView } from './ui/panelView';
 import { SchematicView } from './ui/schematicView';
@@ -78,6 +80,8 @@ function syncUi(): void {
   undoButton.disabled = !session.canUndo;
   redoButton.disabled = !session.canRedo;
   document.body.dataset.mode = session.mode;
+  const { title } = session.project.panel;
+  document.title = title ? `${title} - eebox` : 'eebox';
   byId('mode-panel').classList.toggle('active', session.mode === 'panel');
   byId('mode-schematic').classList.toggle('active', session.mode === 'schematic');
   byId('bundle-mode').classList.toggle('active', schematicView.bundleMode);
@@ -317,7 +321,7 @@ async function openSharedHash(): Promise<void> {
 
 async function exportPng(): Promise<void> {
   try {
-    downloadBlob(await renderToPng(activeView(), session), `${session.mode}.png`);
+    downloadBlob(await renderToPng(activeView(), session), `${fileStem(session.project.panel.title, 'panel')}-${session.mode}.png`);
   } catch (error) {
     showStatus(`PNG export failed: ${(error as Error).message}`, true);
   }
@@ -334,13 +338,19 @@ function checkProject(): void {
   showStatus([...shown, ...(hidden > 0 ? [`${hidden} more`] : [])].join('\n'), true);
 }
 
+function exportSvg(): void {
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob([renderToSvg(activeView(), session)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
+}
+
 function exportBom(): void {
   const rows = buildBom(session.project.panel, session.resolve);
   if (rows.length === 0) {
     showStatus('Nothing is placed on the panel yet.');
     return;
   }
-  downloadBlob(new Blob(['\uFEFF', bomToCsv(rows)], { type: 'text/csv;charset=utf-8' }), 'bom.csv');
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', bomToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-bom.csv`);
 }
 
 async function removeLibrary(library: Library): Promise<void> {
@@ -394,6 +404,8 @@ byId<HTMLInputElement>('open-project').addEventListener('change', async (e) => {
   else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, file.name);
 });
 
+new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
+
 const inspector = new InspectorView(byId('inspector-content'), session, (message) =>
   confirmDialog(message, 'Continue'),
 );
@@ -415,10 +427,14 @@ byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
 byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
 byId('save-project').addEventListener('click', () =>
-  downloadBlob(new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }), 'panel.eebox.json'),
+  downloadBlob(
+    new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }),
+    `${fileStem(session.project.panel.title, 'panel')}.eebox.json`,
+  ),
 );
 byId('share-link').addEventListener('click', () => void shareLink());
 byId('export-png').addEventListener('click', () => void exportPng());
+byId('export-svg').addEventListener('click', exportSvg);
 byId('export-bom').addEventListener('click', exportBom);
 for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));

@@ -1,4 +1,11 @@
-import { applyEdit, inspect, type InspectContext, type InspectorField, type InspectorView as View } from './inspector';
+import {
+  applyAction,
+  applyEdit,
+  inspect,
+  type InspectContext,
+  type InspectorField,
+  type InspectorView as View,
+} from './inspector';
 import type { Session } from './session';
 
 interface Control {
@@ -36,16 +43,11 @@ export class InspectorView {
   /** `force` also rewrites the field being typed in, to revert an edit that was refused. */
   refresh(force: boolean): void {
     const view = inspect(this.context());
-    if (!view) {
-      this.signature = '';
-      this.controls.clear();
-      const hint = document.createElement('p');
-      hint.className = 'inspector-empty';
-      hint.textContent = 'Select a module, comb, row, node or wire to see and edit its properties.';
-      this.container.replaceChildren(hint);
-      return;
-    }
-    const signature = JSON.stringify([view.title, view.fields.map((f) => [f.key, f.kind, f.options])]);
+    const signature = JSON.stringify([
+      view.title,
+      view.fields.map((f) => [f.key, f.kind, f.options, f.label]),
+      view.actions,
+    ]);
     if (signature !== this.signature) {
       this.signature = signature;
       this.build(view);
@@ -98,6 +100,27 @@ export class InspectorView {
       row.append(label, cell);
       this.container.append(row);
     }
+    if (view.actions.length > 0) {
+      const bar = document.createElement('div');
+      bar.className = 'inspector-actions';
+      for (const action of view.actions) {
+        const button = document.createElement('button');
+        button.textContent = action.label;
+        button.addEventListener('click', () => this.act(action.key));
+        bar.append(button);
+      }
+      this.container.append(bar);
+    }
+  }
+
+  private act(key: string): void {
+    const result = applyAction(this.context(), key);
+    if (!result.ok) {
+      this.session.notify(result.message, true);
+      return;
+    }
+    this.session.commit(result.project);
+    if (result.selection) this.session.select(result.selection);
   }
 
   private sync(view: View, force: boolean): void {
