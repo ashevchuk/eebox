@@ -46,11 +46,21 @@ export const JOG_THRESHOLD_MM = 6;
 
 /** Where a drag of this piece starts. The lanes are those of the wire as drawn now, whether it is routed by hand or not. */
 export function beginDrag(a: Endpoint, b: Endpoint, path: Point[], segment: Segment, pointer: Point, route: Lanes | undefined): WireDrag {
-  const lanes = route ?? lanesFromPath(path) ?? lanesFromPath(wirePath(a, b, 0)) ?? [(a.point.y + b.point.y) / 2];
   const segments = segmentsOf(path).length;
-  if (segment.index === 0 || segment.index === segments - 1) return { kind: 'jog', atStart: segment.index === 0, startX: pointer.x, startY: pointer.y, lanes };
-  const index = segment.index - 1;
-  return { kind: 'lane', index, vertical: segment.vertical, grab: (segment.vertical ? pointer.x : pointer.y) - lanes[index]!, lanes };
+  const numberedLikePath = (lanes: Lanes) => lanes.length + 2 === segments;
+  const shown = route && numberedLikePath(route) ? route : lanesFromPath(path);
+  const lanes = shown ?? lanesFromPath(wirePath(a, b, 0)) ?? [(a.point.y + b.point.y) / 2];
+  const jog = (atStart: boolean): WireDrag => ({ kind: 'jog', atStart, startX: pointer.x, startY: pointer.y, lanes });
+  if (segment.index === 0 || segment.index === segments - 1) return jog(segment.index === 0);
+  const pointerAcross = segment.vertical ? pointer.x : pointer.y;
+  let index = segment.index - 1;
+  if (!shown) {
+    const sameWay = lanes.map((value, i) => ({ value, i })).filter(({ i }) => (i % 2 === 1) === segment.vertical);
+    const nearest = sameWay.sort((p, q) => Math.abs(p.value - pointerAcross) - Math.abs(q.value - pointerAcross))[0];
+    if (!nearest) return jog(Math.abs(pointer.y - a.point.y) <= Math.abs(pointer.y - b.point.y));
+    index = nearest.i;
+  }
+  return { kind: 'lane', index, vertical: segment.vertical, grab: pointerAcross - lanes[index]!, lanes };
 }
 
 /** The coordinate a dragged lane is wanted at, with the pointer where it is and the grab offset taken off. */
