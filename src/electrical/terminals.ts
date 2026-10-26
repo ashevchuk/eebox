@@ -1,4 +1,4 @@
-import type { Conductor, ModuleDef, TerminalSide } from '../library/types';
+import type { Conductor, ModuleDef, TerminalDef, TerminalSide } from '../library/types';
 
 export interface Terminal {
   /** Unique within a module: `<side>:<name>`. */
@@ -29,11 +29,29 @@ export function defaultPoleConductors(poles: ModuleDef['poles']): Conductor[] {
 
 type Draft = Omit<Terminal, 'unit'> & { unit?: number };
 
+/** How many terminals an entry of `terminals` stands for at this width: only a group with a count scales. */
+function entryCount(t: TerminalDef, scale: number): number {
+  return scale === 1 || t.count === undefined ? (t.count ?? 1) : Math.max(1, Math.round(t.count * scale));
+}
+
+const scaleOf = (def: ModuleDef, widthUnits: number) => (def.resizable ? widthUnits / def.widthUnits : 1);
+
+/**
+ * For each terminal `terminalsOf` returns, the index of the entry of `def.terminals` it comes from;
+ * empty when the terminals are derived from the poles. A designer uses it to tell which entry a
+ * terminal belongs to.
+ */
+export function terminalSources(def: ModuleDef, widthUnits: number = def.widthUnits): number[] {
+  if (def.kind === 'comb' || !def.terminals) return [];
+  const scale = scaleOf(def, widthUnits);
+  return def.terminals.flatMap((t, index) => Array<number>(entryCount(t, scale)).fill(index));
+}
+
 function draftsOf(def: ModuleDef, widthUnits: number): Draft[] {
   if (def.terminals) {
-    const scale = def.resizable ? widthUnits / def.widthUnits : 1;
+    const scale = scaleOf(def, widthUnits);
     return def.terminals.flatMap((t) => {
-      const count = scale === 1 || t.count === undefined ? (t.count ?? 1) : Math.max(1, Math.round(t.count * scale));
+      const count = entryCount(t, scale);
       return Array.from({ length: count }, (_, i): Draft => {
         const name = count > 1 ? `${t.name}${i + 1}` : t.name;
         return {

@@ -11,6 +11,10 @@ export interface PaletteHandlers {
   /** For the bundled library, which is replaced at start-up: make a copy that can be edited. */
   onCopy(library: Library): void;
   isBundled(library: Library): boolean;
+  /** Open the designer on a module of a library the user owns. */
+  onEditModule(library: Library, def: ModuleDef): void;
+  /** Make a copy of a module of the bundled library in the user's own library and design that. */
+  onCopyModule(library: Library, def: ModuleDef): void;
 }
 
 const OPEN_STATE_KEY = 'eebox:palette-open';
@@ -145,6 +149,14 @@ export class PaletteView {
     detail.textContent = ` ${def.widthUnits}u`;
     item.append(detail);
     const ref: ModuleRef = { libraryId: library.id, moduleId: def.id };
+    const bundled = this.handlers.isBundled(library);
+    const action = document.createElement('button');
+    action.className = 'module-action';
+    action.textContent = bundled ? 'copy' : 'edit';
+    action.title = bundled ? 'Design a copy of this module in My modules' : 'Open this module in the designer';
+    action.addEventListener('pointerdown', (e) => e.stopPropagation());
+    action.addEventListener('click', () => (bundled ? this.handlers.onCopyModule(library, def) : this.handlers.onEditModule(library, def)));
+    item.append(action);
     item.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       item.setPointerCapture(e.pointerId);

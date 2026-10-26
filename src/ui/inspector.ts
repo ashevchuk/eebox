@@ -217,6 +217,8 @@ function terminalLabelFields(placement: Placement, def: ModuleDef | undefined, w
 }
 
 const TAKE_OFF: InspectorAction = { key: 'takeOff', label: 'Take off the rail' };
+export const EDIT_MODULE_ACTION = 'editModule';
+const EDIT_MODULE: InspectorAction = { key: EDIT_MODULE_ACTION, label: 'Edit module…' };
 
 export function inspect(ctx: InspectContext): InspectorView {
   const target = targetOf(ctx);
@@ -257,7 +259,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         : [];
       return {
         title: node ? 'Module node' : 'Module',
-        actions: [TAKE_OFF],
+        actions: def ? [EDIT_MODULE, TAKE_OFF] : [TAKE_OFF],
         fields: [
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),

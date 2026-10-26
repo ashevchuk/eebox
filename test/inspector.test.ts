@@ -380,8 +380,8 @@ describe('take off', () => {
   const actions = (c: InspectContext) => inspect(c).actions.map((a) => a.key);
 
   it('is offered for a module and a module node, and for nothing else', () => {
-    expect(actions(ctx({ placementId: 'p1' }))).toEqual(['takeOff']);
-    expect(actions(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'))).toEqual(['takeOff']);
+    expect(actions(ctx({ placementId: 'p1' }))).toEqual(['editModule', 'takeOff']);
+    expect(actions(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'))).toEqual(['editModule', 'takeOff']);
     for (const c of [ctx({ combId: 'c1' }), ctx({ rail: 0 }), ctx({}), ctx({ wireId: 'w1' }, 'schematic'), ctx({ nodeId: 'n4' }, 'schematic')]) {
       expect(actions(c)).toEqual([]);
     }
@@ -555,5 +555,16 @@ describe('inspector: cross-section of a wire', () => {
     expect(field(shown, 'section')?.value).toBe('4');
     expect(ok(applyEdit(shown, 'section', '')).schematic.wires[0]).not.toHaveProperty('crossSectionMm2');
     expect(message(applyEdit(wired(), 'section', '3'))).toBe('That cross-section is not in the table.');
+  });
+});
+
+describe('inspector: edit module', () => {
+  it('is offered only when the module is known, so a module that is missing from every library has nothing to edit', () => {
+    const missing: Project = { ...build(), panel: { ...build().panel, placements: [place('p1', 'ghost', 0, 0)] } };
+    expect(inspect(ctx({ placementId: 'p1' }, 'panel', missing)).actions.map((a) => a.key)).toEqual(['takeOff']);
+  });
+
+  it('is not run by the model: opening a designer is the job of the view', () => {
+    expect(applyAction(ctx({ placementId: 'p1' }), 'editModule')).toMatchObject({ ok: false });
   });
 });

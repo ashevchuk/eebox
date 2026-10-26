@@ -27,6 +27,9 @@ import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
 import { circuitSchedule, ferruleCounts, scheduleToCsv } from './electrical/schedule';
 import { LIGHT_THEME } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
+import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
+import { openModuleDesigner } from './ui/moduleDesignerView';
+import { MODULE_TEMPLATES } from './ui/moduleTemplates';
 import { editCableSettings } from './ui/cableSettingsDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
@@ -355,6 +358,45 @@ function exportBom(): void {
   downloadBlob(new Blob(['\uFEFF', bomToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-bom.csv`);
 }
 
+function openDesigner(library: Library, moduleId: string, options: { isNew: boolean; offerTemplates?: boolean }): void {
+  openModuleDesigner(library, { moduleId, ...options }, {
+    save: async (saved) => {
+      await storage.put(saved);
+      await refreshLibraries();
+    },
+    askConfirmation: (message, confirmLabel) => confirmDialog(message, confirmLabel),
+  });
+}
+
+/** The user's own library as a draft to put a new module in; it is created when it does not exist yet. */
+function myLibraryDraft(): Library {
+  return structuredClone(session.libraries.find((l) => l.id === MY_LIBRARY_ID) ?? emptyMyLibrary());
+}
+
+function designNewModule(): void {
+  const draft = myLibraryDraft();
+  const id = uniqueId('new-module', draft.modules.map((m) => m.id));
+  draft.modules.push(MODULE_TEMPLATES[0]!.build(id));
+  openDesigner(draft, id, { isNew: true, offerTemplates: true });
+}
+
+function designCopyOf(def: ModuleDef): void {
+  const draft = myLibraryDraft();
+  const id = uniqueId(`${def.id}-copy`, draft.modules.map((m) => m.id));
+  draft.modules.push({ ...structuredClone(def), id, name: `${def.name} (copy)` });
+  openDesigner(draft, id, { isNew: true });
+}
+
+/** A module of a library the user owns is edited in place; one of the bundled library is copied first. */
+function designModuleOf(ref: ModuleRef): void {
+  const library = session.libraries.find((l) => l.id === ref.libraryId);
+  const stored = library?.modules.find((m) => m.id === ref.moduleId);
+  if (library && stored && library.id !== bundledLibraryId) return openDesigner(structuredClone(library), stored.id, { isNew: false });
+  const def = session.resolve(ref);
+  if (def) designCopyOf(def);
+  else showStatus('That module is not in any library, so it cannot be edited.', true);
+}
+
 function openEditor(library: Library, options: EditorOptions): void {
   openLibraryEditor(library, options, {
     libraries: () => session.libraries,
@@ -441,6 +483,8 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
   onExport: downloadLibrary,
   onRemove: (library) => void removeLibrary(library),
   onEdit: (library) => openEditor(structuredClone(library), { isNew: false, originalId: library.id }),
+  onEditModule: (library, def) => designModuleOf({ libraryId: library.id, moduleId: def.id }),
+  onCopyModule: (_library, def) => designCopyOf(def),
   onCopy: (library) => {
     const id = uniqueId(`my-${library.id}`, session.libraries.map((l) => l.id));
     openEditor(copyLibrary(library, id, `My ${library.name}`), { isNew: true, originalId: null });
@@ -450,9 +494,7 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
-const inspector = new InspectorView(byId('inspector-content'), session, (message) =>
-  confirmDialog(message, 'Continue'),
-);
+const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf);
 
 // Commit a typed value before a click elsewhere changes the selection under it.
 window.addEventListener(
@@ -475,6 +517,7 @@ byId('cable-settings').addEventListener('click', async () => {
   session.changed();
 });
 byId('print').addEventListener('click', printProject);
+byId('new-module').addEventListener('click', designNewModule);
 byId('print-labels').addEventListener('click', printLabels);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {

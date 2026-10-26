@@ -1,5 +1,6 @@
 import { FieldsView } from './fieldsView';
-import { applyAction, applyEdit, inspect, type InspectContext } from './inspector';
+import type { ModuleRef } from '../layout/placement';
+import { applyAction, applyEdit, EDIT_MODULE_ACTION, inspect, type InspectContext } from './inspector';
 import type { Session } from './session';
 
 /** Shows what `inspect` describes for the selection and sends every edit through `applyEdit`. */
@@ -10,6 +11,8 @@ export class InspectorView {
     container: HTMLElement,
     private readonly session: Session,
     private readonly confirm: (message: string) => Promise<boolean>,
+    /** Opens the designer on the module of a placed copy; the model cannot do that by itself. */
+    private readonly onEditModule: (module: ModuleRef) => void = () => {},
   ) {
     this.fields = new FieldsView(container, {
       onEdit: (key, raw) => void this.edit(key, raw),
@@ -35,6 +38,13 @@ export class InspectorView {
   }
 
   private async act(key: string): Promise<void> {
+    if (key === EDIT_MODULE_ACTION) {
+      const { project, selection } = this.session;
+      const placementId = selection.placementId ?? project.schematic.nodes.find((n) => n.id === selection.nodeId)?.placementId;
+      const placement = project.panel.placements.find((p) => p.id === placementId);
+      if (placement) this.onEditModule(placement.module);
+      return;
+    }
     let result = applyAction(this.context(), key);
     if (!result.ok && result.needsConfirm) {
       if (!(await this.confirm(result.needsConfirm.message))) return;
