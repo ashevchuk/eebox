@@ -1,4 +1,5 @@
 import { SvgContext } from '../view/svgContext';
+import { DARK_THEME, withTheme, type Theme } from '../view/theme';
 import type { Session } from './session';
 import type { View } from './view';
 
@@ -44,14 +45,14 @@ export function renderToPng(view: View, session: Session): Promise<Blob> {
 }
 
 /** The same drawing as the screen, recorded as vector graphics. */
-export function renderToSvg(view: View, session: Session): string {
+export function renderToSvg(view: View, session: Session, theme: Theme = DARK_THEME, idPrefix = ''): string {
   const framing = framingOf(view);
   const measuring = document.createElement('canvas').getContext('2d')!;
   const measure = (text: string, font: string) => {
     measuring.font = font;
     return measuring.measureText(text).width;
   };
-  const svg = new SvgContext(framing.width, framing.height, measure);
-  drawFramed(view, session, svg as unknown as CanvasRenderingContext2D, framing);
+  const svg = new SvgContext(framing.width, framing.height, measure, idPrefix);
+  withTheme(theme, () => drawFramed(view, session, svg as unknown as CanvasRenderingContext2D, framing));
   return svg.toSvg();
 }

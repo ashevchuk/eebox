@@ -77,6 +77,8 @@ export class SvgContext {
     private readonly width: number,
     private readonly height: number,
     private readonly measure: (text: string, font: string) => number,
+    /** Ids are global in a page, so drawings that share one page need different prefixes. */
+    private readonly idPrefix = '',
   ) {}
 
   save(): void {
@@ -159,7 +161,7 @@ export class SvgContext {
 
   /** Only rectangular clips are supported: the views clip text to a box. */
   clip(): void {
-    const id = `clip${++this.clips}`;
+    const id = `${this.idPrefix}clip${++this.clips}`;
     this.defs.push(`<clipPath id="${id}"><path d="${this.path.join('')}"${this.transformAttribute()}/></clipPath>`);
     this.body.push(`<g clip-path="url(#${id})">`);
     this.openGroups++;

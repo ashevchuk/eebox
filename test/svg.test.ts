@@ -286,3 +286,28 @@ describe('the views drawn through SvgContext', () => {
     expect(svg.toSvg()).toContain('(on the shelf)');
   });
 });
+
+describe('SvgContext id prefix', () => {
+  const clipped = (prefix?: string) => {
+    const ctx = new SvgContext(100, 100, () => 0, prefix);
+    ctx.beginPath();
+    ctx.rect(0, 0, 10, 10);
+    ctx.clip();
+    return ctx.toSvg();
+  };
+
+  it('puts the prefix on the clip id and on the reference to it', () => {
+    const svg = clipped('schematic-');
+    expect(svg).toContain('<clipPath id="schematic-clip1">');
+    expect(svg).toContain('clip-path="url(#schematic-clip1)"');
+  });
+
+  it('gives two drawings on one page ids that do not collide', () => {
+    const ids = (svg: string) => svg.match(/id="[^"]+"/g);
+    expect(ids(clipped('panel-'))).not.toEqual(ids(clipped('schematic-')));
+  });
+
+  it('keeps the plain ids without a prefix', () => {
+    expect(clipped()).toContain('<clipPath id="clip1">');
+  });
+});

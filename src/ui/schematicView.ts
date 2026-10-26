@@ -28,10 +28,10 @@ import {
   type TerminalRef,
   type TerminalsOfNode,
 } from '../schematic/model';
-import { CONDUCTORS } from '../library/types';
+import { CONDUCTORS, type Conductor } from '../library/types';
 import type { Project } from '../project';
 import { Camera, type Bounds, type Point } from '../view/Camera';
-import { CONDUCTOR_COLORS } from '../view/colors';
+import { theme } from '../view/theme';
 import { LEVER_COLORS } from '../view/render';
 import type { Session } from './session';
 import type { View } from './view';
@@ -59,7 +59,6 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-load': 'The load data is out of range.',
 };
 const COLORS = {
-  background: '#0b0c10',
   selection: '#f5c518',
   orphan: '#ef4444',
   text: '#14161d',
@@ -101,7 +100,7 @@ export class SchematicView implements View {
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = COLORS.background;
+    ctx.fillStyle = theme().background;
     ctx.fillRect(0, 0, width, height);
     ctx.translate(width / 2 - this.camera.x * this.camera.scale, height / 2 - this.camera.y * this.camera.scale);
     ctx.scale(this.camera.scale, this.camera.scale);
@@ -113,7 +112,7 @@ export class SchematicView implements View {
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
-      if (path && conductor) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : CONDUCTOR_COLORS[conductor], 2.5);
+      if (path && conductor) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : theme().conductors[conductor], 2.5);
     }
     const currents = this.currents();
     for (const wire of frame.schematic.wires) {
@@ -260,7 +259,7 @@ export class SchematicView implements View {
   /** Comb contacts have no wires of their own; show the terminals each comb pin ties together. */
   private drawCombLinks(ctx: CanvasRenderingContext2D, frame: Frame): void {
     const { panel } = this.session.project;
-    const groups = new Map<string, { pin: keyof typeof CONDUCTOR_COLORS; points: Array<{ point: Point; dir: number }> }>();
+    const groups = new Map<string, { pin: Conductor; points: Array<{ point: Point; dir: number }> }>();
     for (const contact of combContacts(panel, this.session.resolve)) {
       const node = frame.schematic.nodes.find((n) => n.placementId === contact.placementId);
       const port = node && portOf(frame.layout, { node: node.id, terminal: contact.terminalId });
@@ -277,7 +276,7 @@ export class SchematicView implements View {
         const b = sorted[i]!;
         const lane = COMB_LINK_OFFSET + CONDUCTORS.indexOf(pin) * COMB_LINK_LANE;
         const y = (a.dir === 1 ? Math.max : Math.min)(a.point.y, b.point.y) + a.dir * lane;
-        this.strokePath(ctx, [a.point, { x: a.point.x, y }, { x: b.point.x, y }, b.point], CONDUCTOR_COLORS[pin], 2, [5, 4]);
+        this.strokePath(ctx, [a.point, { x: a.point.x, y }, { x: b.point.x, y }, b.point], theme().conductors[pin], 2, [5, 4]);
       }
     }
   }
@@ -326,9 +325,9 @@ export class SchematicView implements View {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const width = ctx.measureText(text).width + 8;
-    ctx.fillStyle = 'rgba(11, 12, 16, 0.85)';
+    ctx.fillStyle = theme().wireLabelBackground;
     ctx.fillRect(at.x - width / 2, at.y - 7, width, 14);
-    ctx.fillStyle = '#e5e7eb';
+    ctx.fillStyle = theme().wireLabelText;
     ctx.fillText(text, at.x, at.y);
     ctx.restore();
   }
@@ -380,7 +379,7 @@ export class SchematicView implements View {
     for (const { terminal, point } of layout.ports) {
       ctx.beginPath();
       ctx.arc(point.x, point.y, PORT_RADIUS - 1, 0, Math.PI * 2);
-      ctx.fillStyle = CONDUCTOR_COLORS[terminal.conductor];
+      ctx.fillStyle = theme().conductors[terminal.conductor];
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#14161d';

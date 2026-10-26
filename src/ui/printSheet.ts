@@ -1,4 +1,5 @@
 import { buildBom, type BomRow } from '../project/bom';
+import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
 import type { Session } from './session';
 import type { View } from './view';
@@ -28,9 +29,10 @@ export function bomCells(row: BomRow): string[] {
   ];
 }
 
-function drawingOf(view: View, session: Session, caption: string): HTMLElement {
+/** `idPrefix` keeps the ids inside one drawing from capturing the references of another on the same page. */
+function drawingOf(view: View, session: Session, caption: string, idPrefix: string): HTMLElement {
   const figure = document.createElement('figure');
-  const parsed = new DOMParser().parseFromString(renderToSvg(view, session), 'image/svg+xml');
+  const parsed = new DOMParser().parseFromString(renderToSvg(view, session, LIGHT_THEME, idPrefix), 'image/svg+xml');
   figure.append(document.importNode(parsed.documentElement, true));
   const text = document.createElement('figcaption');
   text.textContent = caption;
@@ -58,8 +60,8 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   const { panel, schematic } = session.project;
   const title = document.createElement('h1');
   title.textContent = panel.title ?? 'Panel';
-  const parts: HTMLElement[] = [title, drawingOf(views.panel, session, 'Panel layout')];
-  if (schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, 'Wiring schematic'));
+  const parts: HTMLElement[] = [title, drawingOf(views.panel, session, 'Panel layout', 'panel-')];
+  if (schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, 'Wiring schematic', 'schematic-'));
   const rows = buildBom(panel, session.resolve);
   if (rows.length > 0) {
     const heading = document.createElement('h2');

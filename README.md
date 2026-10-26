@@ -47,7 +47,6 @@ Pushes to `main` run the tests and deploy `dist-file/` to GitHub Pages.
 - The cable table (copper, PVC, 30 °C, methods B1, B2, C and E, 1.5 to 35 mm²) was entered without the standard at hand and is **not verified** against IEC 60364-5-52. Check it before relying on a cable size. There is no voltage drop, grouping or temperature correction and no selectivity calculation.
 - Currents assume 230 V single-phase and balanced 400 V three-phase loads. Wires behind a phase bar, and wires in a loop, show no current.
 - The checks are advice, not a design verification.
-- Printing keeps the dark background of the drawings.
 - A project keeps its own copy of the modules it uses, so a changed library reaches it only through *Update modules from libraries*.
 
 ## License

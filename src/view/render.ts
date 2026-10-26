@@ -2,7 +2,7 @@ import { terminalsOf } from '../electrical/terminals';
 import { MODULE_UNIT_MM, type ModuleDef, type ModuleKind } from '../library/types';
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
-import { CONDUCTOR_COLORS } from './colors';
+import { theme } from './theme';
 import { FRAME_PADDING, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
 
 export interface Ghost {
@@ -45,16 +45,11 @@ const PIN_RADIUS = 2.4;
 const PIN_SPACING = 5;
 
 const COLORS = {
-  background: '#0b0c10',
-  frame: '#2a2f3b',
-  frameFill: '#14161d',
   rail: '#9aa1b3',
   body: '#e5e7eb',
   text: '#14161d',
   missing: '#7f1d1d',
   selection: '#f5c518',
-  label: '#e5e7eb',
-  rowLabel: '#9aa1b3',
   ghostOk: 'rgba(34, 197, 94, 0.55)',
   ghostBad: 'rgba(239, 68, 68, 0.55)',
 };
@@ -123,15 +118,15 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene): void {
   panel.railLabels.forEach((label, rail) => {
     if (!label) return;
     const r = railRect(panel, rail);
-    drawUpwardsLabel(ctx, label, FRAME_PADDING / 2, r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', COLORS.rowLabel);
+    drawUpwardsLabel(ctx, label, FRAME_PADDING / 2, r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
   });
   for (const placement of panel.placements) {
     if (!placement.label) continue;
     const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
-    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail), 'right', COLORS.label);
+    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail), 'right', theme().label);
   }
   ctx.font = LABEL_FONT;
-  ctx.fillStyle = COLORS.label;
+  ctx.fillStyle = theme().label;
   ctx.textAlign = 'left';
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);
@@ -159,7 +154,7 @@ function drawTerminals(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, w
     const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
     const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * PIN_SPACING;
     const x = r.x + (terminal.unit + 0.5) * MODULE_UNIT_MM + offset;
-    drawPin(ctx, x, terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, CONDUCTOR_COLORS[terminal.conductor]);
+    drawPin(ctx, x, terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, theme().conductors[terminal.conductor]);
   }
 }
 
@@ -180,7 +175,7 @@ function drawComb(
   ctx.strokeRect(r.x, r.y, r.width, r.height);
   for (let unit = 0; unit < widthUnits; unit++) {
     const pin = def.comb.pattern[unit % def.comb.pattern.length]!;
-    drawPin(ctx, r.x + (unit + 0.5) * MODULE_UNIT_MM, r.y + r.height / 2, CONDUCTOR_COLORS[pin]);
+    drawPin(ctx, r.x + (unit + 0.5) * MODULE_UNIT_MM, r.y + r.height / 2, theme().conductors[pin]);
   }
 }
 
@@ -215,7 +210,7 @@ export function render(
   dpr: number,
 ): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = COLORS.background;
+  ctx.fillStyle = theme().background;
   ctx.fillRect(0, 0, viewportW, viewportH);
 
   ctx.translate(viewportW / 2 - camera.x * camera.scale, viewportH / 2 - camera.y * camera.scale);
@@ -223,13 +218,13 @@ export function render(
 
   const { panel } = scene;
   const frame = frameRect(panel);
-  fillRect(ctx, frame, COLORS.frameFill);
-  ctx.strokeStyle = COLORS.frame;
+  fillRect(ctx, frame, theme().frameFill);
+  ctx.strokeStyle = theme().frame;
   ctx.lineWidth = 2;
   ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
   if (panel.title) {
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillStyle = COLORS.label;
+    ctx.fillStyle = theme().label;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(fitText(ctx, panel.title, frame.width - 28), 14, 24);
@@ -238,7 +233,7 @@ export function render(
   panel.railLengthsUnits.forEach((_length, rail) => {
     const r = railRect(panel, rail);
     fillRect(ctx, r, COLORS.rail);
-    ctx.fillStyle = COLORS.frameFill;
+    ctx.fillStyle = theme().frameFill;
     for (let unit = 0; unit < r.width / MODULE_UNIT_MM; unit++) {
       ctx.fillRect(r.x + unit * MODULE_UNIT_MM + MODULE_UNIT_MM / 2 - 3, r.y + r.height / 2 - 1.5, 6, 3);
     }
