@@ -24,6 +24,7 @@ import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
 import { PaletteView } from './ui/paletteView';
+import { fillPrintSheet } from './ui/printSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
 import { downloadBlob } from './ui/download';
@@ -297,6 +298,13 @@ function checkProject(): void {
   showStatus([...shown, ...(hidden > 0 ? [`${hidden} more`] : [])].join('\n'), true);
 }
 
+function printProject(): void {
+  const sheet = byId('print-sheet');
+  fillPrintSheet(sheet, session, views);
+  window.addEventListener('afterprint', () => sheet.replaceChildren(), { once: true });
+  window.print();
+}
+
 function exportSvg(): void {
   const stem = fileStem(session.project.panel.title, 'panel');
   downloadBlob(new Blob([renderToSvg(activeView(), session)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
@@ -423,6 +431,7 @@ window.addEventListener(
 
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
+byId('print').addEventListener('click', printProject);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
     isNew: true,

@@ -1,5 +1,6 @@
 import { buildNets, findNetProblems } from '../electrical/nets';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
+import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
@@ -242,18 +243,13 @@ export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => M
       ? [`${kind} ${item.id}: width ${item.widthUnits} is outside ${allowed.minUnits}-${allowed.maxUnits}`]
       : [];
   });
-  const nameOf = (owner: { kind: 'placement' | 'node'; id: string }) => {
-    if (owner.kind === 'node') return project.schematic.nodes.find((n) => n.id === owner.id)?.label ?? owner.id;
-    const placement = project.panel.placements.find((p) => p.id === owner.id);
-    return placement?.label ?? (placement && resolve(placement.module)?.name) ?? owner.id;
-  };
   const nets = findNetProblems(buildNets(project, resolve)).map(
     (p) =>
       `${p.kind === 'mixed-phases' ? 'different phases joined' : 'phase, neutral or earth joined'}: ${p.net.terminals
-        .map((t) => `${nameOf(t.owner)} [${t.owner.id}] ${t.terminal.id}`)
+        .map((t) => `${ownerName(project, resolve, t.owner)} [${t.owner.id}] ${t.terminal.id}`)
         .join(', ')}`,
   );
-  return [...panel, ...combs, ...widths, ...schematic, ...nets];
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {
