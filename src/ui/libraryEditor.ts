@@ -144,8 +144,8 @@ function moduleView(module: ModuleDef): InspectorView {
     select('curve', 'Trip curve', module.curve ?? '', ['', ...TRIP_CURVES]),
     number('breakingCapacityKA', 'Breaking capacity', optional(module.breakingCapacityKA), 'kA'),
     number('residualCurrentMa', 'Residual current', optional(module.residualCurrentMa), 'mA'),
-    integer('resizeMin', 'Narrowest copy', optional(module.resizable?.minUnits), 'units; busbars and combs only'),
-    integer('resizeMax', 'Widest copy', optional(module.resizable?.maxUnits), 'units; empty both for a fixed width'),
+    integer('resizeMin', 'Narrowest copy', optional(module.resizable?.minUnits), 'units; empty both for a fixed width'),
+    integer('resizeMax', 'Widest copy', optional(module.resizable?.maxUnits), 'units; a placed copy can have any width in the range'),
   ];
   const actions: InspectorAction[] = [
     { key: 'duplicate', label: 'Duplicate' },
@@ -247,7 +247,6 @@ function withKind(module: ModuleDef, kind: ModuleKind): ModuleDef {
     next = withOptional(withOptional(next, 'terminals', undefined), 'comb', next.comb ?? { ...DEFAULT_COMB, pattern: [...DEFAULT_COMB.pattern] });
   } else {
     next = withOptional(next, 'comb', undefined);
-    if (kind !== 'busbar') next = withOptional(next, 'resizable', undefined);
   }
   return next;
 }

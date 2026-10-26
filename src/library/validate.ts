@@ -124,10 +124,6 @@ export const COMB_SPEC: FieldSpec = {
 
 function checkResizable(def: Record<string, unknown>, path: string, errors: ValidationError[]): boolean {
   if (def.resizable === undefined) return false;
-  if (def.kind !== 'busbar' && def.kind !== 'comb') {
-    errors.push({ path: `${path}.resizable`, message: 'is only allowed for busbars and combs' });
-    return false;
-  }
   const spec = validateObject(def.resizable, RESIZE_SPEC, `${path}.resizable`, errors);
   if (!spec) return false;
   const { minUnits, maxUnits } = spec as { minUnits: number; maxUnits: number };

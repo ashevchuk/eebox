@@ -205,6 +205,19 @@ describe('resizable modules', () => {
     expect(terminalsOf(bar({ resizable: { minUnits: 1, maxUnits: 24 } }), 1).filter((t) => t.side === 'top')).toHaveLength(1);
   });
 
+  it('keeps a single terminal single when the copy is wider, and scales only groups with a count', () => {
+    const relay: ModuleDef = {
+      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
+      terminals: [
+        { name: 'A1', conductor: 'L', side: 'top' },
+        { name: '14', conductor: 'C', side: 'bottom' },
+        { name: 'G', conductor: 'N', side: 'bottom', count: 2 },
+      ],
+    };
+    expect(terminalsOf(relay, 1).map((t) => t.id)).toEqual(['top:A1', 'bottom:14', 'bottom:G1', 'bottom:G2']);
+    expect(terminalsOf(relay, 3).map((t) => t.id)).toEqual(['top:A1', 'bottom:14', 'bottom:G1', 'bottom:G2', 'bottom:G3', 'bottom:G4', 'bottom:G5', 'bottom:G6']);
+  });
+
   it('does not scale a module that is not resizable', () => {
     const fixed = bar({ resizable: undefined });
     expect(terminalsOf(fixed, 12)).toHaveLength(12);
@@ -232,8 +245,9 @@ describe('resizable validation', () => {
     expect(validateLibrary(lib({ kind: 'comb', comb: { pattern: ['L'], side: 'top' } })).ok).toBe(true);
   });
 
-  it('rejects it on anything that is not a bar or a comb', () => {
-    expect(errorPaths(lib({ kind: 'breaker' }))).toEqual(['modules[0].resizable']);
+  it('accepts it on any kind of module, because devices of one kind differ in width between makes', () => {
+    expect(validateLibrary(lib({ kind: 'breaker' })).ok).toBe(true);
+    expect(validateLibrary(lib({ kind: 'relay', widthUnits: 2, resizable: { minUnits: 1, maxUnits: 4 } })).ok).toBe(true);
   });
 
   it('rejects a reversed or out-of-bounds range and a width outside it', () => {

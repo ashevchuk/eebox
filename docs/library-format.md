@@ -37,7 +37,7 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | `sku`, `ratedCurrentA`, `curve`, `breakingCapacityKA`, `residualCurrentMa` | optional | `curve` is one of `B C D K Z`; searchable in the palette |
 | `terminals` | array | replaces the terminals derived from `poles` |
 | `comb` | object | required for, and only allowed on, kind `comb` |
-| `resizable` | object | only for `busbar` and `comb` |
+| `resizable` | object | optional, any kind; lets a placed copy have its own width |
 
 ### Derived terminals
 
@@ -74,8 +74,15 @@ the top side and gives them no `net`, because nothing joins them inside the modu
 
 ### Resizable
 
-`resizable: { minUnits, maxUnits }` lets a placed copy have its own width in that range; `widthUnits`
-must lie inside it. Terminal groups scale with the width: a 6-unit bar with 12 terminals gets 18 at 9 units.
+`resizable: { minUnits, maxUnits }` lets a placed copy have its own width in that range, because
+devices of one kind differ in width between makes: a voltage relay of one make is 1 unit wide, of
+another 2. Set the width of a placed copy in the inspector (*Width*). `widthUnits` must lie inside the range.
+
+Terminal groups, the entries that have a `count`, scale with the width: a 6-unit bar with 12 terminals
+gets 18 at 9 units. A terminal without a `count` stays single. A resizable module cannot use `unit`
+positions, since its terminals are spread over the width.
+
+Leave `resizable` out for devices whose width follows from their poles, such as breakers.
 
 ## Enclosure
 

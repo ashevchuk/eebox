@@ -343,6 +343,33 @@ function transferController(): ModuleDef[] {
   ];
 }
 
+/**
+ * Widths that a placed copy of a device may take, because devices of one kind differ between makes.
+ * Protective devices keep their width: it follows the number of poles. Contactors place their
+ * terminals by position and stay fixed too.
+ */
+const WIDTH_RANGES: Record<string, readonly [number, number]> = {
+  'ats-controller-3pn': [2, 8],
+  'time-switch-1p': [1, 4],
+  'kwh-1p-40': [1, 4],
+  'kwh-3p-63': [3, 8],
+  'pilot-light-230': [1, 2],
+  'psu-24v-1a': [1, 8],
+  'psu-24v-2a5': [2, 8],
+  'din-socket-16': [2, 6],
+};
+const RELAY_WIDTH_RANGE = [1, 4] as const;
+const CHANGEOVER_EXTRA_UNITS = 6;
+
+function withWidthRange(def: ModuleDef): ModuleDef {
+  if (def.resizable) return def;
+  const range =
+    WIDTH_RANGES[def.id] ??
+    (def.id.startsWith('changeover-') ? ([def.poles, def.poles + CHANGEOVER_EXTRA_UNITS] as const) : undefined) ??
+    (def.kind === 'relay' ? RELAY_WIDTH_RANGE : undefined);
+  return range ? { ...def, resizable: { minUnits: range[0], maxUnits: range[1] } } : def;
+}
+
 export function genericModules(): ModuleDef[] {
   return [
     ...breakers(),
@@ -358,7 +385,7 @@ export function genericModules(): ModuleDef[] {
     ...transferController(),
     ...bars(),
     ...combs(),
-  ];
+  ].map(withWidthRange);
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -371,7 +398,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '3';
+export const GENERIC_LIBRARY_VERSION = '4';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

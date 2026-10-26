@@ -17,6 +17,19 @@ export const defs: Record<string, ModuleDef> = {
     sku: 'SKU-16',
   },
   mcb3: { id: 'mcb3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, poles: 3 },
+  relay: {
+    id: 'relay',
+    kind: 'relay',
+    name: 'Voltage relay',
+    widthUnits: 1,
+    poles: 2,
+    resizable: { minUnits: 1, maxUnits: 4 },
+    terminals: [
+      { name: 'L', conductor: 'L', side: 'top' },
+      { name: 'N', conductor: 'N', side: 'top' },
+      { name: '14', conductor: 'C', side: 'bottom' },
+    ],
+  },
   rcd4: { id: 'rcd4', kind: 'rcd', name: 'RCD 4P', widthUnits: 4, poles: 4 },
   rcbo: { id: 'rcbo', kind: 'rcbo', name: 'RCBO 1P+N', widthUnits: 2, poles: 2 },
   contactor: {

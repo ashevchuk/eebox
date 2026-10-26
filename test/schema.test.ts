@@ -70,12 +70,12 @@ describe('library schema matches the validator', () => {
     expect(schema.properties.description.maxLength).toBe(MAX_DESCRIPTION_LENGTH);
   });
 
-  it('states the rules that tie fields together: comb needs a spec, resizable is for bars and combs', () => {
-    const [combRule, resizeRule] = defs.module.allOf;
+  it('states the one rule that ties fields together: a comb needs a spec and no terminals, others no spec', () => {
+    expect(defs.module.allOf).toHaveLength(1);
+    const [combRule] = defs.module.allOf;
     expect(combRule.then.required).toEqual(['comb']);
     expect(combRule.then.not.required).toEqual(['terminals']);
     expect(combRule.else.not.required).toEqual(['comb']);
-    expect(resizeRule.then.properties.kind.enum).toEqual(['busbar', 'comb']);
   });
 
   it('is pointed at by the bundled library, which the validator accepts', () => {

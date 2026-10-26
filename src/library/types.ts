@@ -80,8 +80,9 @@ export interface ModuleDef {
   /** Required for, and only allowed on, kind "comb". */
   comb?: CombSpec;
   /**
-   * Lets a placed copy have its own width. Terminal groups scale with it: a bar of 6 units with
-   * 12 terminals gets 18 at 9 units. Only for busbars and combs.
+   * Lets a placed copy have its own width, as devices of one kind differ between makes. Terminal
+   * groups (those with a `count`) scale with it: a bar of 6 units with 12 terminals gets 18 at 9
+   * units; single terminals stay single.
    */
   resizable?: ResizeSpec;
 }

@@ -252,10 +252,11 @@ describe('editing a module', () => {
     expect(validateDraft(toComb.draft)).toEqual([]);
     const back = edit(state(toComb.draft, on('bar').target), 'kind', 'breaker');
     expect('comb' in moduleOf(back.draft, 'bar')).toBe(false);
-    expect('resizable' in moduleOf(back.draft, 'bar')).toBe(false);
+    expect(moduleOf(back.draft, 'bar').resizable).toEqual({ minUnits: 2, maxUnits: 24 });
+    expect(validateDraft(back.draft)).toEqual([]);
   });
 
-  it('keeps a resizable range when the kind changes to another that allows it', () => {
+  it('keeps a resizable range when the kind changes, whatever the new kind', () => {
     expect(moduleOf(edit(on('comb'), 'kind', 'busbar').draft, 'comb').resizable).toBeUndefined();
     expect(moduleOf(edit(on('bar'), 'kind', 'busbar').draft, 'bar').resizable).toBeDefined();
   });

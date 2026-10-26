@@ -22,7 +22,7 @@ describe('the bundled library', () => {
   });
 
   it('is valid and has metadata that says where the numbers come from', () => {
-    expect(library.version).toBe('3');
+    expect(library.version).toBe('4');
     expect(library.description).toMatch(/not taken from any manufacturer/);
   });
 
@@ -97,6 +97,22 @@ describe('the bundled library', () => {
     const rows = new Set(library.enclosures.map((e) => e.railLengthsUnits.length));
     expect([...rows].sort()).toEqual([1, 2, 3, 4, 5]);
     expect(library.enclosures.every((e) => new Set(e.railLengthsUnits).size === 1)).toBe(true);
+  });
+});
+
+describe('widths of a placed copy', () => {
+  it('lets relays, meters, power supplies and changeover switches vary, within a range that holds the default', () => {
+    for (const m of library.modules.filter((x) => ['relay', 'meter', 'psu'].includes(x.kind) || x.id.startsWith('changeover-'))) {
+      expect(m.resizable, m.id).toBeDefined();
+      expect(m.widthUnits, m.id).toBeGreaterThanOrEqual(m.resizable!.minUnits);
+      expect(m.widthUnits, m.id).toBeLessThanOrEqual(m.resizable!.maxUnits);
+    }
+  });
+
+  it('keeps protective devices and contactors at the width of their poles', () => {
+    for (const m of library.modules.filter((x) => ['breaker', 'rcd', 'rcbo', 'contactor'].includes(x.kind))) {
+      expect(m.resizable, m.id).toBeUndefined();
+    }
   });
 });
 

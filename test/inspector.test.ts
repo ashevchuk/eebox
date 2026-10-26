@@ -517,3 +517,26 @@ describe('inspector: load power and cable', () => {
     expect(message(applyEdit(loadCtx(project), 'powerFactor', '3'))).toMatch(/power factor/i);
   });
 });
+
+describe('inspector: width of a relay', () => {
+  const withRelay = (): Project => {
+    const base = build();
+    return { ...base, panel: { ...base.panel, placements: [...base.panel.placements, place('p9', 'relay', 0, 14)] } };
+  };
+  const relayCtx = (project: Project = withRelay()) => ctx({ placementId: 'p9' }, 'panel', project);
+
+  it('offers the width of a resizable relay as a number within the range of its library entry', () => {
+    expect(field(relayCtx(), 'width')).toMatchObject({ kind: 'integer', value: 1, min: 1, max: 4, hint: '1-4 units' });
+  });
+
+  it('sets the width to two units and keeps the single terminals single', () => {
+    const project = ok(applyEdit(relayCtx(), 'width', '2'));
+    const placed = project.panel.placements.find((p) => p.id === 'p9');
+    expect(placed?.widthUnits).toBe(2);
+    expect(field(relayCtx(project), 'terminals')?.value).toBe('top L N · bottom 14');
+  });
+
+  it('refuses a width outside the range and does not touch the project', () => {
+    expect(message(applyEdit(relayCtx(), 'width', '5'))).toBe('The width is outside what the library allows.');
+  });
+});

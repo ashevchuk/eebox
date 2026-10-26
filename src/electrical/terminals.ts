@@ -33,7 +33,7 @@ function draftsOf(def: ModuleDef, widthUnits: number): Draft[] {
   if (def.terminals) {
     const scale = def.resizable ? widthUnits / def.widthUnits : 1;
     return def.terminals.flatMap((t) => {
-      const count = scale === 1 ? (t.count ?? 1) : Math.max(1, Math.round((t.count ?? 1) * scale));
+      const count = scale === 1 || t.count === undefined ? (t.count ?? 1) : Math.max(1, Math.round(t.count * scale));
       return Array.from({ length: count }, (_, i): Draft => {
         const name = count > 1 ? `${t.name}${i + 1}` : t.name;
         return {

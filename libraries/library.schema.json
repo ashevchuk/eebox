@@ -202,23 +202,6 @@
               ]
             }
           }
-        },
-        {
-          "if": {
-            "required": [
-              "resizable"
-            ]
-          },
-          "then": {
-            "properties": {
-              "kind": {
-                "enum": [
-                  "busbar",
-                  "comb"
-                ]
-              }
-            }
-          }
         }
       ]
     },
