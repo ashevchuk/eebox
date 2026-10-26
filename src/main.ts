@@ -30,6 +30,8 @@ import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
 import { openModuleDesigner } from './ui/moduleDesignerView';
 import { MODULE_TEMPLATES } from './ui/moduleTemplates';
+import { EXAMPLES } from './examples';
+import { chooseExample } from './ui/examplesDialog';
 import { editCableSettings } from './ui/cableSettingsDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
@@ -515,6 +517,13 @@ byId('cable-settings').addEventListener('click', async () => {
   session.cableSettings = edited;
   if (autosaveStore && !saveCableSettings(autosaveStore, edited)) showStatus('Cable settings are used now but could not be stored.', true);
   session.changed();
+});
+byId('open-example').addEventListener('click', async () => {
+  const example = await chooseExample(EXAMPLES);
+  if (!example) return;
+  const result = parseProjectJson(example.text);
+  if (!result.ok) showStatus(describeErrors(example.title, result.errors).join('\n'), true);
+  else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, example.title);
 });
 byId('print').addEventListener('click', printProject);
 byId('new-module').addEventListener('click', designNewModule);

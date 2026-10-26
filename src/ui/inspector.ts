@@ -18,6 +18,7 @@ import { takeOff } from '../layout/shelf';
 import {
   movePlacement,
   setPlacementLabel,
+  setPlacementState,
   setPlacementWidth,
   setTerminalLabel,
   type CombPlacement,
@@ -35,6 +36,7 @@ import {
   MIN_POWER_FACTOR,
   type LoadSpec,
 } from '../electrical/loads';
+import { energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
 import { CONDUCTORS, type Conductor, type ModuleDef } from '../library/types';
@@ -44,6 +46,7 @@ import {
   renameNode,
   setNodeConductors,
   setNodeLoad,
+  setSourceOff,
   setWireSection,
   setWireLabel,
   type SchematicNode,
@@ -149,9 +152,14 @@ const readonly = (key: string, label: string, value: string | number): Inspector
 });
 
 function loadFields(project: Project, resolve: Resolve, node: SchematicNode, settings?: CableSettings): InspectorField[] {
+  if (node.kind === 'source') {
+    return [{ key: 'supply', label: 'Supply', kind: 'select', value: node.off ? 'off' : 'on', options: ['on', 'off'], hint: 'off to see what loses power' }];
+  }
   if (node.kind !== 'load') return [];
   const spec = node.load;
+  const power = energy(project, resolve);
   const fields: InspectorField[] = [
+    ...(power.hasSource ? [readonly('supplied', 'Supplied', power.deadNodes.has(node.id) ? 'no' : 'yes')] : []),
     { key: 'powerW', label: 'Power', kind: 'number', value: spec?.powerW ?? '', hint: 'W; empty for none' },
     { key: 'powerFactor', label: 'Power factor', kind: 'number', value: spec?.powerFactor ?? '', min: MIN_POWER_FACTOR, max: 1, hint: `from ${MIN_POWER_FACTOR} to 1; empty for ${DEFAULT_POWER_FACTOR}` },
     { key: 'method', label: 'Cable laying', kind: 'select', value: spec?.method ?? DEFAULT_INSTALL_METHOD, options: INSTALL_METHODS, hint: 'IEC reference method' },
@@ -171,6 +179,21 @@ function loadFields(project: Project, resolve: Resolve, node: SchematicNode, set
     fields.push(readonly('drop', 'Voltage drop', `${report.dropPercent.toFixed(1)} % (limit ${report.dropLimitPercent} %)`));
   }
   fields.push(readonly('cableNote', 'Cable table', CABLE_TABLE_NOTE));
+  return fields;
+}
+
+/** The position of a switching device, and whether the module carries voltage while the sources are on. */
+function powerFields(placement: Placement, def: ModuleDef | undefined, power: Energy): InspectorField[] {
+  if (!def) return [];
+  const positions = positionsOf(def);
+  const fields: InspectorField[] = [];
+  if (positions.length > 0) {
+    fields.push({
+      key: 'state', label: 'Position', kind: 'select', value: positionOf(placement, def) ?? positions[0]!, options: positions,
+      hint: positions.includes('1') ? '1 or 2 picks the input, open breaks the circuit' : 'open breaks the circuit',
+    });
+  }
+  if (power.hasSource) fields.push(readonly('supplied', 'Supplied', power.placementLive(placement.id) ? 'yes' : 'no'));
   return fields;
 }
 
@@ -264,6 +287,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
           ...positionFields(placement, def, project, width),
+          ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
           ...moduleDetails(def, width),
           ...terminalLabelFields(placement, def, width),
@@ -357,12 +381,14 @@ const ERROR_TEXT: Record<string, string> = {
   'unknown-rail': 'There is no such row.',
   'unknown-module': 'The module is missing from the libraries.',
   'not-resizable': 'This module cannot be resized.',
+  'invalid-state': 'That position is not one this device has.',
   'width-out-of-range': 'The width is outside what the library allows.',
   'invalid-label': LABEL_MESSAGE,
   'modules-do-not-fit': 'Modules on this row would not fit.',
   'rail-not-empty': 'Move the modules off the rows you remove first.',
   'invalid-conductors': 'A conductor can be ticked once, and at least one is needed.',
   'not-a-load': 'Only a load has a power.',
+  'not-a-source': 'Only a source can be switched off.',
   'invalid-load': 'The load data is out of range.',
   'invalid-section': 'That cross-section is not in the table.',
 };
@@ -464,6 +490,11 @@ export function applyEdit(
         const result = setPlacementLabel(panel, placement.id, text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
+      if (key === 'state') {
+        const def = resolve(placement.module);
+        const result = setPlacementState(panel, placement.id, text, def ? positionsOf(def) : []);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
       if (key.startsWith('terminal:')) {
         const result = setTerminalLabel(panel, placement.id, key.slice('terminal:'.length), text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
@@ -558,6 +589,10 @@ export function applyEdit(
         return result.ok ? withSchematic(result.schematic) : fail(text.trim() === '' ? 'This item needs a label.' : LABEL_MESSAGE);
       }
       if (key === 'nodeX' || key === 'nodeY') return moveNodeTo(node);
+      if (key === 'supply' && node.kind === 'source') {
+        const result = setSourceOff(schematic, node.id, text === 'off');
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
+      }
       if (node.kind === 'load' && LOAD_KEYS.includes(key)) {
         const next = loadAfterEdit(node.load, key, text);
         if (typeof next === 'string') return fail(next);

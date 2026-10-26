@@ -1,11 +1,32 @@
 import { stableStringify } from '../library/equality';
-import type { Library, ModuleDef } from '../library/types';
+import { TRIP_CURVES, type Library, type ModuleDef, type TripCurve } from '../library/types';
 import { validateLibrary } from '../library/validate';
+import { Camera } from '../view/Camera';
+import { railRect } from '../view/geometry';
+import { History } from '../view/history';
+import { render } from '../view/render';
 import { theme } from '../view/theme';
 import { FieldsView } from './fieldsView';
-import type { InspectorField, InspectorView } from './inspector';
+import type { InspectorView } from './inspector';
 import { applyEditorAction, applyEditorEdit, describeEditor, validateDraft, type EditorState } from './libraryEditor';
-import { addTerminalAt, designerLayout, moveTerminal, pinAt, slotAt, UNIT_PX, type DesignerLayout, type DesignerPin } from './moduleDesigner';
+import {
+  addPreset,
+  addTerminalAt,
+  connectTerminals,
+  designerLayout,
+  detachTerminal,
+  makeVariants,
+  moveTerminal,
+  netGroups,
+  pinAt,
+  railPreviewScene,
+  repairPositions,
+  slotAt,
+  TERMINAL_PRESETS,
+  UNIT_PX,
+  type DesignerLayout,
+  type DesignerPin,
+} from './moduleDesigner';
 import { MODULE_TEMPLATES } from './moduleTemplates';
 
 export interface DesignerHost {
@@ -22,6 +43,8 @@ export interface DesignerOptions {
   offerTemplates?: boolean;
 }
 
+type Tool = 'place' | 'connect';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_SHOWN_ERRORS = 6;
 const DRAG_THRESHOLD_PX = 3;
@@ -29,6 +52,10 @@ const MAX_LABEL_CHARS = 28;
 const MAX_ZOOM = 2.5;
 const STAGE_WIDTH_PX = 560;
 const STAGE_HEIGHT_PX = 400;
+const RAIL_PREVIEW = { width: 520, height: 150 };
+const NET_COLOR = '#7c3aed';
+const RAIL_MARGIN_MM = 45;
+const SINGLE_TERMINAL = 'single';
 
 function svgElement(tag: string, attributes: Record<string, string | number>, text?: string): SVGElement {
   const el = document.createElementNS(SVG_NS, tag);
@@ -37,13 +64,25 @@ function svgElement(tag: string, attributes: Record<string, string | number>, te
   return el;
 }
 
-/** A modal that draws a module and lets a person place its terminals with the mouse. */
+function button(label: string, onClick: () => void, title?: string): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.textContent = label;
+  if (title) el.title = title;
+  el.addEventListener('click', onClick);
+  return el;
+}
+
+/** A modal that draws a module and lets a person place and join its terminals with the mouse. */
 export class ModuleDesignerView {
-  private state: EditorState;
+  private readonly history: History<Library>;
+  private moduleId: string;
   private savedText: string;
-  private isNew: boolean;
   private pristine: boolean;
   private selected: number | null = null;
+  private tool: Tool = 'place';
+  private connectFrom: number | null = null;
+  /** The width the drawing shows, when the slider has moved it; null follows the width of the module. */
+  private previewWidth: number | null = null;
   private hover: { unit: number; side: 'top' | 'bottom' } | null = null;
   private drag: { pin: DesignerPin; start: { x: number; y: number }; moved: boolean } | null = null;
   private message = '';
@@ -51,11 +90,20 @@ export class ModuleDesignerView {
   private layout!: DesignerLayout;
 
   private readonly dialog = document.createElement('dialog');
-  private readonly stage = document.createElement('div');
+  private readonly svgHost = document.createElement('div');
+  private readonly railCanvas = document.createElement('canvas');
   private readonly status = document.createElement('span');
   private readonly saveButton = document.createElement('button');
+  private readonly undoButton = document.createElement('button');
+  private readonly redoButton = document.createElement('button');
   private readonly errors = document.createElement('div');
   private readonly templateSelect = document.createElement('select');
+  private readonly kindSelect = document.createElement('select');
+  private readonly placeButton = document.createElement('button');
+  private readonly connectButton = document.createElement('button');
+  private readonly detachButton = document.createElement('button');
+  private readonly widthSlider = document.createElement('input');
+  private readonly widthLabel = document.createElement('span');
   private readonly moduleFields: FieldsView;
   private readonly terminalFields: FieldsView;
 
@@ -64,8 +112,8 @@ export class ModuleDesignerView {
     private readonly options: DesignerOptions,
     private readonly host: DesignerHost,
   ) {
-    this.state = { draft: library, target: { kind: 'module', id: options.moduleId } };
-    this.isNew = options.isNew;
+    this.history = new History<Library>(library);
+    this.moduleId = options.moduleId;
     this.pristine = options.offerTemplates === true;
     this.savedText = options.isNew ? '' : stableStringify(library);
 
@@ -75,30 +123,42 @@ export class ModuleDesignerView {
     header.append(title);
     if (options.offerTemplates) header.append(this.templatePicker());
     this.status.className = 'editor-status';
+    this.undoButton.textContent = 'Undo';
+    this.undoButton.addEventListener('click', () => this.undo());
+    this.redoButton.textContent = 'Redo';
+    this.redoButton.addEventListener('click', () => this.redo());
     this.saveButton.textContent = 'Save';
     this.saveButton.className = 'primary';
     this.saveButton.addEventListener('click', () => void this.save());
-    const close = document.createElement('button');
-    close.textContent = 'Close';
-    close.addEventListener('click', () => void this.close());
-    header.append(this.status, this.saveButton, close);
+    header.append(this.status, this.undoButton, this.redoButton, this.saveButton, button('Close', () => void this.close()));
 
-    this.stage.className = 'designer-stage';
+    const stage = document.createElement('div');
+    stage.className = 'designer-stage';
+    this.railCanvas.width = RAIL_PREVIEW.width;
+    this.railCanvas.height = RAIL_PREVIEW.height;
+    this.railCanvas.className = 'designer-rail';
+    const hint = document.createElement('p');
+    hint.className = 'designer-hint';
+    hint.textContent =
+      'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. ' +
+      'Connect: click two terminals to join them inside the module.';
+    stage.append(this.toolbar(), this.svgHost, this.widthControl(), hint, this.railCaption(), this.railCanvas);
+
     const side = document.createElement('section');
     side.className = 'designer-fields';
-    const moduleFieldsHost = document.createElement('div');
-    const terminalFieldsHost = document.createElement('div');
-    side.append(terminalFieldsHost, moduleFieldsHost);
+    const terminalHost = document.createElement('div');
+    const moduleHost = document.createElement('div');
+    side.append(terminalHost, moduleHost);
     const handlers = {
       onEdit: (key: string, raw: string | string[]) => this.edit(key, typeof raw === 'string' ? raw : raw.join(' ')),
       onAction: (action: { key: string }) => this.act(action.key),
     };
-    this.moduleFields = new FieldsView(moduleFieldsHost, handlers);
-    this.terminalFields = new FieldsView(terminalFieldsHost, handlers);
+    this.moduleFields = new FieldsView(moduleHost, handlers);
+    this.terminalFields = new FieldsView(terminalHost, handlers);
 
     const body = document.createElement('div');
     body.className = 'designer-body';
-    body.append(this.stage, side);
+    body.append(stage, side);
     this.errors.className = 'editor-errors';
     this.dialog.className = 'app-dialog editor-dialog designer-dialog';
     this.dialog.append(header, body, this.errors);
@@ -116,12 +176,24 @@ export class ModuleDesignerView {
     this.renderAll(true);
   }
 
+  private get draft(): Library {
+    return this.history.current;
+  }
+
+  private get state(): EditorState {
+    return { draft: this.draft, target: { kind: 'module', id: this.moduleId } };
+  }
+
   private get module(): ModuleDef {
-    return this.state.draft.modules.find((m) => m.id === this.options.moduleId)!;
+    return this.draft.modules.find((m) => m.id === this.moduleId)!;
+  }
+
+  private get shownWidth(): number {
+    return this.previewWidth ?? this.module.widthUnits;
   }
 
   private get dirty(): boolean {
-    return stableStringify(this.state.draft) !== this.savedText;
+    return stableStringify(this.draft) !== this.savedText;
   }
 
   private templatePicker(): HTMLElement {
@@ -138,16 +210,60 @@ export class ModuleDesignerView {
     this.templateSelect.addEventListener('change', () => {
       const template = MODULE_TEMPLATES.find((t) => t.id === this.templateSelect.value);
       if (!template || !this.pristine) return;
-      const built = template.build(this.options.moduleId);
-      this.state = {
-        ...this.state,
-        draft: { ...this.state.draft, modules: this.state.draft.modules.map((m) => (m.id === built.id ? built : m)) },
-      };
-      this.selected = null;
-      this.renderAll(true);
+      const built = template.build(this.moduleId);
+      this.commit({ ...this.draft, modules: this.draft.modules.map((m) => (m.id === built.id ? built : m)) }, null, true);
     });
     label.append(this.templateSelect);
     return label;
+  }
+
+  private toolbar(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'designer-toolbar';
+    this.kindSelect.title = 'What a click on the drawing adds';
+    for (const [value, label] of [[SINGLE_TERMINAL, 'Single terminal'], ...TERMINAL_PRESETS.map((p) => [p.id, p.label] as const)]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      this.kindSelect.append(option);
+    }
+    this.placeButton.textContent = 'Place';
+    this.placeButton.addEventListener('click', () => this.setTool('place'));
+    this.connectButton.textContent = 'Connect';
+    this.connectButton.title = 'Click two terminals to join them inside the module';
+    this.connectButton.addEventListener('click', () => this.setTool('connect'));
+    this.detachButton.textContent = 'Detach';
+    this.detachButton.title = 'Take the selected terminal out of its connection';
+    this.detachButton.addEventListener('click', () => this.detach());
+    bar.append(this.placeButton, this.kindSelect, this.connectButton, this.detachButton, button('Variants…', () => this.variants(), 'Make a copy for every rating'));
+    return bar;
+  }
+
+  private widthControl(): HTMLElement {
+    const row = document.createElement('label');
+    row.className = 'designer-width';
+    this.widthSlider.type = 'range';
+    this.widthSlider.step = '1';
+    this.widthSlider.addEventListener('input', () => {
+      this.previewWidth = Number(this.widthSlider.value);
+      this.renderAll();
+    });
+    row.append(this.widthLabel, this.widthSlider);
+    return row;
+  }
+
+  private railCaption(): HTMLElement {
+    const caption = document.createElement('p');
+    caption.className = 'designer-hint';
+    caption.textContent = 'On a rail:';
+    return caption;
+  }
+
+  private setTool(tool: Tool): void {
+    this.tool = tool;
+    this.connectFrom = null;
+    this.say('');
+    this.renderAll();
   }
 
   private say(message: string, isError = false): void {
@@ -157,27 +273,76 @@ export class ModuleDesignerView {
     this.status.classList.toggle('error', isError);
   }
 
+  /** Records a new draft in the history; `reset` also forgets what was selected and the width that was tried. */
+  private commit(draft: Library, selected: number | null, reset = false): void {
+    if (stableStringify(draft) === stableStringify(this.draft)) return;
+    this.history.commit(draft);
+    this.selected = selected;
+    this.connectFrom = null;
+    if (reset) this.previewWidth = null;
+    this.say('');
+    this.renderAll(true);
+  }
+
+  private undo(): void {
+    if (!this.history.undo()) return;
+    this.afterHistory();
+  }
+
+  private redo(): void {
+    if (!this.history.redo()) return;
+    this.afterHistory();
+  }
+
+  private afterHistory(): void {
+    this.pristine = false;
+    this.connectFrom = null;
+    if (!this.draft.modules.some((m) => m.id === this.moduleId)) this.moduleId = this.options.moduleId;
+    const count = this.module.terminals?.length ?? 0;
+    if (this.selected !== null && this.selected >= count) this.selected = null;
+    this.say('');
+    this.renderAll(true);
+  }
+
   private renderAll(force = false): void {
-    this.layout = designerLayout(this.module);
+    this.layout = designerLayout(this.module, this.shownWidth);
     this.drawStage();
+    this.drawRailPreview();
     this.renderFields(force);
-    const problems = validateDraft(this.state.draft);
+    const problems = validateDraft(this.draft);
     this.errors.textContent = problems
       .slice(0, MAX_SHOWN_ERRORS)
       .map((p) => `${p.path || '(library)'}: ${p.message}`)
       .join('\n');
     this.saveButton.disabled = problems.length > 0 || !this.dirty;
+    this.undoButton.disabled = !this.history.canUndo;
+    this.redoButton.disabled = !this.history.canRedo;
+    this.placeButton.classList.toggle('active', this.tool === 'place');
+    this.connectButton.classList.toggle('active', this.tool === 'connect');
+    this.kindSelect.disabled = this.tool !== 'place';
+    const entry = this.selected === null ? undefined : this.module.terminals?.[this.selected];
+    this.detachButton.disabled = entry?.net === undefined;
+    this.syncWidthControl();
+    this.templateSelect.disabled = !this.pristine;
     this.status.textContent = this.message;
     this.status.classList.toggle('error', this.messageIsError);
-    this.templateSelect.disabled = !this.pristine;
+  }
+
+  private syncWidthControl(): void {
+    const range = this.module.resizable;
+    this.widthSlider.disabled = !range;
+    this.widthSlider.min = String(range?.minUnits ?? this.module.widthUnits);
+    this.widthSlider.max = String(range?.maxUnits ?? this.module.widthUnits);
+    this.widthSlider.value = String(this.shownWidth);
+    const note = range ? `${range.minUnits}-${range.maxUnits}` : 'fixed';
+    this.widthLabel.textContent = `Shown at ${this.shownWidth} unit${this.shownWidth === 1 ? '' : 's'} (${note}) `;
   }
 
   private renderFields(force: boolean): void {
     const view = describeEditor(this.state);
-    const isTerminalField = (f: InspectorField) => f.key.startsWith('t.');
     const moduleActions = view.actions.filter((a) => a.key === 'defaultTerminals');
     this.moduleFields.render(
-      { title: 'Module', fields: view.fields.filter((f) => !isTerminalField(f)), actions: moduleActions } satisfies InspectorView,
+      { title: 'Module', fields: view.fields.filter((f) => !f.key.startsWith('t.')), actions: moduleActions } satisfies InspectorView,
       force,
     );
     const index = this.selected;
@@ -212,29 +377,46 @@ export class ModuleDesignerView {
       svgElement(
         'text',
         { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, fill: '#14161d', transform: `rotate(-90 ${cx} ${cy})` },
-        label.length > MAX_LABEL_CHARS ? `${label.slice(0, MAX_LABEL_CHARS - 1)}\u2026` : label,
+        label.length > MAX_LABEL_CHARS ? `${label.slice(0, MAX_LABEL_CHARS - 1)}…` : label,
       ),
     );
     svg.append(svgElement('text', { x: body.x, y: body.y + body.height + 18, 'font-size': 11, fill: '#9aa1b3' }, `${layout.widthUnits} unit${layout.widthUnits === 1 ? '' : 's'}, ${(layout.widthUnits * 17.5).toFixed(1)} mm`));
+    for (const { net, pins } of netGroups(layout)) {
+      const line = svgElement('polyline', { points: pins.map((p) => `${p.x},${p.y}`).join(' '), fill: 'none', stroke: NET_COLOR, 'stroke-width': 3, 'stroke-dasharray': '6 4', opacity: 0.85 });
+      line.append(svgElement('title', {}, `Joined inside the module: ${net}`));
+      svg.append(line);
+    }
     if (this.hover && this.drag?.moved) {
       const x = body.x + (this.hover.unit + 0.5) * UNIT_PX;
       const y = this.hover.side === 'top' ? body.y + 18 : body.y + body.height - 18;
       svg.append(svgElement('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#f5c518', 'stroke-dasharray': '3 3', 'stroke-width': 2 }));
     }
     for (const pin of layout.pins) {
-      const selected = pin.source !== null && pin.source === this.selected;
-      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: 6, fill: colours[pin.terminal.conductor], stroke: selected ? '#f5c518' : '#14161d', 'stroke-width': selected ? 3 : 1, class: 'designer-pin' }));
-      svg.append(
-        svgElement('text', { x: pin.x, y: pin.terminal.side === 'top' ? pin.y + 19 : pin.y - 11, 'text-anchor': 'middle', 'font-size': 9, fill: '#14161d' }, pin.terminal.name),
-      );
+      const entry = pin.source ?? layout.pins.indexOf(pin);
+      const marked = entry === this.selected || entry === this.connectFrom;
+      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: 6, fill: colours[pin.terminal.conductor], stroke: marked ? '#f5c518' : '#14161d', 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
+      svg.append(svgElement('text', { x: pin.x, y: pin.terminal.side === 'top' ? pin.y + 19 : pin.y - 11, 'text-anchor': 'middle', 'font-size': 9, fill: '#14161d' }, pin.terminal.name));
     }
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e, svg));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e, svg));
     svg.addEventListener('pointerup', (e) => this.onPointerUp(e, svg));
-    const hint = document.createElement('p');
-    hint.className = 'designer-hint';
-    hint.textContent = 'Click the top or bottom half to add a terminal, click a terminal to select it, drag it to move it, press Delete to remove it.';
-    this.stage.replaceChildren(svg, hint);
+    this.svgHost.replaceChildren(svg);
+  }
+
+  /** Draws the module with the very renderer of the panel, on a rail of its own. */
+  private drawRailPreview(): void {
+    const ctx = this.railCanvas.getContext('2d');
+    if (!ctx) return;
+    const { panel, resolve } = railPreviewScene(this.module, this.shownWidth);
+    const rail = railRect(panel, 0);
+    const camera = new Camera();
+    camera.fit(
+      { minX: rail.x - RAIL_MARGIN_MM, minY: rail.y - RAIL_MARGIN_MM, maxX: rail.x + rail.width + RAIL_MARGIN_MM, maxY: rail.y + rail.height + RAIL_MARGIN_MM },
+      RAIL_PREVIEW.width,
+      RAIL_PREVIEW.height,
+      0,
+    );
+    render(ctx, camera, { panel, resolve, selectedPlacementId: null, selectedCombId: null, selectedRail: null, moving: null, ghost: null }, RAIL_PREVIEW.width, RAIL_PREVIEW.height, 1);
   }
 
   private point(e: PointerEvent, svg: SVGElement): { x: number; y: number } {
@@ -249,18 +431,51 @@ export class ModuleDesignerView {
   private onPointerDown(e: PointerEvent, svg: SVGElement): void {
     const at = this.point(e, svg);
     const pin = pinAt(this.layout, at.x, at.y);
+    if (this.tool === 'connect') return this.connectAt(pin);
     if (pin) {
       this.drag = { pin, start: at, moved: false };
       svg.setPointerCapture(e.pointerId);
       this.selected = this.entryOf(pin);
       this.renderFields(false);
+      this.detachButton.disabled = this.module.terminals?.[this.selected]?.net === undefined;
       return;
     }
     const slot = slotAt(this.layout, at.x, at.y);
     if (!slot) return;
-    const added = addTerminalAt(this.state.draft, this.options.moduleId, slot.unit, slot.side);
+    const kind = this.kindSelect.value;
+    const width = this.shownWidth;
+    const added =
+      kind === SINGLE_TERMINAL
+        ? addTerminalAt(this.draft, this.moduleId, slot.unit, slot.side, 'L', width)
+        : addPreset(this.draft, this.moduleId, kind, slot.unit, slot.side, width);
     if (!added.ok) return this.say(added.message, true);
-    this.apply(added.draft, added.index);
+    this.commit(added.draft, added.index);
+  }
+
+  private connectAt(pin: DesignerPin | undefined): void {
+    if (!pin) {
+      this.connectFrom = null;
+      return this.renderAll();
+    }
+    const entry = this.entryOf(pin);
+    if (this.connectFrom === null) {
+      this.connectFrom = entry;
+      this.say('Now click the terminal to join it to.');
+      return this.renderAll();
+    }
+    const joined = connectTerminals(this.draft, this.moduleId, this.connectFrom, entry);
+    if (!joined.ok) {
+      this.say(joined.message, true);
+      return this.renderAll();
+    }
+    this.commit(joined.draft, entry);
+  }
+
+  private detach(): void {
+    if (this.selected === null) return;
+    const result = detachTerminal(this.draft, this.moduleId, this.selected);
+    if (!result.ok) return this.say(result.message, true);
+    this.commit(result.draft, this.selected);
   }
 
   private onPointerMove(e: PointerEvent, svg: SVGElement): void {
@@ -275,32 +490,28 @@ export class ModuleDesignerView {
   private onPointerUp(e: PointerEvent, svg: SVGElement): void {
     const drag = this.drag;
     this.drag = null;
-    if (!drag?.moved) {
-      this.hover = null;
-      return this.renderAll();
-    }
-    const slot = slotAt(this.layout, this.point(e, svg).x, this.point(e, svg).y);
+    const at = this.point(e, svg);
+    const slot = drag?.moved ? slotAt(this.layout, at.x, at.y) : null;
     this.hover = null;
-    if (!slot) return this.renderAll();
-    const moved = moveTerminal(this.state.draft, this.options.moduleId, this.entryOf(drag.pin), slot.unit, slot.side);
+    if (!drag?.moved || !slot) return this.renderAll();
+    const moved = moveTerminal(this.draft, this.moduleId, this.entryOf(drag.pin), slot.unit, slot.side, this.shownWidth);
     if (!moved.ok) {
       this.say(moved.message, true);
       return this.renderAll();
     }
-    this.apply(moved.draft, moved.index);
-  }
-
-  private apply(draft: Library, selected: number | null): void {
-    this.state = { ...this.state, draft };
-    this.selected = selected;
-    this.pristine = false;
-    this.say('');
-    this.renderAll(true);
+    this.commit(moved.draft, moved.index);
   }
 
   private onKey(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
-    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selected !== null && !/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) {
+    const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName);
+    if ((e.ctrlKey || e.metaKey) && !typing && (e.key === 'z' || e.key === 'y' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.key === 'y' || e.shiftKey) this.redo();
+      else this.undo();
+      return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selected !== null && !typing) {
       e.preventDefault();
       this.act(`removeTerminal:${this.selected}`);
     }
@@ -312,35 +523,70 @@ export class ModuleDesignerView {
       this.say(result.message, true);
       return this.renderAll(true);
     }
-    this.state = { draft: result.draft, target: result.target ?? this.state.target };
-    if (result.target?.kind === 'module') this.options.moduleId = result.target.id;
+    if (result.target?.kind === 'module') this.moduleId = result.target.id;
     this.pristine = false;
-    this.say('');
-    this.renderAll();
+    if (key === 'widthUnits') this.previewWidth = null;
+    const repaired = ['widthUnits', 'resizeMin', 'resizeMax'].includes(key) ? repairPositions(result.draft, this.moduleId) : result.draft;
+    this.commit(repaired, this.selected);
   }
 
   private act(key: string): void {
     const result = applyEditorAction(this.state, key);
     if (!result.ok) return this.say(result.message, true);
-    this.state = { draft: result.draft, target: { kind: 'module', id: this.options.moduleId } };
     this.pristine = false;
-    const removed = /^removeTerminal:(\d+)$/.exec(key);
-    if (removed) this.selected = null;
-    if (key === 'addTerminal') this.selected = (this.module.terminals?.length ?? 1) - 1;
-    this.say('');
-    this.renderAll(true);
+    let selected = this.selected;
+    if (/^removeTerminal:\d+$/.test(key)) selected = null;
+    if (key === 'addTerminal') selected = (result.draft.modules.find((m) => m.id === this.moduleId)?.terminals?.length ?? 1) - 1;
+    this.commit(result.draft, selected);
+  }
+
+  /** Asks for ratings and curves and adds a copy of the module for each. */
+  private variants(): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog';
+    const title = document.createElement('h2');
+    title.textContent = 'Variants of this module';
+    const help = document.createElement('p');
+    help.textContent = `One copy for every rating, and for every curve if you list any. Ratings in amperes, curves out of ${TRIP_CURVES.join(' ')}, separated by spaces.`;
+    const ratings = document.createElement('input');
+    ratings.placeholder = 'Ratings: 6 10 16 25 32';
+    const curves = document.createElement('input');
+    curves.placeholder = 'Curves (optional): B C';
+    const problem = document.createElement('div');
+    problem.className = 'editor-errors';
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog-actions';
+    const make = button('Make variants', () => {
+      const rates = ratings.value.split(/[\s,]+/).filter(Boolean).map(Number);
+      const named = curves.value.split(/[\s,]+/).filter(Boolean).map((c) => c.toUpperCase());
+      const unknown = named.find((c) => !(TRIP_CURVES as readonly string[]).includes(c));
+      if (rates.some((r) => !Number.isFinite(r))) return void (problem.textContent = 'Ratings must be numbers.');
+      if (unknown) return void (problem.textContent = `Unknown curve ${unknown}.`);
+      const result = makeVariants(this.draft, this.moduleId, rates, named as TripCurve[]);
+      if (!result.ok) return void (problem.textContent = result.message);
+      dialog.close();
+      this.pristine = false;
+      this.commit(result.draft, this.selected);
+      this.say(`Made ${result.ids.length} variants after this module.`);
+    });
+    make.className = 'primary';
+    actions.append(button('Cancel', () => dialog.close()), make);
+    dialog.append(title, help, ratings, curves, problem, actions);
+    dialog.addEventListener('close', () => dialog.remove());
+    this.dialog.append(dialog);
+    dialog.showModal();
+    ratings.focus();
   }
 
   private async save(): Promise<void> {
-    const checked = validateLibrary(this.state.draft);
+    const checked = validateLibrary(this.draft);
     if (!checked.ok) return this.say('Fix the problems listed below first.', true);
     try {
       await this.host.save(checked.library);
     } catch (error) {
       return this.say(`Saving failed: ${(error as Error).message}`, true);
     }
-    this.isNew = false;
-    this.savedText = stableStringify(this.state.draft);
+    this.savedText = stableStringify(this.draft);
     this.say(`Saved "${this.module.name}".`);
     this.renderAll();
   }

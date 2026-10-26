@@ -142,16 +142,19 @@ const COMB_PLACEMENT_SPEC: FieldSpec = {
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
 };
+const STATES = ['closed', 'open', '1', '2'] as const;
 const SHELF_ITEM_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
+  state: { required: false, check: oneOf(STATES) },
 };
 const PLACEMENT_SPEC: FieldSpec = {
   ...COMB_PLACEMENT_SPEC,
   terminalLabels: { required: false, check: terminalLabelsCheck },
+  state: { required: false, check: oneOf(STATES) },
 };
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },
@@ -166,6 +169,7 @@ const NODE_SPEC: FieldSpec = {
   placementId: { required: false, check: identifier },
   conductors: { required: false, check: conductorsCheck },
   load: { required: false, check: objectCheck },
+  off: { required: false, check: (v) => (v === true ? null : 'must be true when present') },
 };
 const LOAD_SPEC: FieldSpec = {
   powerW: { required: true, check: (v) => (typeof v === 'number' && loadSpecProblem({ powerW: v }) === null ? null : `must be above 0 and at most ${MAX_POWER_W}`) },
@@ -192,6 +196,7 @@ function checkNodeShape(node: Record<string, unknown>, path: string, errors: Val
   if (!isModule && node.conductors === undefined) {
     errors.push({ path: `${path}.conductors`, message: 'is required for source and load nodes' });
   }
+  if (node.off !== undefined && node.kind !== 'source') errors.push({ path: `${path}.off`, message: 'is only allowed on a source node' });
   if (node.load !== undefined) {
     if (node.kind !== 'load') errors.push({ path: `${path}.load`, message: 'is only allowed on a load node' });
     else child(node, 'load', LOAD_SPEC, `${path}.load`, errors);

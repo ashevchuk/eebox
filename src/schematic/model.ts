@@ -20,6 +20,8 @@ export interface SchematicNode {
   conductors?: Conductor[];
   /** What a `load` node draws; only on load nodes. */
   load?: LoadSpec;
+  /** A `source` node that is switched off, to see what loses power; only on source nodes. */
+  off?: boolean;
 }
 
 export interface TerminalRef {
@@ -58,6 +60,7 @@ export type SchematicError =
   | { kind: 'invalid-label' }
   | { kind: 'not-a-free-node' }
   | { kind: 'not-a-load' }
+  | { kind: 'not-a-source' }
   | { kind: 'invalid-load' }
   | { kind: 'invalid-section' }
   | { kind: 'invalid-conductors' };
@@ -266,6 +269,16 @@ export function setNodeConductors(
       wires,
     },
   };
+}
+
+/** Switches a source on or off; a source that is off feeds nothing. */
+export function setSourceOff(schematic: Schematic, id: string, off: boolean): SchematicResult {
+  const node = schematic.nodes.find((n) => n.id === id);
+  if (!node) return failure('unknown-node');
+  if (node.kind !== 'source') return failure('not-a-source');
+  const { off: _previous, ...rest } = node;
+  const updated: SchematicNode = off ? { ...rest, off: true } : rest;
+  return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
 }
 
 /** Sets the cross-section of a wire, or clears it with `undefined`. */

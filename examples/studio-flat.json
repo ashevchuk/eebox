@@ -1,0 +1,437 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "railLengthsUnits": [
+        12,
+        12
+      ],
+      "railPitchesMm": [
+        150
+      ],
+      "railLabels": [
+        "Incoming",
+        "Final circuits"
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "main-switch-2p-40"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "Main switch"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pe-bar-12"
+          },
+          "rail": 0,
+          "slot": 3,
+          "label": "PE"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-c10-30"
+          },
+          "rail": 1,
+          "slot": 0,
+          "label": "Lights"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-c16-30"
+          },
+          "rail": 1,
+          "slot": 2,
+          "label": "Sockets"
+        },
+        {
+          "id": "p5",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-b13-30"
+          },
+          "rail": 1,
+          "slot": 4,
+          "label": "Boiler"
+        }
+      ],
+      "combs": [
+        {
+          "id": "c1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "comb-lpn-12"
+          },
+          "rail": 1,
+          "slot": 0,
+          "widthUnits": 6
+        }
+      ],
+      "shelf": [],
+      "title": "Studio flat"
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "Main switch 2P 40A",
+          "x": 300,
+          "y": 150,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "Earth bar 12 terminals",
+          "x": 620,
+          "y": 150,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "RCBO 1P+N C10 30mA",
+          "x": 100,
+          "y": 360,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "RCBO 1P+N C16 30mA",
+          "x": 300,
+          "y": 360,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "module",
+          "label": "RCBO 1P+N B13 30mA",
+          "x": 500,
+          "y": 360,
+          "placementId": "p5",
+          "id": "n5"
+        },
+        {
+          "kind": "source",
+          "label": "Mains",
+          "x": 300,
+          "y": 0,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n6"
+        },
+        {
+          "kind": "load",
+          "label": "Lights",
+          "x": 100,
+          "y": 560,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n7",
+          "load": {
+            "powerW": 400,
+            "crossSectionMm2": 1.5,
+            "lengthM": 25,
+            "circuit": "lighting"
+          }
+        },
+        {
+          "kind": "load",
+          "label": "Sockets circuit",
+          "x": 300,
+          "y": 560,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n8",
+          "load": {
+            "powerW": 2300,
+            "crossSectionMm2": 2.5,
+            "lengthM": 18
+          }
+        },
+        {
+          "kind": "load",
+          "label": "Boiler",
+          "x": 500,
+          "y": 560,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n9",
+          "load": {
+            "powerW": 2000,
+            "crossSectionMm2": 2.5,
+            "lengthM": 8
+          }
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:PE"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:PE1"
+          }
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PEb1"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PEb2"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PEb3"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:PE"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/main-switch-2p-40": {
+      "id": "main-switch-2p-40",
+      "kind": "switch",
+      "name": "Main switch 2P 40A",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 40
+    },
+    "generic-iec/pe-bar-12": {
+      "id": "pe-bar-12",
+      "kind": "busbar",
+      "name": "Earth bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "PE",
+          "conductor": "PE",
+          "side": "top",
+          "net": "PE",
+          "count": 6
+        },
+        {
+          "name": "PEb",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PE",
+          "count": 6
+        }
+      ]
+    },
+    "generic-iec/rcbo-1pn-c10-30": {
+      "id": "rcbo-1pn-c10-30",
+      "kind": "rcbo",
+      "name": "RCBO 1P+N C10 30mA",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 10,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/rcbo-1pn-c16-30": {
+      "id": "rcbo-1pn-c16-30",
+      "kind": "rcbo",
+      "name": "RCBO 1P+N C16 30mA",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 16,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/rcbo-1pn-b13-30": {
+      "id": "rcbo-1pn-b13-30",
+      "kind": "rcbo",
+      "name": "RCBO 1P+N B13 30mA",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 13,
+      "curve": "B",
+      "breakingCapacityKA": 6,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/comb-lpn-12": {
+      "id": "comb-lpn-12",
+      "kind": "comb",
+      "name": "Comb L+N, 12 units",
+      "widthUnits": 12,
+      "poles": 2,
+      "comb": {
+        "pattern": [
+          "L",
+          "N"
+        ],
+        "side": "top"
+      },
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 54
+      }
+    }
+  }
+}

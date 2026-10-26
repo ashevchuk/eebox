@@ -1,3 +1,4 @@
+import { energy, type Energy } from '../electrical/energy';
 import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
 import { FREE_NODE_PRESETS, nodeTerminalsLookup } from '../electrical/nodeTerminals';
@@ -56,6 +57,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'not-a-free-node': 'Only a source or a load has conductors of its own.',
   'invalid-conductors': 'A source or load needs at least one conductor, each used once.',
   'not-a-load': 'Only a load has a power.',
+  'not-a-source': 'Only a source can be switched off.',
   'invalid-load': 'The load data is out of range.',
   'invalid-section': 'That cross-section is not in the table.',
 };
@@ -65,7 +67,10 @@ const COLORS = {
   text: '#14161d',
   valid: '#22c55e',
   invalid: '#ef4444',
+  dead: '#9ca3af',
 };
+const DEAD_WIRE_DASH = [3, 5];
+const DEAD_NODE_ALPHA = 0.45;
 const NODE_FILL = { module: '#e5e7eb', source: '#f5c518', load: '#a7f3d0' } as const;
 
 const TERMINAL_LABEL_WIDTH = 24;
@@ -110,12 +115,15 @@ export class SchematicView implements View {
     const { wireId, nodeId, placementId } = this.session.selection;
     this.drawCombLinks(ctx, frame);
     const routes = routeWires(frame.schematic, frame.layout);
+    const { currents, power } = this.analysis();
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
-      if (path && conductor) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : theme().conductors[conductor], 2.5);
+      if (!path || !conductor) continue;
+      const dead = power.deadWires.has(wire.id);
+      const colour = wire.id === wireId ? COLORS.selection : dead ? COLORS.dead : theme().conductors[conductor];
+      this.strokePath(ctx, path, colour, 2.5, dead ? DEAD_WIRE_DASH : undefined);
     }
-    const currents = this.currents();
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
       const amps = currents.get(wire.id);
@@ -124,7 +132,13 @@ export class SchematicView implements View {
     }
     for (const { node } of frame.layout.values()) {
       const selected = node.id === nodeId || (node.placementId !== undefined && node.placementId === placementId);
+      const dead = power.deadNodes.has(node.id);
+      if (dead) {
+        ctx.save();
+        ctx.globalAlpha = DEAD_NODE_ALPHA;
+      }
       this.drawNode(ctx, frame, node, selected);
+      if (dead) ctx.restore();
     }
     this.drawPreview(ctx, frame);
   }
@@ -308,15 +322,20 @@ export class SchematicView implements View {
     }
   }
 
-  private currentsCache?: { project: Project; snapshot: Session['snapshot']; libraries: Session['libraries']; value: Map<string, number> };
+  private analysisCache?: {
+    project: Project;
+    snapshot: Session['snapshot'];
+    libraries: Session['libraries'];
+    value: { currents: Map<string, number>; power: Energy };
+  };
 
-  /** Wire currents are worth recomputing only when the project, its modules or the libraries changed. */
-  private currents(): Map<string, number> {
+  /** Currents and voltage are worth recomputing only when the project, its modules or the libraries changed. */
+  private analysis(): { currents: Map<string, number>; power: Energy } {
     const { project, snapshot, libraries } = this.session;
-    const cached = this.currentsCache;
+    const cached = this.analysisCache;
     if (cached && cached.project === project && cached.snapshot === snapshot && cached.libraries === libraries) return cached.value;
-    const value = wireCurrents(project, this.session.resolve);
-    this.currentsCache = { project, snapshot, libraries, value };
+    const value = { currents: wireCurrents(project, this.session.resolve), power: energy(project, this.session.resolve) };
+    this.analysisCache = { project, snapshot, libraries, value };
     return value;
   }
 

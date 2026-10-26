@@ -1,0 +1,667 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "railLengthsUnits": [
+        36,
+        36
+      ],
+      "railPitchesMm": [
+        150
+      ],
+      "railLabels": [
+        "Incoming and protection",
+        "Final circuits"
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "changeover-4p-63"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "Mains / generator"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcd-4p-40-30"
+          },
+          "rail": 0,
+          "slot": 7,
+          "label": "RCD 30 mA"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "n-bar-12"
+          },
+          "rail": 0,
+          "slot": 12,
+          "label": "N"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pe-bar-12"
+          },
+          "rail": 0,
+          "slot": 19,
+          "label": "PE"
+        },
+        {
+          "id": "p5",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-3p-c16"
+          },
+          "rail": 1,
+          "slot": 0,
+          "label": "Lathe"
+        },
+        {
+          "id": "p6",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-b10"
+          },
+          "rail": 1,
+          "slot": 3,
+          "label": "Lights"
+        }
+      ],
+      "combs": [
+        {
+          "id": "c1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "comb-3ph-12"
+          },
+          "rail": 1,
+          "slot": 0,
+          "widthUnits": 4
+        }
+      ],
+      "shelf": [],
+      "title": "Workshop with a backup input"
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "Changeover switch I-0-II 4P 63A",
+          "x": 200,
+          "y": 150,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "RCD 4P 40A 30mA",
+          "x": 200,
+          "y": 300,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "Neutral bar 12 terminals",
+          "x": -100,
+          "y": 300,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "Earth bar 12 terminals",
+          "x": 620,
+          "y": 300,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 3P C16",
+          "x": 100,
+          "y": 460,
+          "placementId": "p5",
+          "id": "n5"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P B10",
+          "x": 360,
+          "y": 460,
+          "placementId": "p6",
+          "id": "n6"
+        },
+        {
+          "kind": "source",
+          "label": "Mains",
+          "x": 60,
+          "y": 0,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "id": "n7"
+        },
+        {
+          "kind": "source",
+          "label": "Generator",
+          "x": 360,
+          "y": 0,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "id": "n8"
+        },
+        {
+          "kind": "load",
+          "label": "Lathe",
+          "x": 100,
+          "y": 640,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "PE"
+          ],
+          "id": "n9",
+          "load": {
+            "powerW": 4000,
+            "powerFactor": 0.85,
+            "crossSectionMm2": 2.5,
+            "lengthM": 30
+          }
+        },
+        {
+          "kind": "load",
+          "label": "Workshop lights",
+          "x": 360,
+          "y": 640,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n10",
+          "load": {
+            "powerW": 600,
+            "crossSectionMm2": 1.5,
+            "lengthM": 40,
+            "circuit": "lighting"
+          }
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1a"
+          }
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2a"
+          }
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3a"
+          }
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:Na"
+          }
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1b"
+          }
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2b"
+          }
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3b"
+          }
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:Nb"
+          }
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w15",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w16",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:N1"
+          }
+        },
+        {
+          "id": "w17",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:PE"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:PE1"
+          }
+        },
+        {
+          "id": "w18",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:PE"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:PE2"
+          }
+        },
+        {
+          "id": "w19",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w20",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w21",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w22",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:PEb1"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w23",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w24",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:Nb1"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w25",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:PEb2"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:PE"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/changeover-4p-63": {
+      "id": "changeover-4p-63",
+      "kind": "switch",
+      "name": "Changeover switch I-0-II 4P 63A",
+      "widthUnits": 6,
+      "poles": 4,
+      "ratedCurrentA": 63,
+      "terminals": [
+        {
+          "name": "L1a",
+          "conductor": "L1",
+          "side": "top"
+        },
+        {
+          "name": "L2a",
+          "conductor": "L2",
+          "side": "top"
+        },
+        {
+          "name": "L3a",
+          "conductor": "L3",
+          "side": "top"
+        },
+        {
+          "name": "Na",
+          "conductor": "N",
+          "side": "top"
+        },
+        {
+          "name": "L1b",
+          "conductor": "L1",
+          "side": "top"
+        },
+        {
+          "name": "L2b",
+          "conductor": "L2",
+          "side": "top"
+        },
+        {
+          "name": "L3b",
+          "conductor": "L3",
+          "side": "top"
+        },
+        {
+          "name": "Nb",
+          "conductor": "N",
+          "side": "top"
+        },
+        {
+          "name": "L1",
+          "conductor": "L1",
+          "side": "bottom"
+        },
+        {
+          "name": "L2",
+          "conductor": "L2",
+          "side": "bottom"
+        },
+        {
+          "name": "L3",
+          "conductor": "L3",
+          "side": "bottom"
+        },
+        {
+          "name": "N",
+          "conductor": "N",
+          "side": "bottom"
+        }
+      ],
+      "resizable": {
+        "minUnits": 4,
+        "maxUnits": 10
+      }
+    },
+    "generic-iec/rcd-4p-40-30": {
+      "id": "rcd-4p-40-30",
+      "kind": "rcd",
+      "name": "RCD 4P 40A 30mA",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 40,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/n-bar-12": {
+      "id": "n-bar-12",
+      "kind": "busbar",
+      "name": "Neutral bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "N",
+          "conductor": "N",
+          "side": "top",
+          "net": "N",
+          "count": 6
+        },
+        {
+          "name": "Nb",
+          "conductor": "N",
+          "side": "bottom",
+          "net": "N",
+          "count": 6
+        }
+      ]
+    },
+    "generic-iec/pe-bar-12": {
+      "id": "pe-bar-12",
+      "kind": "busbar",
+      "name": "Earth bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "PE",
+          "conductor": "PE",
+          "side": "top",
+          "net": "PE",
+          "count": 6
+        },
+        {
+          "name": "PEb",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PE",
+          "count": 6
+        }
+      ]
+    },
+    "generic-iec/mcb-3p-c16": {
+      "id": "mcb-3p-c16",
+      "kind": "breaker",
+      "name": "MCB 3P C16",
+      "widthUnits": 3,
+      "poles": 3,
+      "ratedCurrentA": 16,
+      "curve": "C",
+      "breakingCapacityKA": 6
+    },
+    "generic-iec/mcb-1p-b10": {
+      "id": "mcb-1p-b10",
+      "kind": "breaker",
+      "name": "MCB 1P B10",
+      "widthUnits": 1,
+      "poles": 1,
+      "ratedCurrentA": 10,
+      "curve": "B",
+      "breakingCapacityKA": 6
+    },
+    "generic-iec/comb-3ph-12": {
+      "id": "comb-3ph-12",
+      "kind": "comb",
+      "name": "Comb 3-phase, 12 units",
+      "widthUnits": 12,
+      "poles": 3,
+      "comb": {
+        "pattern": [
+          "L1",
+          "L2",
+          "L3"
+        ],
+        "side": "top"
+      },
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 54
+      }
+    }
+  }
+}

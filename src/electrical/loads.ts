@@ -10,7 +10,7 @@ import {
   type InstallMethod,
   type LoadedConductors,
 } from './cables';
-import { netContextOf, PASSIVE_KINDS, type Resolve } from './context';
+import { Components, netContextOf, PASSIVE_KINDS, type Resolve } from './context';
 import { buildNets, terminalKey } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
 import type { Terminal } from './terminals';
@@ -104,21 +104,6 @@ export function voltageDropLimitPercent(node: SchematicNode, settings: CableSett
 }
 
 export const formatAmps = (amps: number): string => String(Number(amps.toFixed(1)));
-
-class Components {
-  private readonly parent = new Map<string, string>();
-
-  find(key: string): string {
-    let root = this.parent.get(key) ?? key;
-    while (this.parent.has(root) && this.parent.get(root) !== root) root = this.parent.get(root)!;
-    this.parent.set(key, root);
-    return root;
-  }
-
-  join(a: string, b: string): void {
-    this.parent.set(this.find(a), this.find(b));
-  }
-}
 
 /**
  * The current each phase wire carries: the load current on the side of the wire that is cut off

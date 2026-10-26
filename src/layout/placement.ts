@@ -17,6 +17,8 @@ export interface Placement {
   widthUnits?: number;
   /** Labels of single terminals, keyed by terminal id (e.g. `top:N3`). */
   terminalLabels?: Record<string, string>;
+  /** Position of a device that switches: `closed` or `open`, or `1`, `2` or `open` with two inputs. */
+  state?: string;
 }
 
 /** A module taken off its rail: it keeps its id, so a schematic node and wires find it again. */
@@ -68,6 +70,7 @@ export type PlacementError =
   | { kind: 'unknown-placement' }
   | { kind: 'invalid-label' }
   | { kind: 'not-resizable' }
+  | { kind: 'invalid-state' }
   | { kind: 'width-out-of-range' };
 
 export type PlacementResult =
@@ -235,6 +238,18 @@ export function setPlacementLabel(panel: Panel, id: string, text: string): Place
     if (p.id !== id) return p;
     const { label: _previous, ...rest } = p;
     return parsed.label === undefined ? rest : { ...rest, label: parsed.label };
+  });
+  return { ok: true, panel: { ...panel, placements } };
+}
+
+/** Sets the position of a switching device, or clears it with `undefined` so it takes its default. */
+export function setPlacementState(panel: Panel, id: string, state: string | undefined, allowed: readonly string[]): PlacementResult {
+  if (!panel.placements.some((p) => p.id === id)) return { ok: false, error: { kind: 'unknown-placement' } };
+  if (state !== undefined && !allowed.includes(state)) return { ok: false, error: { kind: 'invalid-state' } };
+  const placements = panel.placements.map((p) => {
+    if (p.id !== id) return p;
+    const { state: _previous, ...rest } = p;
+    return state === undefined ? rest : { ...rest, state };
   });
   return { ok: true, panel: { ...panel, placements } };
 }

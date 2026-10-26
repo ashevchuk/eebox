@@ -39,3 +39,19 @@ export function netContextOf(project: Project, resolve: Resolve): NetContext {
   }
   return { project, nets, netOf, defs, terminals };
 }
+
+/** Groups keys that are joined; asking for the group of a key that was never joined gives the key itself. */
+export class Components {
+  private readonly parent = new Map<string, string>();
+
+  find(key: string): string {
+    let root = this.parent.get(key) ?? key;
+    while (this.parent.has(root) && this.parent.get(root) !== root) root = this.parent.get(root)!;
+    this.parent.set(key, root);
+    return root;
+  }
+
+  join(a: string, b: string): void {
+    this.parent.set(this.find(a), this.find(b));
+  }
+}
