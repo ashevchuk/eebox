@@ -186,6 +186,17 @@ try {
     expectTrue(csv.includes('Ferrule (mm2),Quantity'), 'the circuit list lacks the ferrules');
   });
 
+  await step('the library and the inspector can be hidden to give the drawing room, and come back', async () => {
+    const hidden = (name) => browser.evaluate(`document.body.classList.contains('hide-${name}')`);
+    const wide = await browser.evaluate(`document.getElementById('stage-wrap').clientWidth`);
+    await browser.evaluate(`document.getElementById('toggle-inspector').click()`);
+    expectEqual(await hidden('inspector'), true, 'inspector hidden');
+    expectTrue((await browser.evaluate(`document.getElementById('stage-wrap').clientWidth`)) > wide, 'the drawing did not get wider');
+    await browser.evaluate(`document.getElementById('toggle-inspector').click()`);
+    expectEqual(await hidden('inspector'), false, 'inspector shown again');
+    expectEqual(await browser.evaluate(`document.getElementById('stage-wrap').clientWidth`), wide, 'width after showing it again');
+  });
+
   await step('the schematic menu separates wires that run close and takes hand-drawn routes off', async () => {
     const choose = async (item) => {
       await clickButton('Nodes');

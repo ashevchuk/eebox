@@ -24,6 +24,8 @@ export interface Scene {
   selectedCombId: string | null;
   /** Items selected together as a group, instead of the two above. */
   selectedIds?: ReadonlySet<string>;
+  /** Placed modules to mark: outlined in red for a fault, in amber for advice. */
+  marked?: ReadonlyMap<string, 'error' | 'advice'>;
   selectedRail: number | null;
   /** The placement or comb being dragged; drawn dimmed at its old position. */
   moving: { kind: 'placement' | 'comb'; id: string } | null;
@@ -32,6 +34,8 @@ export interface Scene {
   band?: Rect | null;
   /** What the ruler has measured, in world coordinates. */
   ruler?: RulerLine | null;
+  /** Draws only the rails and what stands on them, without the frame and its title, as a full-size print needs. */
+  bare?: boolean;
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -272,16 +276,18 @@ export function render(
 
   const { panel } = scene;
   const frame = frameRect(panel);
-  fillRect(ctx, frame, theme().frameFill);
-  ctx.strokeStyle = theme().frame;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
-  if (panel.title) {
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillStyle = theme().label;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(fitText(ctx, panel.title, frame.width - 28), 14, 24);
+  if (!scene.bare) {
+    fillRect(ctx, frame, theme().frameFill);
+    ctx.strokeStyle = theme().frame;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
+    if (panel.title) {
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillStyle = theme().label;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(fitText(ctx, panel.title, frame.width - 28), 14, 24);
+    }
   }
 
   panel.railLengthsUnits.forEach((_length, rail) => {
@@ -304,6 +310,13 @@ export function render(
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
     drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement));
+    const mark = scene.marked?.get(placement.id);
+    if (mark) {
+      const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
+      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+    }
     if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
       const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
       ctx.strokeStyle = COLORS.selection;

@@ -40,7 +40,7 @@ import { chooseColours } from './ui/colourDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
-import { selectedIds } from './ui/selection';
+import { selectedIds, selectedWires } from './ui/selection';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
@@ -110,9 +110,9 @@ function syncUi(): void {
   byId('bundle-mode').classList.toggle('active', schematicView.bundleMode);
   byId('ruler').classList.toggle('active', session.ruler.on);
   canvas.style.cursor = session.mode === 'panel' && session.ruler.on ? 'crosshair' : '';
-  const { nodeId, wireId } = session.selection;
+  const { nodeId } = session.selection;
   const chosen = selectedIds(session.selection);
-  deleteButton.disabled = !(session.mode === 'panel' ? chosen.placements.length + chosen.combs.length > 0 : nodeId || wireId);
+  deleteButton.disabled = !(session.mode === 'panel' ? chosen.placements.length + chosen.combs.length > 0 : nodeId || selectedWires(session.selection).length > 0);
 }
 
 session.subscribe(() => {
@@ -631,7 +631,10 @@ byId('export-circuits').addEventListener('click', exportCircuits);
 byId('export-wires').addEventListener('click', exportWires);
 byId('export-wire-labels').addEventListener('click', exportWireLabels);
 for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
-  byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));
+  byId(`add-${preset}`).addEventListener('click', () => {
+    schematicView.addFreeNode(preset);
+    fitView('schematic');
+  });
 }
 byId('check').addEventListener('click', checkProject);
 byId('bundle-mode').addEventListener('click', () => {
@@ -646,6 +649,44 @@ undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
 new ResizeObserver(resizeCanvas).observe(stageWrap);
 window.addEventListener('hashchange', () => void openSharedHash());
+
+/** The panels beside the drawing can be hidden, and start hidden in a narrow window; the choice is kept. */
+const PANEL_KEYS = { sidebar: 'eebox:hide-sidebar', inspector: 'eebox:hide-inspector' } as const;
+const NARROW_WINDOW_PX = 1100;
+
+const chosenHidden: Partial<Record<keyof typeof PANEL_KEYS, boolean>> = {};
+
+function panelHidden(name: keyof typeof PANEL_KEYS): boolean {
+  const chosen = chosenHidden[name];
+  if (chosen !== undefined) return chosen;
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(PANEL_KEYS[name]);
+  } catch {
+    stored = null;
+  }
+  return stored === null ? window.innerWidth < NARROW_WINDOW_PX : stored === 'yes';
+}
+
+function showPanels(): void {
+  for (const name of ['sidebar', 'inspector'] as const) {
+    document.body.classList.toggle(`hide-${name}`, panelHidden(name));
+    byId(`toggle-${name}`).classList.toggle('active', !panelHidden(name));
+  }
+}
+
+for (const name of ['sidebar', 'inspector'] as const) {
+  byId(`toggle-${name}`).addEventListener('click', () => {
+    chosenHidden[name] = !panelHidden(name);
+    try {
+      window.localStorage.setItem(PANEL_KEYS[name], chosenHidden[name] ? 'yes' : 'no');
+    } catch {
+      // The choice then holds for this visit only.
+    }
+    showPanels();
+  });
+}
+showPanels();
 
 const autosaveStore: KeyValueStore | null = (() => {
   try {

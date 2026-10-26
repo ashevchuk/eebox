@@ -143,7 +143,7 @@ export interface ColourChoice {
   custom: ColourScheme;
 }
 
-export const DEFAULT_COLOUR_CHOICE: ColourChoice = { scheme: 'eu', custom: EU_SCHEME };
+export const DEFAULT_COLOUR_CHOICE: ColourChoice = { scheme: 'pue', custom: PUE_SCHEME };
 
 export function coloursOf(choice: ColourChoice): ColourScheme {
   return choice.scheme === 'custom' ? choice.custom : BUILT_IN_SCHEMES.find((s) => s.id === choice.scheme)!.colours;

@@ -1,4 +1,5 @@
-import { TILE_HEIGHT_MM, TILE_OVERLAP_MM, TILE_WIDTH_MM, tileLayout } from '../project/tiles';
+import { TILE_HEIGHT_MM, TILE_OVERLAP_MM, TILE_WIDTH_MM, sheetsWithContent, tileLayout } from '../project/tiles';
+import { printArea } from '../view/geometry';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
 import type { Session } from './session';
@@ -17,15 +18,32 @@ const element = (tag: string, className: string, text?: string): HTMLElement => 
  * lies under the sheet.
  */
 export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: View): void {
-  const bounds = panelView.fitBounds();
+  const measuring = document.createElement('canvas').getContext('2d')!;
+  measuring.font = '8px sans-serif';
+  const combInfo = (item: { module: Parameters<Session['resolve']>[0]; widthUnits?: number }) => {
+    const def = session.resolve(item.module);
+    return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
+  };
+  const { bounds, rects } = printArea(session.project.panel, session.widthOf, combInfo, (text) => measuring.measureText(text).width);
   const widthMm = bounds.maxX - bounds.minX;
   const heightMm = bounds.maxY - bounds.minY;
-  const parsed = new DOMParser().parseFromString(renderToSvg(panelView, session, LIGHT_THEME, 'full-'), 'image/svg+xml');
+  session.bareDrawing = true;
+  let markup: string;
+  try {
+    markup = renderToSvg(panelView, session, LIGHT_THEME, 'full-', bounds);
+  } finally {
+    session.bareDrawing = false;
+  }
+  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml');
   const layout = tileLayout(widthMm, heightMm);
-  const total = layout.tiles.length;
+  const printed = sheetsWithContent(
+    layout,
+    rects.map((r) => ({ ...r, x: r.x - bounds.minX, y: r.y - bounds.minY })),
+  );
+  const total = printed.length;
 
   sheet.replaceChildren(
-    ...layout.tiles.map((tile, index) => {
+    ...printed.map((tile, index) => {
       const page = element('div', 'tile');
       const drawing = element('div', 'tile-drawing');
       const svg = document.importNode(parsed.documentElement, true) as unknown as SVGSVGElement;

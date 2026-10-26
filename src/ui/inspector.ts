@@ -37,6 +37,7 @@ import {
   MIN_POWER_FACTOR,
   type LoadSpec,
 } from '../electrical/loads';
+import type { Finding } from '../electrical/problems';
 import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
 import { mmFromUnits } from '../layout/units';
 import { terminalsOf } from '../electrical/terminals';
@@ -58,7 +59,7 @@ import {
 } from '../schematic/model';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import { copyItems, MAX_REPEAT_COPIES, repeatItems } from '../layout/clipboard';
-import { groupSelection, selectedIds } from './selection';
+import { groupSelection, selectedIds, selectedWires } from './selection';
 import type { Mode, Selection } from './session';
 
 export type FieldKind = 'text' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
@@ -101,6 +102,8 @@ export interface InspectContext {
   fromLibraries: Resolve;
   /** Cable table and voltage drop norms; the built-in ones when absent. */
   cableSettings?: CableSettings;
+  /** Faults and advice, so the inspector can say why something is marked. */
+  findings?: Finding[];
 }
 
 export type EditResult =
@@ -122,6 +125,7 @@ type Target =
   | { kind: 'rail'; rail: number }
   | { kind: 'group'; count: number }
   | { kind: 'wire'; wire: Wire }
+  | { kind: 'wires'; wires: Wire[] }
   | { kind: 'node'; node: SchematicNode };
 
 /** Adds copies of what is selected, edge to edge after it; the number is typed in and nothing is kept in the field. */
@@ -137,7 +141,9 @@ const NOT_A_DECIMAL = 'Enter a number.';
 function targetOf({ project, selection, mode }: InspectContext): Target {
   const { panel, schematic } = project;
   if (mode === 'schematic') {
-    const wire = schematic.wires.find((w) => w.id === selection.wireId);
+    const chosen = schematic.wires.filter((w) => selectedWires(selection).includes(w.id));
+    if (chosen.length > 1) return { kind: 'wires', wires: chosen };
+    const wire = chosen[0];
     if (wire) return { kind: 'wire', wire };
     const node = schematic.nodes.find((n) => n.id === selection.nodeId);
     if (!node) return { kind: 'panel' };
@@ -171,6 +177,10 @@ const decimal = (key: string, label: string, value: number, min: number, max: nu
 const readonly = (key: string, label: string, value: string | number): InspectorField => ({
   key, label, kind: 'readonly', value,
 });
+
+/** One line for every fault that this item takes part in, so a red mark on the drawing has a reason. */
+const faultFields = (findings: Finding[] | undefined, takesPart: (p: Finding) => boolean): InspectorField[] =>
+  (findings ?? []).filter(takesPart).map((p, i) => readonly(`problem${i}`, p.severity === 'error' ? 'Problem' : 'Advice', p.message));
 
 function loadFields(project: Project, resolve: Resolve, node: SchematicNode, settings?: CableSettings): InspectorField[] {
   if (node.kind === 'source') {
@@ -321,6 +331,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: node ? 'Module node' : 'Module',
         actions: def ? [EDIT_MODULE, TAKE_OFF] : [TAKE_OFF],
         fields: [
+          ...faultFields(ctx.findings, (p) => p.placements.includes(placement.id)),
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
           ...positionFields(placement, def, project, width),
@@ -352,6 +363,12 @@ export function inspect(ctx: InspectContext): InspectorView {
         ],
       };
     }
+    case 'wires':
+      return {
+        title: `${target.wires.length} wires selected`,
+        actions: target.wires.some((w) => w.route) ? [{ key: 'routeAutomatically', label: 'Route automatically' }] : [],
+        fields: [readonly('count', 'Selected', target.wires.length), readonly('route', 'Routed by hand', target.wires.filter((w) => w.route).length)],
+      };
     case 'group':
       return {
         title: `${target.count} items selected`,
@@ -392,6 +409,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: 'Wire',
         actions: wire.route ? [{ key: 'routeAutomatically', label: 'Route automatically' }] : [],
         fields: [
+          ...faultFields(ctx.findings, (p) => p.wires.includes(wire.id)),
           text('label', 'Label', wire.label ?? ''),
           { key: 'section', label: 'Cross-section', kind: 'select', value: wire.crossSectionMm2 === undefined ? '' : String(wire.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2, for the ferrules; empty for the load cable' },
           readonly('from', 'From', end(wire.a)),
@@ -408,6 +426,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: node.kind === 'source' ? 'Source' : node.kind === 'load' ? 'Load' : 'Module node',
         actions: [],
         fields: [
+          ...faultFields(ctx.findings, (p) => p.nodes.includes(node.id)),
           text('label', 'Label', node.label),
           ...(node.conductors
             ? [{ key: 'conductors', label: 'Conductors', kind: 'choices' as const, value: [...node.conductors], options: CONDUCTORS }]
@@ -622,6 +641,7 @@ export function applyEdit(
       }
       return fail('That property cannot be edited.');
     }
+    case 'wires':
     case 'group':
       return fail('That property cannot be edited.');
     case 'rail': {
@@ -696,9 +716,14 @@ export function applyEdit(
 /** Runs an inspector action; returns the project to commit and what should be selected afterwards. */
 export function applyAction(ctx: InspectContext, key: string, options: { confirmed?: boolean } = {}): EditResult {
   const target = targetOf(ctx);
-  if (key === 'routeAutomatically' && target.kind === 'wire') {
-    const result = setWireRoute(ctx.project.schematic, target.wire.id, undefined);
-    return result.ok ? { ok: true, project: { ...ctx.project, schematic: result.schematic } } : fail(describeError(result.error));
+  if (key === 'routeAutomatically' && (target.kind === 'wire' || target.kind === 'wires')) {
+    let schematic = ctx.project.schematic;
+    for (const wire of target.kind === 'wire' ? [target.wire] : target.wires) {
+      const result = setWireRoute(schematic, wire.id, undefined);
+      if (!result.ok) return fail(describeError(result.error));
+      schematic = result.schematic;
+    }
+    return { ok: true, project: { ...ctx.project, schematic } };
   }
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);

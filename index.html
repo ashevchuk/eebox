@@ -129,6 +129,7 @@
       body[data-mode='panel'] .schematic-only,
       body[data-mode='schematic'] .panel-only,
       body[data-mode='schematic'] #sidebar { display: none; }
+      body.hide-sidebar #sidebar, body.hide-inspector #inspector { display: none; }
       #inspector {
         width: 270px;
         flex: 0 0 auto;
@@ -380,6 +381,12 @@
         <button id="delete-selection" title="Remove the selected item (Delete)" disabled>Delete</button>
         <button id="fit">Fit</button>
         <button id="ruler" class="panel-only" title="Measure on the panel: drag from point to point; ends snap to edges (R)">Ruler</button>
+      </div>
+      <span class="toolbar-separator"></span>
+      <span class="toolbar-separator"></span>
+      <div class="toolbar-group">
+        <button id="toggle-sidebar" class="panel-only" title="Show or hide the module library">Library</button>
+        <button id="toggle-inspector" title="Show or hide the inspector">Inspector</button>
       </div>
       <span class="toolbar-separator"></span>
       <button id="check" title="Look for overlaps, orphaned nodes, wrongly joined conductors and design problems">Check</button>

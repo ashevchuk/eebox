@@ -22,3 +22,20 @@ export function groupSelection(placements: string[], combs: string[]): Selection
   if (placements.length === 0 && combs.length === 1) return { combId: combs[0]! };
   return { placementIds: placements, combIds: combs };
 }
+
+/** Ids of the selected wires, whether it is one or a group. */
+export function selectedWires(selection: Selection): string[] {
+  return selection.wireIds ?? (selection.wireId ? [selection.wireId] : []);
+}
+
+/** One wire is a plain selection of it; several are a group; none is no selection. */
+export function wireGroupSelection(ids: string[]): Selection {
+  if (ids.length === 0) return {};
+  return ids.length === 1 ? { wireId: ids[0]! } : { wireIds: ids };
+}
+
+/** Adds the wire to the selected wires, or takes it out if it is in already. */
+export function toggleWire(selection: Selection, id: string): Selection {
+  const current = selectedWires(selection);
+  return wireGroupSelection(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
+}

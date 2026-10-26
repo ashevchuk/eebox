@@ -50,6 +50,45 @@ export interface Energy {
   inputsOf(placementId: string): Record<string, boolean> | undefined;
   /** For a module with logic, how many of its contacts are closed and how many it has. */
   contactsOf(placementId: string): { closed: number; total: number } | undefined;
+  /** Conductors of different kinds that meet only because a device is closed, which wires and bars alone would not have joined. */
+  shorts: ShortCircuit[];
+  /** Phase conductors of sources that are on and joined together, by wires or through closed devices. */
+  parallelSources: ParallelSources[];
+}
+
+export interface ParallelSources {
+  /** Ids of the source nodes whose phases are joined. */
+  sources: string[];
+  terminals: ShortTerminal[];
+  devices: string[];
+}
+
+export interface ShortTerminal {
+  key: string;
+  owner: { kind: 'placement' | 'node'; id: string };
+  terminalId: string;
+  conductor: Conductor;
+}
+
+export interface ShortCircuit {
+  /** Every terminal that is joined together. */
+  terminals: ShortTerminal[];
+  /** Placed devices whose closed contacts do the joining. */
+  devices: string[];
+}
+
+/** Whether these conductors cannot be on one net: two phases, a phase and neutral or earth, DC plus and minus. */
+export function conflictingConductors(conductors: Iterable<Conductor>): boolean {
+  const fixed = new Set<Conductor>();
+  let anyPhase = false;
+  for (const c of conductors) {
+    if (c === 'C') continue;
+    if (c === 'L') anyPhase = true;
+    else fixed.add(c);
+  }
+  const phases = [...fixed].filter((c) => familyOf(c) === 'phase');
+  const others = [...fixed].filter((c) => familyOf(c) !== 'phase');
+  return phases.length > 1 || others.length > 1 || (others.length === 1 && (phases.length > 0 || anyPhase));
 }
 
 const MAX_LOGIC_PASSES = 20;
@@ -77,6 +116,9 @@ export function energy(project: Project, resolve: Resolve): Energy {
     const b = terminalKey(schematic, wire.b);
     if (a !== undefined && b !== undefined) joins.push([a, b]);
   }
+  const staticJoins = joins.length;
+  /** Which placed device made each join that goes through a device, so a short can say which one it is. */
+  const deviceOf = new Map<string, string>();
   for (const placement of panel.placements) {
     const def = context.defs.get(placement.id);
     if (!def || def.logic || PASSIVE_KINDS.includes(def.kind)) continue;
@@ -90,6 +132,8 @@ export function energy(project: Project, resolve: Resolve): Energy {
       if (position !== undefined && position !== CLOSED && position !== String(input)) continue;
       for (const bottom of terminals.filter((t) => t.terminal.side === 'bottom' && t.terminal.conductor === top.terminal.conductor)) {
         joins.push([top.key, bottom.key]);
+        deviceOf.set(top.key, placement.id);
+        deviceOf.set(bottom.key, placement.id);
       }
     }
   }
@@ -183,8 +227,46 @@ export function energy(project: Project, resolve: Resolve): Energy {
       if (keys.length > 0 && !keys.some(live)) deadNodes.add(node.id);
     }
   }
+  const records: ShortTerminal[] = [
+    ...[...context.terminals].flatMap(([placementId, list]) =>
+      list.map((t): ShortTerminal => ({ key: t.key, owner: { kind: 'placement', id: placementId }, terminalId: t.terminal.id, conductor: t.terminal.conductor })),
+    ),
+    ...schematic.nodes
+      .filter((n) => n.kind !== 'module')
+      .flatMap((n) => freeNodeTerminals(n).map((t): ShortTerminal => ({ key: `n:${n.id}/${t.id}`, owner: { kind: 'node', id: n.id }, terminalId: t.id, conductor: t.conductor }))),
+  ];
+  const staticOnly = new Components();
+  for (const [a, b] of joins.slice(0, staticJoins)) staticOnly.join(a, b);
+  const byJoined = new Map<string, ShortTerminal[]>();
+  for (const record of records) {
+    const root = components.find(record.key);
+    byJoined.set(root, [...(byJoined.get(root) ?? []), record]);
+  }
+  const shorts: ShortCircuit[] = [];
+  for (const group of byJoined.values()) {
+    if (group.length < 2 || !conflictingConductors(group.map((t) => t.conductor))) continue;
+    const bySingleNet = new Map<string, Conductor[]>();
+    for (const t of group) bySingleNet.set(staticOnly.find(t.key), [...(bySingleNet.get(staticOnly.find(t.key)) ?? []), t.conductor]);
+    if ([...bySingleNet.values()].some((conductors) => conflictingConductors(conductors))) continue;
+    const devices = [...new Set(group.flatMap((t) => (deviceOf.has(t.key) ? [deviceOf.get(t.key)!] : [])))];
+    const closedContacts = [...closed].filter((c) => group.some((t) => t.key === c.keys[0])).map((c) => c.placementId);
+    shorts.push({ terminals: group, devices: [...new Set([...devices, ...closedContacts])] });
+  }
+
+  const sourceOn = new Map(schematic.nodes.filter((n) => n.kind === 'source').map((n) => [n.id, !n.off]));
+  const parallelSources: ParallelSources[] = [];
+  for (const group of byJoined.values()) {
+    const sources = [...new Set(group.filter((t) => t.owner.kind === 'node' && sourceOn.get(t.owner.id) === true && familyOf(t.conductor) === 'phase').map((t) => t.owner.id))];
+    if (sources.length < 2) continue;
+    const devices = [...new Set(group.flatMap((t) => (deviceOf.has(t.key) ? [deviceOf.get(t.key)!] : [])))];
+    const closedContacts = [...closed].filter((c) => group.some((t) => t.key === c.keys[0])).map((c) => c.placementId);
+    parallelSources.push({ sources, terminals: group, devices: [...new Set([...devices, ...closedContacts])] });
+  }
+
   return {
     hasSource,
+    shorts,
+    parallelSources,
     deadWires,
     deadNodes,
     placementLive: (placementId) => (context.terminals.get(placementId) ?? []).some((t) => isPhase(t.terminal.conductor) && live(t.key)),

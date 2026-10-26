@@ -3,6 +3,7 @@ import type { CableSettings } from './cables';
 import { netContextOf, type Resolve } from './context';
 import type { LoadReport } from './loads';
 import { PROTECTIVE_KINDS } from './loads';
+import type { RuleFinding } from './rules';
 
 const MOHM_PER_OHM = 1000;
 
@@ -24,9 +25,9 @@ export function protectionWarnings(
   settings: CableSettings,
   reports: LoadReport[],
   name: (nodeId: string) => string,
-): string[] {
+): RuleFinding[] {
   const context = netContextOf(project, resolve);
-  const warnings: string[] = [];
+  const warnings: RuleFinding[] = [];
 
   const shortCircuitKA = worstOfSources(project, 'shortCircuitKA');
   if (shortCircuitKA !== undefined) {
@@ -35,9 +36,11 @@ export function protectionWarnings(
       const wired = (context.terminals.get(placement.id) ?? []).some((t) => context.netOf.has(t.key));
       if (!wired || !def?.breakingCapacityKA || !PROTECTIVE_KINDS.includes(def.kind)) continue;
       if (def.breakingCapacityKA < shortCircuitKA) {
-        warnings.push(
-          `${placement.label ?? def.name} [${placement.id}]: its breaking capacity of ${def.breakingCapacityKA} kA is below the prospective short-circuit current of ${shortCircuitKA} kA`,
-        );
+        warnings.push({
+          message: `${placement.label ?? def.name} [${placement.id}]: its breaking capacity of ${def.breakingCapacityKA} kA is below the prospective short-circuit current of ${shortCircuitKA} kA`,
+          nodes: [],
+          placements: [placement.id],
+        });
       }
     }
   }
@@ -55,9 +58,11 @@ export function protectionWarnings(
     const faultA = (settings.faultVoltageV * MOHM_PER_OHM) / impedanceMOhm;
     const needsA = settings.tripMultiples[def.curve] * def.ratedCurrentA;
     if (faultA < needsA) {
-      warnings.push(
-        `${name(report.nodeId)} [${report.nodeId}]: a fault at the end of ${report.lengthM} m of ${report.chosenSectionMm2} mm2 gives about ${Math.round(faultA)} A, below the ${Math.round(needsA)} A that trips its ${def.curve}${def.ratedCurrentA} breaker at once (an RCD upstream would disconnect it instead)`,
-      );
+      warnings.push({
+        message: `${name(report.nodeId)} [${report.nodeId}]: a fault at the end of ${report.lengthM} m of ${report.chosenSectionMm2} mm2 gives about ${Math.round(faultA)} A, below the ${Math.round(needsA)} A that trips its ${def.curve}${def.ratedCurrentA} breaker at once (an RCD upstream would disconnect it instead)`,
+        nodes: [report.nodeId],
+        placements: [report.breakerPlacementId],
+      });
     }
   }
   return warnings;

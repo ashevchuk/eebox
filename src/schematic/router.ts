@@ -12,6 +12,8 @@ const LANES_IN_GAP = 2;
 const BEND_COST = 24;
 const OVERLAP_COST_PER_PX = 6;
 const MAX_EXPANSIONS = 60000;
+/** Lines of the grid that are not needed to leave a terminal or follow a hand-drawn wire are left out when they are closer than this to another, or the router would put two wires there. */
+const MIN_LINE_GAP = 10;
 
 type Direction = 0 | 1 | 2 | 3;
 const START: 4 = 4;
@@ -57,6 +59,13 @@ class MinHeap {
     }
     return top;
   }
+}
+
+/** The lines that have to be there, and of the others those that are a gap away from every line kept. */
+function gridLines(required: number[], optional: number[]): number[] {
+  const kept = sortedUnique(required);
+  for (const value of sortedUnique(optional)) if (kept.every((k) => Math.abs(k - value) >= MIN_LINE_GAP)) kept.push(value);
+  return kept.sort((a, b) => a - b);
 }
 
 function sortedUnique(values: number[]): number[] {
@@ -225,29 +234,31 @@ export function routeWires(schematic: Schematic, layout: Layout): Map<string, Po
   }
 
   const obstacles = [...layout.values()].map((n) => inflate(n.rect));
-  const xValues: number[] = [];
-  const yValues: number[] = [];
+  const xRequired: number[] = [];
+  const yRequired: number[] = [];
+  const xOptional: number[] = [];
+  const yOptional: number[] = [];
   for (const o of obstacles) {
     for (let k = 0; k < LANES_AROUND_NODE; k++) {
-      xValues.push(o.x - k * LANE, o.x + o.width + k * LANE);
-      yValues.push(o.y - k * LANE, o.y + o.height + k * LANE);
+      xOptional.push(o.x - k * LANE, o.x + o.width + k * LANE);
+      yOptional.push(o.y - k * LANE, o.y + o.height + k * LANE);
     }
   }
   for (const path of manual.values()) {
     for (const p of path) {
-      xValues.push(p.x);
-      yValues.push(p.y);
+      xRequired.push(p.x);
+      yRequired.push(p.y);
     }
   }
   for (const { from, to } of endpoints) {
-    xValues.push(from.stub.x, to.stub.x);
-    yValues.push(from.stub.y, to.stub.y);
+    xRequired.push(from.stub.x, to.stub.x);
+    yRequired.push(from.stub.y, to.stub.y);
     for (let k = -LANES_IN_GAP; k <= LANES_IN_GAP; k++) {
-      xValues.push((from.stub.x + to.stub.x) / 2 + k * LANE);
-      yValues.push((from.stub.y + to.stub.y) / 2 + k * LANE);
+      xOptional.push((from.stub.x + to.stub.x) / 2 + k * LANE);
+      yOptional.push((from.stub.y + to.stub.y) / 2 + k * LANE);
     }
   }
-  const s: Search = { xs: sortedUnique(xValues), ys: sortedUnique(yValues), obstacles, used: new Map(), blocked: new Map() };
+  const s: Search = { xs: gridLines(xRequired, xOptional), ys: gridLines(yRequired, yOptional), obstacles, used: new Map(), blocked: new Map() };
   /**
    * A terminal whose stub ends inside the clearance of a nearby node is shut in by the clearance
    * alone, so such a wire is searched against the bodies of the nodes instead of their clearance.

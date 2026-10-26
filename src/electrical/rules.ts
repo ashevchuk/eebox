@@ -27,13 +27,28 @@ function contextOf(project: Project, resolve: Resolve): Context {
   return { ...netContextOf(project, resolve), name: (owner) => ownerName(project, resolve, owner) };
 }
 
+/** A piece of advice with what to mark on the drawings: the nodes and the placed modules it is about. */
+export interface RuleFinding {
+  message: string;
+  nodes: string[];
+  placements: string[];
+}
+
+const about = (message: string, where: { nodes?: string[]; placements?: string[] }): RuleFinding => ({ message, nodes: where.nodes ?? [], placements: where.placements ?? [] });
+
 /**
  * Design rules that a wiring can break without being wrong in itself. They are advice, so the
  * result is a list of messages and never prevents anything.
  */
 export function findRuleWarnings(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): string[] {
+  return findRuleFindings(project, resolve, settings).map((f) => f.message);
+}
+
+/** The same advice, each with the nodes and modules it is about; a module's own node is included. */
+export function findRuleFindings(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): RuleFinding[] {
   const context = contextOf(project, resolve);
   const reports = loadReports(project, resolve, settings);
+  const moduleNodeOf = (placementId: string) => project.schematic.nodes.filter((n) => n.placementId === placementId).map((n) => n.id);
   return [
     ...openEarth(context),
     ...unfedModules(context),
@@ -41,33 +56,33 @@ export function findRuleWarnings(project: Project, resolve: Resolve, settings: C
     ...loadsWithoutResidualCurrentProtection(context),
     ...cablesAgainstBreakers(reports, context.name),
     ...protectionWarnings(project, resolve, settings, reports, (id) => context.name({ kind: 'node', id })),
-  ];
+  ].map((f) => ({ ...f, nodes: [...new Set([...f.nodes, ...f.placements.flatMap(moduleNodeOf)])] }));
 }
 
-function openEarth({ project, netOf, name }: Context): string[] {
+function openEarth({ project, netOf, name }: Context): RuleFinding[] {
   return project.schematic.nodes.flatMap((node) => {
     if (node.kind !== 'load') return [];
     const earth = freeNodeTerminals(node).find((t) => t.conductor === 'PE');
     return earth && !netOf.has(`n:${node.id}/${earth.id}`)
-      ? [`${name({ kind: 'node', id: node.id })} [${node.id}]: protective earth is not connected`]
+      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: protective earth is not connected`, { nodes: [node.id] })]
       : [];
   });
 }
 
-function unfedModules({ project, netOf, defs, terminals, name }: Context): string[] {
+function unfedModules({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
   return project.panel.placements.flatMap((placement) => {
     const def = defs.get(placement.id);
     if (!def || PASSIVE_KINDS.includes(def.kind)) return [];
     const used = (side: Terminal['side']) =>
       terminals.get(placement.id)!.some((t) => t.terminal.side === side && netOf.has(t.key));
     return used('bottom') && !used('top')
-      ? [`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: its outputs are connected but its input is not fed`]
+      ? [about(`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: its outputs are connected but its input is not fed`, { placements: [placement.id] })]
       : [];
   });
 }
 
 /** Per phase, the modules fed through a module's outputs must not draw more than the module is rated for. */
-function overloadedModules({ project, nets, defs, name }: Context): string[] {
+function overloadedModules({ project, nets, defs, name }: Context): RuleFinding[] {
   return project.panel.placements.flatMap((placement) => {
     const rating = defs.get(placement.id)?.ratedCurrentA;
     if (!rating) return [];
@@ -87,12 +102,12 @@ function overloadedModules({ project, nets, defs, name }: Context): string[] {
       worst = Math.max(worst, [...drawn.values()].reduce((a, b) => a + b, 0));
     }
     return worst > rating
-      ? [`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: the modules it feeds add up to ${worst} A on one phase, above its rating of ${rating} A`]
+      ? [about(`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: the modules it feeds add up to ${worst} A on one phase, above its rating of ${rating} A`, { placements: [placement.id] })]
       : [];
   });
 }
 
-function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals, name }: Context): string[] {
+function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
   const reachesSource = (net: Net, seen: Set<Net>): boolean => {
     if (seen.has(net)) return false;
     seen.add(net);
@@ -114,16 +129,17 @@ function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals
       .filter(isPhase)
       .flatMap((t) => netOf.get(`n:${node.id}/${t.id}`) ?? []);
     return fed.some((net) => reachesSource(net, new Set()))
-      ? [`${name({ kind: 'node', id: node.id })} [${node.id}]: it is fed without passing an RCD or RCBO`]
+      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: it is fed without passing an RCD or RCBO`, { nodes: [node.id] })]
       : [];
   });
 }
 
 /** A circuit needs load current <= breaker rating <= what the cable carries. */
-function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): string[] {
+function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): RuleFinding[] {
   return reports.flatMap((report) => {
     const who = `${name({ kind: 'node', id: report.nodeId })} [${report.nodeId}]`;
     const warnings: string[] = [];
+    const where = { nodes: [report.nodeId], placements: report.breakerPlacementId ? [report.breakerPlacementId] : [] };
     if (report.breakerA !== undefined && report.currentA > report.breakerA) {
       warnings.push(`${who}: it draws ${formatAmps(report.currentA)} A but its breaker is rated ${report.breakerA} A`);
     }
@@ -143,6 +159,6 @@ function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): st
           : `${who}: no listed cross-section keeps the voltage drop within ${report.dropLimitPercent} %`,
       );
     }
-    return warnings;
+    return warnings.map((message) => about(message, where));
   });
 }

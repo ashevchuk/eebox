@@ -1,5 +1,5 @@
 import type { Conductor } from '../library/types';
-import { EU_SCHEME, styleOf, type ColourScheme, type ConductorStyle, type Ground } from './colourScheme';
+import { PUE_SCHEME, styleOf, type ColourScheme, type ConductorStyle, type Ground } from './colourScheme';
 
 /** The colours that depend on the background; everything else reads the same on light and dark. */
 export interface Theme {
@@ -38,7 +38,7 @@ export const LIGHT_THEME: Theme = {
 };
 
 let active: Theme = DARK_THEME;
-let scheme: ColourScheme = EU_SCHEME;
+let scheme: ColourScheme = PUE_SCHEME;
 
 /** The colours conductors are drawn in; the same on the screen, in an export and in print. */
 export function setColourScheme(next: ColourScheme): void {

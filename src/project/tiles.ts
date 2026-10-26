@@ -39,3 +39,22 @@ export function tileLayout(
   }
   return { columns, rows, tiles };
 }
+
+export interface Area {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The sheets that have something on them: those whose part of the drawing touches one of the areas. */
+export function sheetsWithContent(
+  layout: TileLayout,
+  areas: Area[],
+  sheetWidthMm = TILE_WIDTH_MM,
+  sheetHeightMm = TILE_HEIGHT_MM,
+): Tile[] {
+  return layout.tiles.filter((tile) =>
+    areas.some((a) => a.x < tile.x + sheetWidthMm && a.x + a.width > tile.x && a.y < tile.y + sheetHeightMm && a.y + a.height > tile.y),
+  );
+}

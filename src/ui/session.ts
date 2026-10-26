@@ -6,7 +6,8 @@ import type { Library, ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
 import { emptySchematic } from '../schematic/model';
-import { groupSelection, selectedIds } from './selection';
+import { findFindings, type Finding } from '../electrical/problems';
+import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
 import { History } from '../view/history';
 
@@ -16,6 +17,8 @@ export interface Selection {
   placementId?: string;
   nodeId?: string;
   wireId?: string;
+  /** Set instead of `wireId` when several wires are selected together. */
+  wireIds?: string[];
   combId?: string;
   /** Set instead of `placementId` and `combId` when several items are selected together. */
   placementIds?: string[];
@@ -43,6 +46,11 @@ export class Session {
   cableSettings: CableSettings = DEFAULT_CABLE_SETTINGS;
   mode: Mode = 'panel';
   selection: Selection = {};
+  /** Whether the drawings mark the faults and the advice; off while exporting, so a drawing for others is not full of red. */
+  marksVisible = true;
+  private findingCache: { revision: object; libraries: Library[]; settings: CableSettings; list: Finding[] } | null = null;
+  /** Draw only the rails and what stands on them, without the frame; set while the full-size print is made. */
+  bareDrawing = false;
   /** The wire under the pointer in the schematic, highlighted on the screen; it is left out of exports. */
   hoverWireId: string | null = null;
   /** The ruler of the panel view: whether it is on and the last thing measured. Not part of the project. */
@@ -62,6 +70,16 @@ export class Session {
   /** Changes whenever the project or its module definitions do; what autosave watches. */
   get revision(): object {
     return this.history.current;
+  }
+
+  /** Faults and advice to mark on the drawings, found again only when the project, the libraries or the cable settings change. */
+  get findings(): Finding[] {
+    const revision = this.revision;
+    const cache = this.findingCache;
+    if (!cache || cache.revision !== revision || cache.libraries !== this.libraries || cache.settings !== this.cableSettings) {
+      this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: findFindings(this.project, this.resolve, this.cableSettings) };
+    }
+    return this.findingCache!.list;
   }
 
   get canUndo(): boolean {
@@ -131,7 +149,7 @@ export class Session {
 
   private afterHistoryMove(): void {
     const { panel, schematic } = this.project;
-    const { nodeId, wireId, rail } = this.selection;
+    const { nodeId, rail } = this.selection;
     const kept = selectedIds(this.selection);
     this.selection = {
       ...groupSelection(
@@ -140,7 +158,7 @@ export class Session {
       ),
       ...(rail !== undefined && rail < panel.railLengthsUnits.length ? { rail } : {}),
       ...(nodeId && schematic.nodes.some((n) => n.id === nodeId) ? { nodeId } : {}),
-      ...(wireId && schematic.wires.some((w) => w.id === wireId) ? { wireId } : {}),
+      ...wireGroupSelection(selectedWires(this.selection).filter((id) => schematic.wires.some((w) => w.id === id))),
     };
     this.changed();
   }

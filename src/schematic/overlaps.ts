@@ -5,6 +5,8 @@ import { lanesFromPath, moveLane, normalisePath, pathFromLanes, type Lanes } fro
 
 /** Pieces of different wires that run side by side closer than this look like one wire. */
 const CLOSE_MM = WIRE_GAP_MM - 1;
+/** Wires closer than this are stuck together to the eye, and Check says so; the lines of the router's grid keep a gap well above it. */
+export const TOUCH_MM = 5;
 /** A lane that is within this of where it should be is left alone. */
 const LEAVE_MM = 0.5;
 /** A shared stretch shorter than this is two wires crossing or touching, not running together. */
@@ -39,7 +41,8 @@ function interior(path: Point[]) {
   return pieces;
 }
 
-export function findOverlaps(paths: Map<string, Point[]>): Overlap[] {
+/** Pieces of wires that run side by side closer than `closerThan`, over a stretch long enough to see. */
+export function findOverlaps(paths: Map<string, Point[]>, closerThan = CLOSE_MM): Overlap[] {
   const pieces = [...paths].flatMap(([wire, path]) => interior(path).map((p) => ({ wire, ...p })));
   const found: Overlap[] = [];
   for (let i = 0; i < pieces.length; i++) {
@@ -48,7 +51,7 @@ export function findOverlaps(paths: Map<string, Point[]>): Overlap[] {
       const q = pieces[j]!;
       if (p.wire === q.wire || p.vertical !== q.vertical) continue;
       const [cp, cq] = p.vertical ? [p.a.x, q.a.x] : [p.a.y, q.a.y];
-      if (Math.abs(cp - cq) > CLOSE_MM) continue;
+      if (Math.abs(cp - cq) > closerThan) continue;
       const [p1, p2] = p.vertical ? [p.a.y, p.b.y].sort((x, y) => x - y) : [p.a.x, p.b.x].sort((x, y) => x - y);
       const [q1, q2] = q.vertical ? [q.a.y, q.b.y].sort((x, y) => x - y) : [q.a.x, q.b.x].sort((x, y) => x - y);
       if (Math.min(p2!, q2!) - Math.max(p1!, q1!) < MIN_SHARED_MM) continue;

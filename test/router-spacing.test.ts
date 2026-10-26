@@ -19,13 +19,7 @@ function closePairs(text: string): number {
 }
 
 describe('the automatic router keeps wires a gap apart in the examples', () => {
-  it('has no wires running side by side too close in the small examples', () => {
-    expect(closePairs(house)).toBe(0);
-    expect(closePairs(studio)).toBe(0);
-  });
-
-  it('keeps the busy examples from getting worse than they are now', () => {
-    expect(closePairs(autoBackup)).toBeLessThanOrEqual(9);
-    expect(closePairs(workshop)).toBeLessThanOrEqual(5);
+  it('has no wires running side by side closer than a gap in any example', () => {
+    for (const text of [house, studio, autoBackup, workshop]) expect(closePairs(text)).toBe(0);
   });
 });

@@ -53,6 +53,56 @@ export function beginDrag(a: Endpoint, b: Endpoint, path: Point[], segment: Segm
   return { kind: 'lane', index, vertical: segment.vertical, grab: (segment.vertical ? pointer.x : pointer.y) - lanes[index]!, lanes };
 }
 
+/** The coordinate a dragged lane is wanted at, with the pointer where it is and the grab offset taken off. */
+export function laneValue(drag: Extract<WireDrag, { kind: 'lane' }>, pointer: Point, snap: (value: number, axis: 'x' | 'y') => number = (v) => v): number {
+  return snap((drag.vertical ? pointer.x : pointer.y) - drag.grab, drag.vertical ? 'x' : 'y');
+}
+
+/** How far a piece of another wire may be from the one pulled, across its line, and still go along with it. */
+export const COMPANION_BAND_MM = 30;
+
+export interface Companion {
+  wire: string;
+  a: Endpoint;
+  b: Endpoint;
+  drag: Extract<WireDrag, { kind: 'lane' }>;
+}
+
+/**
+ * The pieces of the other selected wires that run alongside the piece being pulled, the same way and
+ * overlapping it along its line, one for each wire: they move by as much as it does.
+ */
+export function companionsOf(
+  pulled: Extract<WireDrag, { kind: 'lane' }>,
+  pulledSegment: Segment,
+  pointer: Point,
+  others: Array<{ wire: string; a: Endpoint; b: Endpoint; path: Point[]; route: Lanes | undefined }>,
+): Companion[] {
+  const along = (s: Segment): [number, number] => (s.vertical ? [Math.min(s.a.y, s.b.y), Math.max(s.a.y, s.b.y)] : [Math.min(s.a.x, s.b.x), Math.max(s.a.x, s.b.x)]);
+  const across = (s: Segment) => (s.vertical ? s.a.x : s.a.y);
+  const [from, to] = along(pulledSegment);
+  const found: Companion[] = [];
+  for (const other of others) {
+    const segments = segmentsOf(other.path);
+    const candidates = segments.filter((s) => {
+      const [f, t] = along(s);
+      return s.index >= 1 && s.index <= segments.length - 2 && s.vertical === pulled.vertical && Math.abs(across(s) - across(pulledSegment)) <= COMPANION_BAND_MM && Math.min(t, to) - Math.max(f, from) > 0;
+    });
+    const nearest = candidates.sort((x, y) => Math.abs(across(x) - across(pulledSegment)) - Math.abs(across(y) - across(pulledSegment)))[0];
+    if (!nearest) continue;
+    const drag = beginDrag(other.a, other.b, other.path, nearest, pointer, other.route);
+    if (drag.kind === 'lane') found.push({ wire: other.wire, a: other.a, b: other.b, drag });
+  }
+  return found;
+}
+
+/** The ids of the wires with a piece inside the rectangle. */
+export function wiresInRect(routes: Map<string, Point[]>, rect: { x: number; y: number; width: number; height: number }): string[] {
+  const hits = (a: Point, b: Point) =>
+    Math.max(a.x, b.x) >= rect.x && Math.min(a.x, b.x) <= rect.x + rect.width && Math.max(a.y, b.y) >= rect.y && Math.min(a.y, b.y) <= rect.y + rect.height;
+  return [...routes].filter(([, path]) => path.slice(1).some((p, i) => hits(path[i]!, p))).map(([id]) => id);
+}
+
 /** How the lanes look with the pointer at a point; `snap` may pull a coordinate onto something nearby. */
 export function dragLanes(a: Endpoint, b: Endpoint, drag: WireDrag, pointer: Point, snap: (value: number, axis: 'x' | 'y') => number = (v) => v): Lanes {
   if (drag.kind === 'jog') {

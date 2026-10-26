@@ -1,3 +1,4 @@
+import type { Bounds } from '../view/Camera';
 import { SvgContext } from '../view/svgContext';
 import { DARK_THEME, withTheme, type Theme } from '../view/theme';
 import type { Session } from './session';
@@ -10,8 +11,8 @@ interface Framing {
   height: number;
 }
 
-function framingOf(view: View): Framing {
-  const bounds = view.fitBounds();
+function framingOf(view: View, area?: Bounds): Framing {
+  const bounds = area ?? view.fitBounds();
   const contentW = bounds.maxX - bounds.minX;
   const contentH = bounds.maxY - bounds.minY;
   const pxPerUnit = LONG_SIDE_PX / Math.max(contentW, contentH);
@@ -19,16 +20,18 @@ function framingOf(view: View): Framing {
 }
 
 /** Draws the whole view, framed to its content and without selection, regardless of the on-screen camera. */
-function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D, { width, height }: Framing): void {
+function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D, { width, height }: Framing, area?: Bounds): void {
   const { camera } = view;
   const savedCamera = { x: camera.x, y: camera.y, scale: camera.scale };
   const savedSelection = session.selection;
   const savedRuler = session.ruler;
   const savedHover = session.hoverWireId;
-  camera.fit(view.fitBounds(), width, height, 0);
+  const savedMarks = session.marksVisible;
+  camera.fit(area ?? view.fitBounds(), width, height, 0);
   session.selection = {};
   session.ruler = { on: false, line: null };
   session.hoverWireId = null;
+  session.marksVisible = false;
   try {
     view.draw(ctx, width, height, 1);
   } finally {
@@ -36,6 +39,7 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
     session.selection = savedSelection;
     session.ruler = savedRuler;
     session.hoverWireId = savedHover;
+    session.marksVisible = savedMarks;
   }
 }
 
@@ -52,14 +56,14 @@ export function renderToPng(view: View, session: Session, theme: Theme = DARK_TH
 }
 
 /** The same drawing as the screen, recorded as vector graphics. */
-export function renderToSvg(view: View, session: Session, theme: Theme = DARK_THEME, idPrefix = ''): string {
-  const framing = framingOf(view);
+export function renderToSvg(view: View, session: Session, theme: Theme = DARK_THEME, idPrefix = '', area?: Bounds): string {
+  const framing = framingOf(view, area);
   const measuring = document.createElement('canvas').getContext('2d')!;
   const measure = (text: string, font: string) => {
     measuring.font = font;
     return measuring.measureText(text).width;
   };
   const svg = new SvgContext(framing.width, framing.height, measure, idPrefix);
-  withTheme(theme, () => drawFramed(view, session, svg as unknown as CanvasRenderingContext2D, framing));
+  withTheme(theme, () => drawFramed(view, session, svg as unknown as CanvasRenderingContext2D, framing, area));
   return svg.toSvg();
 }

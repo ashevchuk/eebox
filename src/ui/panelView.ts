@@ -1,3 +1,4 @@
+import { markedBy } from '../electrical/problems';
 import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
 import { moveGroup } from '../layout/group';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
@@ -71,6 +72,8 @@ export class PanelView implements View {
         ghost: drag?.ghost ?? null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
         ruler: this.session.ruler.line,
+        bare: this.session.bareDrawing,
+        marked: this.session.marksVisible ? markedBy(this.session.findings, 'placements') : new Map(),
       },
       width,
       height,

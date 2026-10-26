@@ -15,11 +15,12 @@ import {
   type Endpoint,
   type Layout,
 } from '../schematic/geometry';
+import { markedBy } from '../electrical/problems';
 import { laneTargets, snapLane, type SnapTarget } from '../schematic/laneSnap';
-import type { Lanes } from '../schematic/manualRoute';
+import { moveLane, type Lanes } from '../schematic/manualRoute';
 import { spreadOverlaps } from '../schematic/overlaps';
 import { routeWires } from '../schematic/router';
-import { beginDrag, dragLanes, hitSegment, segmentsOf, type Segment, type WireDrag } from '../schematic/wireEditing';
+import { beginDrag, companionsOf, dragLanes, hitSegment, laneValue, segmentsOf, wiresInRect, type Companion, type Segment, type WireDrag } from '../schematic/wireEditing';
 import {
   addNode,
   connect,
@@ -41,8 +42,10 @@ import { CONDUCTORS, type Conductor } from '../library/types';
 import type { Project } from '../project';
 import { Camera, type Bounds, type Point } from '../view/Camera';
 import { drawConductorDot, strokeConductor } from '../view/conductorDraw';
+import { rectBetween } from '../view/geometry';
 import { theme } from '../view/theme';
 import { LEVER_COLORS } from '../view/render';
+import { selectedWires, toggleWire, wireGroupSelection } from './selection';
 import type { Session } from './session';
 import type { View } from './view';
 
@@ -53,7 +56,16 @@ const WIRE_HIT_TOLERANCE = 6;
 const WIRE_DRAG_START_PX = 4;
 const SNAP_PX = 6;
 const GUIDE_COLOR = '#38bdf8';
+/** Under a wire that is joined to what it must not be joined to. */
+const FAULT_HALO = 'rgba(239, 68, 68, 0.6)';
+/** Around a selected wire, which keeps its own colour: with the PUE colours a yellow line could not tell yellow L1 from a selected wire. */
+const SELECTION_HALO = 'rgba(245, 197, 24, 0.55)';
+const ADVICE_HALO = 'rgba(245, 158, 11, 0.55)';
 const GRIP_PX = 4;
+/** The room a new node takes from the others: about its own size, and a gap. */
+const NEW_NODE_WIDTH = 110;
+const NEW_NODE_HEIGHT = 44;
+const NEW_NODE_GAP = 70;
 const COMB_LINK_OFFSET = 10;
 const COMB_LINK_LANE = 5;
 
@@ -82,6 +94,7 @@ const COLORS = {
   text: '#14161d',
   valid: '#22c55e',
   invalid: '#ef4444',
+  advice: '#f59e0b',
   dead: '#9ca3af',
 };
 const DEAD_WIRE_DASH = [3, 5];
@@ -119,9 +132,13 @@ export class SchematicView implements View {
     downAt: Point;
     started: boolean;
     lanes: Lanes;
+    /** Pieces of the other selected wires that go along with the one pulled, and where they are now. */
+    companions: Array<Companion & { lanes: Lanes }>;
     targets: Record<'x' | 'y', SnapTarget[]>;
     guide: { axis: 'x' | 'y'; value: number } | null;
   } | null = null;
+  /** A rubber band being dragged over the schematic to select wires. */
+  private band: { from: Point; to: Point } | null = null;
   /** The piece of a wire under the pointer, for the cursor and the highlight. */
   private hover: { wireId: string; segment: Segment } | null = null;
   /** While on, dragging from a node wires all its poles to the node it is dropped on, as Shift does. */
@@ -141,16 +158,23 @@ export class SchematicView implements View {
     ctx.scale(this.camera.scale, this.camera.scale);
 
     const frame = this.frame();
-    const { wireId, nodeId, placementId } = this.session.selection;
+    const { nodeId, placementId } = this.session.selection;
+    const chosenWires = new Set(selectedWires(this.session.selection));
     this.drawCombLinks(ctx, frame);
     const routes = routeWires(frame.schematic, frame.layout);
     const { currents, power } = this.analysis();
+    const findings = this.session.marksVisible ? this.session.findings : [];
+    const markedWires = markedBy(findings, 'wires');
+    const markedNodes = markedBy(findings, 'nodes');
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
       if (!path || !conductor) continue;
+      const wireMark = markedWires.get(wire.id);
+      if (wireMark) this.strokePath(ctx, path, wireMark === 'error' ? FAULT_HALO : ADVICE_HALO, 9);
       const dead = power.deadWires.has(wire.id);
-      if (wire.id === wireId || dead) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : COLORS.dead, 2.5, dead ? DEAD_WIRE_DASH : undefined);
+      if (chosenWires.has(wire.id)) this.strokePath(ctx, path, SELECTION_HALO, 10);
+      if (dead) this.strokePath(ctx, path, COLORS.dead, 2.5, DEAD_WIRE_DASH);
       else strokeConductor(ctx, path, conductor, 2.5);
     }
     this.drawWireEditing(ctx, frame, routes);
@@ -163,6 +187,15 @@ export class SchematicView implements View {
       }
       this.drawNode(ctx, frame, node, selected);
       if (dead) ctx.restore();
+      const nodeMark = markedNodes.get(node.id);
+      if (nodeMark) {
+        const { rect } = frame.layout.get(node.id)!;
+        ctx.save();
+        ctx.strokeStyle = nodeMark === 'error' ? COLORS.invalid : COLORS.advice;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(rect.x - 3, rect.y - 3, rect.width + 6, rect.height + 6);
+        ctx.restore();
+      }
     }
     // Drawn after the nodes so that a label whose midpoint falls on a node is not half hidden by it.
     for (const wire of frame.schematic.wires) {
@@ -195,18 +228,28 @@ export class SchematicView implements View {
     }
     const routes = routeWires(frame.schematic, frame.layout);
     const wire = hitWire(frame.schematic, routes, world, this.reach(WIRE_HIT_TOLERANCE));
-    this.session.select(wire ? { wireId: wire.id } : {});
-    if (wire) this.prepareWireDrag(frame, routes, wire, world);
+    if (e.shiftKey && wire) {
+      this.session.select(toggleWire(this.session.selection, wire.id));
+      return true;
+    }
+    if (e.shiftKey) {
+      this.band = { from: world, to: world };
+      return true;
+    }
+    const group = selectedWires(this.session.selection);
+    const inGroup = wire !== undefined && group.length > 1 && group.includes(wire.id);
+    if (!inGroup) this.session.select(wire ? { wireId: wire.id } : {});
+    if (wire) this.prepareWireDrag(frame, routes, wire, world, inGroup ? group : []);
     return wire !== undefined;
   }
 
   /** The highlight of the wire under the pointer, the grips of the selected wire, and the guide while a piece is pulled. */
   private drawWireEditing(ctx: CanvasRenderingContext2D, frame: Frame, routes: Map<string, Point[]>): void {
     const px = 1 / this.camera.scale;
-    const { wireId } = this.session.selection;
-    const hovered = this.hover && this.hover.wireId !== wireId ? routes.get(this.hover.wireId) : undefined;
+    const chosen = selectedWires(this.session.selection);
+    const hovered = this.hover && !chosen.includes(this.hover.wireId) ? routes.get(this.hover.wireId) : undefined;
     if (hovered) this.strokePath(ctx, hovered, 'rgba(255, 255, 255, 0.28)', 5.5);
-    const selected = wireId ? routes.get(wireId) : undefined;
+    const selected = chosen.length === 1 ? routes.get(chosen[0]!) : undefined;
     if (selected) {
       ctx.save();
       const segments = segmentsOf(selected);
@@ -223,6 +266,17 @@ export class SchematicView implements View {
         ctx.fill();
         ctx.stroke();
       }
+      ctx.restore();
+    }
+    if (this.band) {
+      const r = rectBetween(this.band.from, this.band.to);
+      ctx.save();
+      ctx.fillStyle = 'rgba(245, 197, 24, 0.12)';
+      ctx.fillRect(r.x, r.y, r.width, r.height);
+      ctx.strokeStyle = COLORS.selection;
+      ctx.lineWidth = 1.5 * px;
+      ctx.setLineDash([6 * px, 4 * px]);
+      ctx.strokeRect(r.x, r.y, r.width, r.height);
       ctx.restore();
     }
     const guide = this.wireDrag?.started ? this.wireDrag.guide : null;
@@ -250,13 +304,27 @@ export class SchematicView implements View {
     return pixels / this.camera.scale;
   }
 
-  private prepareWireDrag(frame: Frame, routes: Map<string, Point[]>, wire: Wire, world: Point): void {
+  private prepareWireDrag(frame: Frame, routes: Map<string, Point[]>, wire: Wire, world: Point, group: string[]): void {
     const path = routes.get(wire.id);
     const ends = this.endpointsOf(frame, wire);
     const segment = path && hitSegment(path, world, this.reach(WIRE_HIT_TOLERANCE));
     if (!path || !ends || !segment) return;
     const drag = beginDrag(ends.a, ends.b, path, segment, world, wire.route);
-    const others = new Set([wire.id]);
+    const moving = new Set([wire.id, ...group]);
+    const companions =
+      drag.kind === 'lane'
+        ? companionsOf(
+            drag,
+            segment,
+            world,
+            group.flatMap((id) => {
+              const other = frame.schematic.wires.find((w) => w.id === id);
+              const otherPath = routes.get(id);
+              const e = other && this.endpointsOf(frame, other);
+              return id !== wire.id && other && otherPath && e ? [{ wire: id, a: e.a, b: e.b, path: otherPath, route: other.route }] : [];
+            }),
+          ).map((c) => ({ ...c, lanes: c.drag.lanes }))
+        : [];
     this.wireDrag = {
       wireId: wire.id,
       ...ends,
@@ -264,7 +332,8 @@ export class SchematicView implements View {
       downAt: world,
       started: false,
       lanes: drag.lanes,
-      targets: { x: laneTargets('x', frame.layout, routes, others), y: laneTargets('y', frame.layout, routes, others) },
+      companions,
+      targets: { x: laneTargets('x', frame.layout, routes, moving), y: laneTargets('y', frame.layout, routes, moving) },
       guide: null,
     };
   }
@@ -318,7 +387,19 @@ export class SchematicView implements View {
         if (result.target && result.target.kind !== 'grid') pulled.guide = { axis, value: result.value };
         return result.value;
       };
-      pulled.lanes = dragLanes(pulled.a, pulled.b, pulled.drag, world, snap);
+      if (pulled.drag.kind === 'lane') {
+        const value = laneValue(pulled.drag, world, snap);
+        pulled.lanes = moveLane(pulled.a, pulled.b, pulled.drag.lanes, pulled.drag.index, value);
+        const delta = value - pulled.drag.lanes[pulled.drag.index]!;
+        for (const c of pulled.companions) c.lanes = moveLane(c.a, c.b, c.drag.lanes, c.drag.index, c.drag.lanes[c.drag.index]! + delta);
+      } else {
+        pulled.lanes = dragLanes(pulled.a, pulled.b, pulled.drag, world, snap);
+      }
+      this.session.changed();
+      return;
+    }
+    if (this.band) {
+      this.band = { ...this.band, to: world };
       this.session.changed();
       return;
     }
@@ -339,11 +420,31 @@ export class SchematicView implements View {
     const pulled = this.wireDrag;
     this.wireDrag = null;
     if (pulled?.started) {
-      const changed = pulled.lanes.length !== pulled.drag.lanes.length || pulled.lanes.some((v, i) => Math.abs(v - pulled.drag.lanes[i]!) > 1e-6);
+      const differs = (a: Lanes, b: Lanes) => a.length !== b.length || a.some((v, i) => Math.abs(v - b[i]!) > 1e-6);
       const { project } = this.session;
-      const result = changed ? setWireRoute(project.schematic, pulled.wireId, pulled.lanes) : null;
-      if (result?.ok) this.session.commit({ ...project, schematic: result.schematic });
+      let schematic = project.schematic;
+      let changed = false;
+      const moves: Array<[string, Lanes, Lanes]> = [
+        [pulled.wireId, pulled.lanes, pulled.drag.lanes],
+        ...pulled.companions.map((c): [string, Lanes, Lanes] => [c.wire, c.lanes, c.drag.lanes]),
+      ];
+      for (const [id, lanes, before] of moves) {
+        if (!differs(lanes, before)) continue;
+        const result = setWireRoute(schematic, id, lanes);
+        if (result.ok) {
+          schematic = result.schematic;
+          changed = true;
+        }
+      }
+      if (changed) this.session.commit({ ...project, schematic });
       this.session.changed();
+      return;
+    }
+    if (this.band) {
+      const area = rectBetween(this.band.from, this.band.to);
+      this.band = null;
+      const frame = this.frame();
+      this.session.select(wireGroupSelection(wiresInRect(routeWires(frame.schematic, frame.layout), area)));
       return;
     }
     const { wiring, bundle, moving } = this;
@@ -384,10 +485,25 @@ export class SchematicView implements View {
   }
 
   deleteSelection(): void {
-    const { nodeId, wireId } = this.session.selection;
-    const { schematic } = this.session.project;
-    const result = nodeId ? removeNode(schematic, nodeId) : wireId ? removeWire(schematic, wireId) : null;
-    if (result?.ok) this.session.commit({ ...this.session.project, schematic: result.schematic });
+    const { nodeId } = this.session.selection;
+    let { schematic } = this.session.project;
+    let changed = false;
+    if (nodeId) {
+      const result = removeNode(schematic, nodeId);
+      if (result.ok) {
+        schematic = result.schematic;
+        changed = true;
+      }
+    } else {
+      for (const id of selectedWires(this.session.selection)) {
+        const result = removeWire(schematic, id);
+        if (result.ok) {
+          schematic = result.schematic;
+          changed = true;
+        }
+      }
+    }
+    if (changed) this.session.commit({ ...this.session.project, schematic });
     this.session.select({});
   }
 
@@ -395,7 +511,8 @@ export class SchematicView implements View {
     const { kind, label, conductors } = FREE_NODE_PRESETS[preset];
     const project = this.session.project;
     const prototype = { kind, label, conductors: [...conductors] };
-    const spot = freeSpot(this.frame().layout, prototype, { x: snap(this.camera.x), y: snap(this.camera.y) });
+    const { layout } = this.frame();
+    const spot = freeSpot(layout, prototype, this.startForNew(kind, layout));
     const { schematic, node } = addNode(project.schematic, { ...prototype, ...spot });
     this.session.commit({ ...project, schematic });
     this.selectNode(node);
@@ -405,11 +522,13 @@ export class SchematicView implements View {
   spreadWires(): void {
     const project = this.session.project;
     const frame = this.frame();
-    const paths = routeWires(frame.schematic, frame.layout);
+    const chosen = selectedWires(this.session.selection);
+    const only = chosen.length > 1 ? new Set(chosen) : null;
+    const paths = new Map([...routeWires(frame.schematic, frame.layout)].filter(([id]) => !only || only.has(id)));
     const ends = new Map<string, { a: Endpoint; b: Endpoint }>();
     for (const wire of frame.schematic.wires) {
       const e = this.endpointsOf(frame, wire);
-      if (e) ends.set(wire.id, e);
+      if (e && (!only || only.has(wire.id))) ends.set(wire.id, e);
     }
     const { routes, remaining } = spreadOverlaps(paths, ends);
     if (routes.size === 0) {
@@ -437,6 +556,17 @@ export class SchematicView implements View {
     this.session.notify(`Routed ${cleared} wire${cleared === 1 ? '' : 's'} automatically.`);
   }
 
+  /** A new source goes above everything, as it feeds downwards, and a new load below everything. */
+  private startForNew(kind: SchematicNode['kind'], layout: Layout): Point {
+    const rects = [...layout.values()].map((n) => n.rect);
+    if (rects.length === 0) return { x: snap(this.camera.x), y: snap(this.camera.y) };
+    const left = Math.min(...rects.map((r) => r.x));
+    const right = Math.max(...rects.map((r) => r.x + r.width));
+    const x = snap((left + right) / 2 - NEW_NODE_WIDTH / 2);
+    if (kind === 'source') return { x, y: snap(Math.min(...rects.map((r) => r.y)) - NEW_NODE_HEIGHT - NEW_NODE_GAP) };
+    return { x, y: snap(Math.max(...rects.map((r) => r.y + r.height)) + NEW_NODE_GAP) };
+  }
+
   syncModules(): void {
     const project = this.session.project;
     const label = (ref: Parameters<Session['resolve']>[0]) => this.session.resolve(ref)?.name ?? ref.moduleId;
@@ -458,8 +588,9 @@ export class SchematicView implements View {
     const withNode: Schematic = moving
       ? { ...schematic, nodes: schematic.nodes.map((n) => (n.id === moving.id ? { ...n, x: moving.x, y: moving.y } : n)) }
       : schematic;
-    const shown: Schematic = dragged
-      ? { ...withNode, wires: withNode.wires.map((w) => (w.id === dragged.wireId ? { ...w, route: dragged.lanes } : w)) }
+    const routed = dragged ? new Map([[dragged.wireId, dragged.lanes], ...dragged.companions.map((c): [string, Lanes] => [c.wire, c.lanes])]) : null;
+    const shown: Schematic = routed
+      ? { ...withNode, wires: withNode.wires.map((w) => (routed.has(w.id) ? { ...w, route: routed.get(w.id)! } : w)) }
       : withNode;
     return { schematic: shown, terminalsOf, layout: computeLayout(shown, terminalsOf) };
   }

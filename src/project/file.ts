@@ -1,4 +1,4 @@
-import { buildNets, findNetProblems } from '../electrical/nets';
+import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import { CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
 import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
@@ -245,12 +245,6 @@ function validateModules(raw: unknown, errors: ValidationError[]): Record<string
   return modules;
 }
 
-const NET_PROBLEM_TEXT = {
-  'mixed-phases': 'different phases joined',
-  'mixed-polarity': 'DC plus and minus joined',
-  'mixed-families': 'phase, neutral, earth or control conductors joined',
-} as const;
-
 /** Everything wrong with a project that is still loadable: overlaps, orphans, bad wiring. */
 export function projectWarnings(
   project: Project,
@@ -291,13 +285,8 @@ export function projectWarnings(
       ? [`${kind} ${item.id}: width ${item.widthUnits} is outside ${allowed.minUnits}-${allowed.maxUnits}`]
       : [];
   });
-  const nets = findNetProblems(buildNets(project, resolve)).map(
-    (p) =>
-      `${NET_PROBLEM_TEXT[p.kind]}: ${p.net.terminals
-        .map((t) => `${ownerName(project, resolve, t.owner)} [${t.owner.id}] ${t.terminal.id}`)
-        .join(', ')}`,
-  );
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings)];
+  const nets = findConnectionProblems(project, resolve).map((p) => p.message);
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {

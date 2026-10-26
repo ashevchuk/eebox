@@ -2,7 +2,7 @@ import { MODULE_UNIT_MM } from '../library/types';
 import type { CombPlacement, Panel, Placement, WidthOf } from '../layout/placement';
 import type { TerminalSide } from '../library/types';
 import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
-import type { Point } from './Camera';
+import type { Bounds, Point } from './Camera';
 
 /** World units are millimetres. */
 export const RAIL_HEIGHT = 35;
@@ -187,4 +187,55 @@ export function itemsInRect(
       })
       .map((c) => c.id),
   };
+}
+
+/** Space kept around what is printed at full size, so a label or a sheet edge does not touch the drawing. */
+export const PRINT_MARGIN_MM = 12;
+/** A label under a module is cut at the room it has, and starts this far below the module. */
+const PRINT_LABEL_START_MM = 4;
+const PRINT_LABEL_HALF_WIDTH_MM = 6;
+const ROW_LABEL_X_MM = FRAME_PADDING / 2;
+
+/**
+ * What a drawing of the panel at full size has to cover: the rails, the modules, the combs and the
+ * labels, with a margin, and not the empty frame around them. `rects` are the parts that hold
+ * something, so a sheet that holds none of them can be left out. `measure` is the length of a text
+ * in mm, since a label runs only as far as it is long.
+ */
+export function printArea(
+  panel: Panel,
+  widthOf: WidthOf,
+  combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
+  measure: (text: string) => number,
+): { bounds: Bounds; rects: Rect[] } {
+  const rects: Rect[] = panel.railLengthsUnits.map((_length, rail) => railRect(panel, rail));
+  for (const p of panel.placements) {
+    const r = moduleRect(panel, p.rail, p.slot, widthOf(p) ?? 1);
+    rects.push(r);
+    if (p.label) {
+      const length = Math.min(measure(p.label), labelRoom(panel, p.rail));
+      rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
+    }
+  }
+  for (const c of panel.combs) {
+    const info = combInfoOf(c);
+    if (info) rects.push(combRect(panel, c.rail, c.slot, info.widthUnits, info.side));
+  }
+  panel.railLabels.forEach((label, rail) => {
+    if (!label) return;
+    const centre = railCenterY(panel, rail);
+    const half = Math.min(measure(label), 110) / 2;
+    rects.push({ x: ROW_LABEL_X_MM - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
+  });
+  if (rects.length === 0) {
+    const frame = frameRect(panel);
+    return { bounds: { minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height }, rects };
+  }
+  const bounds: Bounds = {
+    minX: Math.min(...rects.map((r) => r.x)) - PRINT_MARGIN_MM,
+    minY: Math.min(...rects.map((r) => r.y)) - PRINT_MARGIN_MM,
+    maxX: Math.max(...rects.map((r) => r.x + r.width)) + PRINT_MARGIN_MM,
+    maxY: Math.max(...rects.map((r) => r.y + r.height)) + PRINT_MARGIN_MM,
+  };
+  return { bounds, rects };
 }

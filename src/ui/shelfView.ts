@@ -1,3 +1,4 @@
+import { confirmDialog } from './dialog';
 import { discardFromShelf } from '../layout/shelf';
 import type { ShelfItem } from '../layout/placement';
 import type { Session } from './session';
@@ -43,7 +44,9 @@ export class ShelfView {
     const discard = document.createElement('button');
     discard.textContent = '×';
     discard.title = 'Discard for good';
-    discard.addEventListener('click', () => {
+    discard.addEventListener('click', async () => {
+      const label = item.label ?? def?.name ?? item.module.moduleId;
+      if (!(await confirmDialog(`Discard "${label}" from the shelf? Undo brings it back.`, 'Discard'))) return;
       const result = discardFromShelf(this.session.project.panel, item.id);
       if (result.ok) this.session.commit({ ...this.session.project, panel: result.panel });
     });
