@@ -25,8 +25,8 @@ export class InspectorView {
   }
 
   private context(): InspectContext {
-    const { project, selection, mode, resolve, snapshot, libraryResolve } = this.session;
-    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve };
+    const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = this.session;
+    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings };
   }
 
   /** `force` also rewrites the field being typed in, to revert an edit that was refused. */

@@ -1,7 +1,7 @@
 import { buildNets, findNetProblems } from '../electrical/nets';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
-import { CROSS_SECTIONS_MM2, INSTALL_METHODS } from '../electrical/cables';
-import { loadSpecProblem, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
+import { CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
+import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
   MAX_RAILS,
@@ -172,12 +172,15 @@ const LOAD_SPEC: FieldSpec = {
   powerFactor: { required: false, check: (v) => (typeof v === 'number' && v >= MIN_POWER_FACTOR && v <= 1 ? null : `must be from ${MIN_POWER_FACTOR} to 1`) },
   method: { required: false, check: oneOf(INSTALL_METHODS) },
   crossSectionMm2: { required: false, check: oneOf(CROSS_SECTIONS_MM2) },
+  lengthM: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_CABLE_LENGTH_M ? null : `must be above 0 and at most ${MAX_CABLE_LENGTH_M}`) },
+  circuit: { required: false, check: oneOf(CIRCUIT_KINDS) },
 };
 const WIRE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   a: { required: true, check: terminalRefCheck },
   b: { required: true, check: terminalRefCheck },
   label: { required: false, check: labelCheck },
+  crossSectionMm2: { required: false, check: oneOf(CROSS_SECTIONS_MM2) },
 };
 
 /** Module nodes take their terminals from the module; source and load nodes carry their own. */
@@ -227,7 +230,11 @@ const NET_PROBLEM_TEXT = {
 } as const;
 
 /** Everything wrong with a project that is still loadable: overlaps, orphans, bad wiring. */
-export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => ModuleDef | undefined): string[] {
+export function projectWarnings(
+  project: Project,
+  resolve: (ref: ModuleRef) => ModuleDef | undefined,
+  settings?: CableSettings,
+): string[] {
   const widthOf = (item: { module: ModuleRef; widthUnits?: number }) =>
     item.widthUnits ?? resolve(item.module)?.widthUnits;
   const describe = (error: { kind: string; with?: string }) =>
@@ -268,7 +275,7 @@ export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => M
         .map((t) => `${ownerName(project, resolve, t.owner)} [${t.owner.id}] ${t.terminal.id}`)
         .join(', ')}`,
   );
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve)];
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {

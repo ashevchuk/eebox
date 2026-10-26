@@ -229,8 +229,7 @@
         },
         "unit": {
           "type": "integer",
-          "minimum": 0,
-          "description": "Position in module units; spread evenly when omitted. Not allowed with count or on a resizable module."
+          "description": "Position in module units from the left edge; spread evenly when omitted. Not allowed with count. On a resizable module a negative value counts from the right edge (-1 is the last unit), and either kind must exist at the narrowest width."
         },
         "count": {
           "type": "integer",

@@ -57,6 +57,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-conductors': 'A source or load needs at least one conductor, each used once.',
   'not-a-load': 'Only a load has a power.',
   'invalid-load': 'The load data is out of range.',
+  'invalid-section': 'That cross-section is not in the table.',
 };
 const COLORS = {
   selection: '#f5c518',

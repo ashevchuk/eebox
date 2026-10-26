@@ -80,15 +80,14 @@ export const MAX_TERMINALS_PER_MODULE = 64;
 export const MAX_TERMINAL_GROUP = 48;
 export const MAX_COMB_PATTERN = 8;
 
-const nonNegativeInteger: FieldCheck = (v) =>
-  Number.isInteger(v) && (v as number) >= 0 ? null : 'must be a non-negative integer';
+const wholeNumber: FieldCheck = (v) => (Number.isInteger(v) ? null : 'must be a whole number');
 
 export const TERMINAL_SPEC: FieldSpec = {
   name: { required: true, check: identifier },
   conductor: { required: true, check: oneOf(CONDUCTORS) },
   side: { required: true, check: oneOf(TERMINAL_SIDES) },
   net: { required: false, check: identifier },
-  unit: { required: false, check: nonNegativeInteger },
+  unit: { required: false, check: wholeNumber },
   count: {
     required: false,
     check: (v) =>
@@ -122,20 +121,36 @@ export const COMB_SPEC: FieldSpec = {
   side: { required: true, check: oneOf(TERMINAL_SIDES) },
 };
 
-function checkResizable(def: Record<string, unknown>, path: string, errors: ValidationError[]): boolean {
-  if (def.resizable === undefined) return false;
+/** Validates the width range of a resizable module and returns its narrowest width, if it has a valid one. */
+function checkResizable(def: Record<string, unknown>, path: string, errors: ValidationError[]): number | undefined {
+  if (def.resizable === undefined) return undefined;
   const spec = validateObject(def.resizable, RESIZE_SPEC, `${path}.resizable`, errors);
-  if (!spec) return false;
+  if (!spec) return undefined;
   const { minUnits, maxUnits } = spec as { minUnits: number; maxUnits: number };
   if (maxUnits < minUnits) {
     errors.push({ path: `${path}.resizable.maxUnits`, message: 'must not be less than minUnits' });
-    return false;
+    return undefined;
   }
   const width = def.widthUnits as number;
   if (width < minUnits || width > maxUnits) {
     errors.push({ path: `${path}.widthUnits`, message: 'must lie within the resizable range' });
   }
-  return true;
+  return minUnits;
+}
+
+/**
+ * A position counts from the left edge; on a resizable module a negative one counts from the right
+ * edge. Either must exist at every width the module can have, so it is bounded by the narrowest one.
+ */
+function checkUnit(unit: number, narrowest: number | undefined, width: number, path: string, errors: ValidationError[]): void {
+  if (narrowest === undefined) {
+    if (unit < 0) errors.push({ path, message: 'cannot be negative: only a resizable module can count from the right edge' });
+    else if (unit >= width) errors.push({ path, message: `must be less than the module width (${width})` });
+  } else if (unit >= narrowest) {
+    errors.push({ path, message: `must be less than the narrowest width (${narrowest}); use a negative position to count from the right edge` });
+  } else if (unit < -narrowest) {
+    errors.push({ path, message: `must not be further from the right edge than the narrowest width (${narrowest})` });
+  }
 }
 
 /** Checks that need more than one field of a module: terminals against width, combs against kind. */
@@ -149,7 +164,7 @@ export function validateModuleDeep(
   if (!isComb && def.comb !== undefined) errors.push({ path: `${path}.comb`, message: 'is only allowed for kind "comb"' });
   if (isComb && def.terminals !== undefined) errors.push({ path: `${path}.terminals`, message: 'a comb has no terminals' });
   if (def.comb !== undefined) validateObject(def.comb, COMB_SPEC, `${path}.comb`, errors);
-  const resizable = checkResizable(def, path, errors);
+  const narrowest = checkResizable(def, path, errors);
   if (!Array.isArray(def.terminals)) return;
 
   const width = def.widthUnits as number;
@@ -162,12 +177,7 @@ export function validateModuleDeep(
     const count = (t.count as number | undefined) ?? 1;
     total += count;
     if (t.unit !== undefined && count > 1) errors.push({ path: `${entryPath}.unit`, message: 'cannot be combined with count' });
-    if (t.unit !== undefined && resizable) {
-      errors.push({ path: `${entryPath}.unit`, message: 'is not allowed on a resizable module, its terminals are spread over the width' });
-    }
-    if (t.unit !== undefined && (t.unit as number) >= width) {
-      errors.push({ path: `${entryPath}.unit`, message: `must be less than the module width (${width})` });
-    }
+    if (t.unit !== undefined) checkUnit(t.unit as number, narrowest, width, `${entryPath}.unit`, errors);
     for (let i = 0; i < count; i++) {
       const name = count > 1 ? `${t.name as string}${i + 1}` : (t.name as string);
       const id = `${t.side as string}:${name}`;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
-import { loadCurrentA, loadReports, loadSpecProblem, wireCurrents, type LoadSpec } from '../src/electrical/loads';
+import { loadCurrentA, loadReports, loadSpecProblem, voltageDropLimitPercent, voltageDropPercent, wireCurrents, type LoadSpec } from '../src/electrical/loads';
+import { DEFAULT_CABLE_SETTINGS } from '../src/electrical/cables';
 import { buildProjectFile, parseProjectJson } from '../src/project/file';
 import type { Project } from '../src/project';
 import { addNode, connect, emptySchematic, setNodeLoad, syncModuleNodes, type Schematic, type SchematicNode } from '../src/schematic/model';
@@ -192,5 +193,85 @@ describe('load in the project file', () => {
     const unknown = json();
     unknown.project.schematic.nodes.find((n: SchematicNode) => n.load).load.voltage = 400;
     expect(parseProjectJson(JSON.stringify(unknown)).ok).toBe(false);
+  });
+});
+
+describe('voltage drop', () => {
+  const node = (conductors: SchematicNode['conductors'], spec: LoadSpec): SchematicNode => ({ ...load(conductors, spec), id: 'n1' });
+
+  it('doubles the length for a single-phase circuit: 10 A over 20 m of 2.5 mm2 drops 3.6 V, 1.57 % of 230 V', () => {
+    expect(voltageDropPercent(node(['L', 'N', 'PE'], { powerW: 2300, lengthM: 20 }), 2.5)).toBeCloseTo(1.5652, 3);
+  });
+
+  it('counts the line once for a balanced three-phase circuit: 9.96 A over 50 m of 6 mm2 drops 1.87 V', () => {
+    expect(voltageDropPercent(node(['L1', 'L2', 'L3', 'N', 'PE'], { powerW: 6900, lengthM: 50 }), 6)).toBeCloseTo(0.8118, 3);
+  });
+
+  it('adds the reactance term for a power factor below one', () => {
+    expect(voltageDropPercent(node(['L', 'N'], { powerW: 2300, powerFactor: 0.8, lengthM: 20 }), 2.5)).toBeCloseTo(1.5757, 3);
+  });
+
+  it('falls with a larger cross-section and has no value without a length', () => {
+    const n = node(['L', 'N'], { powerW: 2300, lengthM: 20 });
+    expect(voltageDropPercent(n, 4)!).toBeLessThan(voltageDropPercent(n, 2.5)!);
+    expect(voltageDropPercent(node(['L', 'N'], { powerW: 2300 }), 2.5)).toBeUndefined();
+  });
+
+  it('has a stricter limit for lighting than for other circuits, from the settings', () => {
+    expect(voltageDropLimitPercent(node(['L', 'N'], { powerW: 1, circuit: 'lighting' }))).toBe(3);
+    expect(voltageDropLimitPercent(node(['L', 'N'], { powerW: 1 }))).toBe(5);
+    const custom = { ...DEFAULT_CABLE_SETTINGS, voltageDropLimitPercent: { lighting: 2, other: 4 } };
+    expect(voltageDropLimitPercent(node(['L', 'N'], { powerW: 1 }), custom)).toBe(4);
+  });
+
+  it('is checked in the load data: a length above zero and up to 1000 m, and a known circuit kind', () => {
+    expect(loadSpecProblem({ powerW: 1, lengthM: 0 })).not.toBeNull();
+    expect(loadSpecProblem({ powerW: 1, lengthM: 1001 })).not.toBeNull();
+    expect(loadSpecProblem({ powerW: 1, lengthM: 30, circuit: 'lighting' })).toBeNull();
+    expect(loadSpecProblem({ powerW: 1, circuit: 'heating' as never })).not.toBeNull();
+  });
+});
+
+describe('minimum cable with a long run', () => {
+  const reportFor = (spec: LoadSpec, settings = DEFAULT_CABLE_SETTINGS) => {
+    const { project, branches } = scene([spec.powerW]);
+    const schematic = setNodeLoad(project.schematic, branches[0]!.node, spec);
+    if (!schematic.ok) throw new Error(schematic.error.kind);
+    return loadReports({ ...project, schematic: schematic.schematic }, resolve, settings)[0]!;
+  };
+
+  it('is the one the current needs when the run is short or unknown', () => {
+    const report = reportFor({ powerW: 3680 });
+    expect(report.minimumSectionMm2).toBe(1.5);
+    expect(report.minimumByCurrentMm2).toBe(1.5);
+    expect(report.dropPercent).toBeUndefined();
+  });
+
+  it('grows until the drop is within 5 % over 80 m: 16 A needs 6 mm2 where the current alone needs 1.5', () => {
+    const report = reportFor({ powerW: 3680, lengthM: 80 });
+    expect(report.minimumByCurrentMm2).toBe(1.5);
+    expect(report.minimumSectionMm2).toBe(6);
+    expect(report.dropPercent!).toBeLessThanOrEqual(5);
+    expect(report.dropLimitPercent).toBe(5);
+  });
+
+  it('grows further for a lighting circuit, whose limit is 3 %', () => {
+    expect(reportFor({ powerW: 3680, lengthM: 80, circuit: 'lighting' }).minimumSectionMm2).toBe(10);
+  });
+
+  it('reports the drop of the chosen cable, even when it is too thin', () => {
+    const report = reportFor({ powerW: 3680, lengthM: 80, crossSectionMm2: 1.5 });
+    expect(report.dropPercent!).toBeGreaterThan(5);
+  });
+
+  it('follows the limit of the settings', () => {
+    const relaxed = { ...DEFAULT_CABLE_SETTINGS, voltageDropLimitPercent: { lighting: 3, other: 20 } };
+    expect(reportFor({ powerW: 3680, lengthM: 80 }, relaxed).minimumSectionMm2).toBe(1.5);
+  });
+
+  it('has none when even the largest cross-section drops too much', () => {
+    const report = reportFor({ powerW: 3680, lengthM: 1000 });
+    expect(report.minimumSectionMm2).toBeUndefined();
+    expect(report.minimumByCurrentMm2).toBe(1.5);
   });
 });

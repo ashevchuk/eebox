@@ -1,3 +1,4 @@
+import { DEFAULT_CABLE_SETTINGS, type CableSettings } from '../electrical/cables';
 import { lookupsOf } from '../layout/lookups';
 import { createPanel } from '../layout/panel';
 import type { ModuleRef } from '../layout/placement';
@@ -33,6 +34,8 @@ interface Document {
 /** State shared by the panel and schematic views. */
 export class Session {
   libraries: Library[] = [];
+  /** The cable table and voltage drop norms; the user can replace them. */
+  cableSettings: CableSettings = DEFAULT_CABLE_SETTINGS;
   mode: Mode = 'panel';
   selection: Selection = {};
   notify: (message: string, isError?: boolean) => void = () => {};

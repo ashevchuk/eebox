@@ -33,12 +33,13 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
   }
 }
 
-export function renderToPng(view: View, session: Session): Promise<Blob> {
+export function renderToPng(view: View, session: Session, theme: Theme = DARK_THEME): Promise<Blob> {
   const framing = framingOf(view);
   const canvas = document.createElement('canvas');
   canvas.width = framing.width;
   canvas.height = framing.height;
-  drawFramed(view, session, canvas.getContext('2d')!, framing);
+  const ctx = canvas.getContext('2d')!;
+  withTheme(theme, () => drawFramed(view, session, ctx, framing));
   return new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encoding failed'))), 'image/png'),
   );

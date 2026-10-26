@@ -1,3 +1,4 @@
+import { CROSS_SECTIONS_MM2 } from '../electrical/cables';
 import { loadSpecProblem, type LoadSpec } from '../electrical/loads';
 import { freeNodeTerminals } from '../electrical/nodeTerminals';
 import type { Terminal } from '../electrical/terminals';
@@ -34,6 +35,8 @@ export interface Wire {
   b: TerminalRef;
   /** Cable or circuit name shown on the wire. */
   label?: string;
+  /** Cross-section of the conductor, which decides the size of the ferrules on its ends. */
+  crossSectionMm2?: number;
 }
 
 export interface Schematic {
@@ -56,6 +59,7 @@ export type SchematicError =
   | { kind: 'not-a-free-node' }
   | { kind: 'not-a-load' }
   | { kind: 'invalid-load' }
+  | { kind: 'invalid-section' }
   | { kind: 'invalid-conductors' };
 
 export type SchematicResult =
@@ -262,6 +266,18 @@ export function setNodeConductors(
       wires,
     },
   };
+}
+
+/** Sets the cross-section of a wire, or clears it with `undefined`. */
+export function setWireSection(schematic: Schematic, id: string, sectionMm2: number | undefined): SchematicResult {
+  if (!schematic.wires.some((w) => w.id === id)) return failure('unknown-wire');
+  if (sectionMm2 !== undefined && !(CROSS_SECTIONS_MM2 as readonly number[]).includes(sectionMm2)) return failure('invalid-section');
+  const wires = schematic.wires.map((w) => {
+    if (w.id !== id) return w;
+    const { crossSectionMm2: _previous, ...rest } = w;
+    return sectionMm2 === undefined ? rest : { ...rest, crossSectionMm2: sectionMm2 };
+  });
+  return { ok: true, schematic: { ...schematic, wires } };
 }
 
 /** Sets what a load draws, or clears it with `undefined`. */

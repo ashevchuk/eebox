@@ -1,3 +1,4 @@
+import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts } from '../electrical/schedule';
 import { buildBom, type BomRow } from '../project/bom';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
@@ -40,16 +41,22 @@ function drawingOf(view: View, session: Session, caption: string, idPrefix: stri
   return figure;
 }
 
-function bomTable(rows: BomRow[]): HTMLTableElement {
-  const table = document.createElement('table');
-  const head = table.createTHead().insertRow();
-  for (const name of BOM_COLUMNS) head.insertCell().textContent = name;
-  const body = table.createTBody();
+function table(header: readonly string[], rows: string[][]): HTMLTableElement {
+  const element = document.createElement('table');
+  const head = element.createTHead().insertRow();
+  for (const name of header) head.insertCell().textContent = name;
+  const body = element.createTBody();
   for (const row of rows) {
     const tr = body.insertRow();
-    for (const cell of bomCells(row)) tr.insertCell().textContent = cell;
+    for (const text of row) tr.insertCell().textContent = text;
   }
-  return table;
+  return element;
+}
+
+function section(heading: string, content: HTMLElement): HTMLElement[] {
+  const title = document.createElement('h2');
+  title.textContent = heading;
+  return [title, content];
 }
 
 /**
@@ -63,10 +70,10 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   const parts: HTMLElement[] = [title, drawingOf(views.panel, session, 'Panel layout', 'panel-')];
   if (schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, 'Wiring schematic', 'schematic-'));
   const rows = buildBom(panel, session.resolve);
-  if (rows.length > 0) {
-    const heading = document.createElement('h2');
-    heading.textContent = 'Parts list';
-    parts.push(heading, bomTable(rows));
-  }
+  if (rows.length > 0) parts.push(...section('Parts list', table(BOM_COLUMNS, rows.map(bomCells))));
+  const circuits = circuitSchedule(session.project, session.resolve, session.cableSettings);
+  if (circuits.length > 0) parts.push(...section('Circuits', table(CIRCUIT_HEADER, circuits.map(circuitCells))));
+  const ferrules = ferruleCounts(session.project);
+  if (ferrules.length > 0) parts.push(...section('Ferrules', table(['Ferrule (mm2)', 'Quantity'], ferrules.map(ferruleCells))));
   sheet.replaceChildren(...parts);
 }

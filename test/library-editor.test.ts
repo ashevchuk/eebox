@@ -382,10 +382,14 @@ describe('what the validator says about a draft', () => {
     expect(errorPaths(result.draft)).toEqual(['modules[1].id']);
   });
 
-  it('flags a fixed position on the terminal of a resizable bar', () => {
+  it('flags a position on a resizable bar only when it would not exist at its narrowest width', () => {
     let s = state(sample(), { kind: 'module', id: 'bar' });
     s = state(edit(s, 't.0.count', '').draft, s.target);
     s = state(edit(s, 't.0.unit', '1').draft, s.target);
+    expect(errorPaths(s.draft)).toEqual([]);
+    s = state(edit(s, 't.0.unit', '-1').draft, s.target);
+    expect(errorPaths(s.draft)).toEqual([]);
+    s = state(edit(s, 't.0.unit', '4').draft, s.target);
     expect(errorPaths(s.draft)).toEqual(['modules[1].terminals[0].unit']);
   });
 

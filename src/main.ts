@@ -17,12 +17,17 @@ import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
 import { bomToCsv, buildBom } from './project/bom';
 import { parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
+import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
+import { circuitSchedule, ferruleCounts, scheduleToCsv } from './electrical/schedule';
+import { LIGHT_THEME } from './view/theme';
+import { fillLabelSheet } from './ui/labelSheet';
+import { editCableSettings } from './ui/cableSettingsDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
@@ -282,14 +287,14 @@ async function openSharedHash(): Promise<void> {
 
 async function exportPng(): Promise<void> {
   try {
-    downloadBlob(await renderToPng(activeView(), session), `${fileStem(session.project.panel.title, 'panel')}-${session.mode}.png`);
+    downloadBlob(await renderToPng(activeView(), session, LIGHT_THEME), `${fileStem(session.project.panel.title, 'panel')}-${session.mode}.png`);
   } catch (error) {
     showStatus(`PNG export failed: ${(error as Error).message}`, true);
   }
 }
 
 function checkProject(): void {
-  const problems = projectWarnings(session.project, session.resolve);
+  const problems = projectWarnings(session.project, session.resolve, session.cableSettings);
   if (problems.length === 0) {
     showStatus('Check passed: no problems found.');
     return;
@@ -316,9 +321,28 @@ function removeOrphans(): void {
   else showStatus(`Removed ${nodes(removed)}.${keptWired > 0 ? ` ${stayed}` : ''}`, keptWired > 0);
 }
 
+function printLabels(): void {
+  const sheet = byId('print-sheet');
+  fillLabelSheet(sheet, session);
+  window.addEventListener('afterprint', () => sheet.replaceChildren(), { once: true });
+  window.print();
+}
+
 function exportSvg(): void {
   const stem = fileStem(session.project.panel.title, 'panel');
-  downloadBlob(new Blob([renderToSvg(activeView(), session)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
+  downloadBlob(new Blob([renderToSvg(activeView(), session, LIGHT_THEME)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
+}
+
+function exportCircuits(): void {
+  const { project } = session;
+  const circuits = circuitSchedule(project, session.resolve, session.cableSettings);
+  const ferrules = ferruleCounts(project);
+  if (circuits.length === 0 && ferrules.length === 0) {
+    showStatus('There are no loads with a power and no wires yet.');
+    return;
+  }
+  const stem = fileStem(project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', scheduleToCsv(circuits, ferrules)], { type: 'text/csv;charset=utf-8' }), `${stem}-circuits.csv`);
 }
 
 function exportBom(): void {
@@ -443,7 +467,15 @@ window.addEventListener(
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
 initMenus();
+byId('cable-settings').addEventListener('click', async () => {
+  const edited = await editCableSettings(session.cableSettings);
+  if (!edited) return;
+  session.cableSettings = edited;
+  if (autosaveStore && !saveCableSettings(autosaveStore, edited)) showStatus('Cable settings are used now but could not be stored.', true);
+  session.changed();
+});
 byId('print').addEventListener('click', printProject);
+byId('print-labels').addEventListener('click', printLabels);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
     isNew: true,
@@ -464,6 +496,7 @@ byId('share-link').addEventListener('click', () => void shareLink());
 byId('export-png').addEventListener('click', () => void exportPng());
 byId('export-svg').addEventListener('click', exportSvg);
 byId('export-bom').addEventListener('click', exportBom);
+byId('export-circuits').addEventListener('click', exportCircuits);
 for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));
 }
@@ -527,6 +560,11 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
 
 async function init(): Promise<void> {
   const stored = autosaveStore ? loadAutosave(autosaveStore) : null;
+  if (autosaveStore) {
+    const { settings, problem } = loadCableSettings(autosaveStore);
+    session.cableSettings = settings;
+    if (problem) showStatus(problem, true);
+  }
   try {
     await seedBundledLibrary(storage, genericIecText);
     await refreshLibraries();

@@ -3,8 +3,10 @@ import type { Project } from '../project';
 import {
   ampacityA,
   CROSS_SECTIONS_MM2,
+  DEFAULT_CABLE_SETTINGS,
   INSTALL_METHODS,
   minimumSectionMm2,
+  type CableSettings,
   type InstallMethod,
   type LoadedConductors,
 } from './cables';
@@ -15,11 +17,18 @@ import type { Terminal } from './terminals';
 import type { SchematicNode } from '../schematic/model';
 
 /** What a load draws and how its cable is laid. Only the power is required. */
+export const CIRCUIT_KINDS = ['other', 'lighting'] as const;
+export type CircuitKind = (typeof CIRCUIT_KINDS)[number];
+
 export interface LoadSpec {
   powerW: number;
   powerFactor?: number;
   method?: InstallMethod;
   crossSectionMm2?: number;
+  /** Length of the cable from the panel to the load, in metres; needed for the voltage drop. */
+  lengthM?: number;
+  /** Lighting circuits have a stricter voltage drop limit. */
+  circuit?: CircuitKind;
 }
 
 export const PHASE_VOLTAGE_V = 230;
@@ -28,6 +37,7 @@ export const DEFAULT_POWER_FACTOR = 1;
 export const DEFAULT_INSTALL_METHOD: InstallMethod = 'C';
 export const MAX_POWER_W = 10_000_000;
 export const MIN_POWER_FACTOR = 0.1;
+export const MAX_CABLE_LENGTH_M = 1000;
 
 /** Breakers and RCBOs are the modules whose rating protects the cable behind them. */
 const PROTECTIVE_KINDS = ['breaker', 'rcbo'];
@@ -36,7 +46,7 @@ export function loadSpecProblem(spec: LoadSpec): string | null {
   if (!Number.isFinite(spec.powerW) || spec.powerW <= 0 || spec.powerW > MAX_POWER_W) {
     return `power must be above 0 and at most ${MAX_POWER_W} W`;
   }
-  const { powerFactor, method, crossSectionMm2 } = spec;
+  const { powerFactor, method, crossSectionMm2, lengthM, circuit } = spec;
   if (powerFactor !== undefined && !(powerFactor >= MIN_POWER_FACTOR && powerFactor <= 1)) {
     return `power factor must be from ${MIN_POWER_FACTOR} to 1`;
   }
@@ -44,6 +54,10 @@ export function loadSpecProblem(spec: LoadSpec): string | null {
   if (crossSectionMm2 !== undefined && !(CROSS_SECTIONS_MM2 as readonly number[]).includes(crossSectionMm2)) {
     return `cross-section must be one of ${CROSS_SECTIONS_MM2.join(', ')} mm2`;
   }
+  if (lengthM !== undefined && !(lengthM > 0 && lengthM <= MAX_CABLE_LENGTH_M)) {
+    return `length must be above 0 and at most ${MAX_CABLE_LENGTH_M} m`;
+  }
+  if (circuit !== undefined && !CIRCUIT_KINDS.includes(circuit)) return `circuit must be one of ${CIRCUIT_KINDS.join(', ')}`;
   return null;
 }
 
@@ -62,6 +76,31 @@ export function loadCurrentA(node: SchematicNode): number | undefined {
   if (phases === 1) return powerW / (PHASE_VOLTAGE_V * powerFactor);
   if (phases === 3) return powerW / (Math.sqrt(3) * LINE_VOLTAGE_V * powerFactor);
   return undefined;
+}
+
+/**
+ * Voltage drop of a final circuit as a percentage of the phase voltage, by the simplified formula of
+ * IEC 60364-5-52: b * I * L * (R cos(phi) + X sin(phi)), with b = 2 for single phase and 1 for
+ * three phase, R the resistance per metre of the cable and X its reactance.
+ */
+export function voltageDropPercent(
+  node: SchematicNode,
+  sectionMm2: number,
+  settings: CableSettings = DEFAULT_CABLE_SETTINGS,
+): number | undefined {
+  const current = loadCurrentA(node);
+  const length = node.load?.lengthM;
+  if (current === undefined || length === undefined) return undefined;
+  const powerFactor = node.load?.powerFactor ?? DEFAULT_POWER_FACTOR;
+  const sine = Math.sqrt(Math.max(0, 1 - powerFactor * powerFactor));
+  const resistance = settings.resistivityOhmMm2PerM / sectionMm2;
+  const b = phaseConductors(node).length === 1 ? 2 : 1;
+  const drop = b * current * length * (resistance * powerFactor + settings.reactanceOhmPerM * sine);
+  return (drop / PHASE_VOLTAGE_V) * 100;
+}
+
+export function voltageDropLimitPercent(node: SchematicNode, settings: CableSettings = DEFAULT_CABLE_SETTINGS): number {
+  return settings.voltageDropLimitPercent[node.load?.circuit ?? 'other'];
 }
 
 export const formatAmps = (amps: number): string => String(Number(amps.toFixed(1)));
@@ -152,11 +191,19 @@ export interface LoadReport {
   requiredA: number;
   /** Smallest listed cross-section for `requiredA`; undefined when the table has none large enough. */
   minimumSectionMm2?: number;
+  /** Smallest cross-section that carries `requiredA`, before the voltage drop is taken into account. */
+  minimumByCurrentMm2?: number;
   chosenSectionMm2?: number;
   chosenAmpacityA?: number;
+  lengthM?: number;
+  dropLimitPercent: number;
+  /** Voltage drop at the chosen cross-section, or at the minimum one when none is chosen. */
+  dropPercent?: number;
+  /** The module the load hangs on, so a schedule can name its breaker. */
+  breakerPlacementId?: string;
 }
 
-export function loadReports(project: Project, resolve: Resolve): LoadReport[] {
+export function loadReports(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): LoadReport[] {
   const context = netContextOf(project, resolve);
   return project.schematic.nodes.flatMap((node): LoadReport[] => {
     const currentA = loadCurrentA(node);
@@ -164,16 +211,23 @@ export function loadReports(project: Project, resolve: Resolve): LoadReport[] {
     if (currentA === undefined || loaded === undefined || !node.load) return [];
     const firstPhase = freeNodeTerminals(node).find((t) => familyOf(t.conductor) === 'phase');
     const net = firstPhase && context.netOf.get(`n:${node.id}/${firstPhase.id}`);
-    const ratings = (net?.terminals ?? []).flatMap((t) => {
+    const breakers = (net?.terminals ?? []).flatMap((t) => {
       const def = t.owner.kind === 'placement' ? context.defs.get(t.owner.id) : undefined;
-      return t.terminal.side === 'bottom' && def && PROTECTIVE_KINDS.includes(def.kind) && def.ratedCurrentA ? [def.ratedCurrentA] : [];
+      return t.terminal.side === 'bottom' && def && PROTECTIVE_KINDS.includes(def.kind) && def.ratedCurrentA
+        ? [{ placementId: t.owner.id, ratedA: def.ratedCurrentA }]
+        : [];
     });
-    const breakerA = ratings.length > 0 ? Math.min(...ratings) : undefined;
-    const requiredA = Math.max(currentA, breakerA ?? 0);
+    const breaker = breakers.reduce<(typeof breakers)[number] | undefined>((lowest, b) => (!lowest || b.ratedA < lowest.ratedA ? b : lowest), undefined);
+    const requiredA = Math.max(currentA, breaker?.ratedA ?? 0);
     const method = node.load.method ?? DEFAULT_INSTALL_METHOD;
     const chosenSectionMm2 = node.load.crossSectionMm2;
-    const minimum = minimumSectionMm2(method, loaded, requiredA);
-    const chosenAmpacityA = chosenSectionMm2 === undefined ? undefined : ampacityA(method, loaded, chosenSectionMm2);
+    const limit = voltageDropLimitPercent(node, settings);
+    const withinLimit = (section: number) => (voltageDropPercent(node, section, settings) ?? 0) <= limit;
+    const minimumByCurrent = minimumSectionMm2(method, loaded, requiredA, settings);
+    const minimum = minimumSectionMm2(method, loaded, requiredA, settings, withinLimit);
+    const chosenAmpacityA = chosenSectionMm2 === undefined ? undefined : ampacityA(method, loaded, chosenSectionMm2, settings);
+    const dropSection = chosenSectionMm2 ?? minimum;
+    const dropPercent = dropSection === undefined ? undefined : voltageDropPercent(node, dropSection, settings);
     return [
       {
         nodeId: node.id,
@@ -181,10 +235,14 @@ export function loadReports(project: Project, resolve: Resolve): LoadReport[] {
         loaded,
         method,
         requiredA,
-        ...(breakerA !== undefined ? { breakerA } : {}),
+        dropLimitPercent: limit,
+        ...(breaker ? { breakerA: breaker.ratedA, breakerPlacementId: breaker.placementId } : {}),
         ...(minimum !== undefined ? { minimumSectionMm2: minimum } : {}),
+        ...(minimumByCurrent !== undefined ? { minimumByCurrentMm2: minimumByCurrent } : {}),
         ...(chosenSectionMm2 !== undefined ? { chosenSectionMm2 } : {}),
         ...(chosenAmpacityA !== undefined ? { chosenAmpacityA } : {}),
+        ...(node.load.lengthM !== undefined ? { lengthM: node.load.lengthM } : {}),
+        ...(dropPercent !== undefined ? { dropPercent } : {}),
       },
     ];
   });

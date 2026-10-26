@@ -540,3 +540,20 @@ describe('inspector: width of a relay', () => {
     expect(message(applyEdit(relayCtx(), 'width', '5'))).toBe('The width is outside what the library allows.');
   });
 });
+
+describe('inspector: cross-section of a wire', () => {
+  const wired = () => ctx({ wireId: build().schematic.wires[0]!.id }, 'schematic');
+
+  it('offers the cross-section as a choice of the table sizes, empty at first', () => {
+    expect(field(wired(), 'section')).toMatchObject({ kind: 'select', value: '', options: ['', '1.5', '2.5', '4', '6', '10', '16', '25', '35'] });
+  });
+
+  it('sets and clears it, and refuses a size that is not listed', () => {
+    const project = ok(applyEdit(wired(), 'section', '4'));
+    expect(project.schematic.wires[0]?.crossSectionMm2).toBe(4);
+    const shown = ctx({ wireId: project.schematic.wires[0]!.id }, 'schematic', project);
+    expect(field(shown, 'section')?.value).toBe('4');
+    expect(ok(applyEdit(shown, 'section', '')).schematic.wires[0]).not.toHaveProperty('crossSectionMm2');
+    expect(message(applyEdit(wired(), 'section', '3'))).toBe('That cross-section is not in the table.');
+  });
+});

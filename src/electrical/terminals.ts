@@ -67,7 +67,7 @@ export function terminalsOf(def: ModuleDef, widthUnits: number = def.widthUnits)
   drafts.forEach((d) => perSide[d.side]++);
   return drafts.map((d) => {
     const index = seen[d.side]++;
-    const unit = d.unit ?? Math.floor((index * widthUnits) / perSide[d.side]);
+    const unit = d.unit === undefined ? Math.floor((index * widthUnits) / perSide[d.side]) : d.unit < 0 ? widthUnits + d.unit : d.unit;
     return { ...d, unit };
   });
 }

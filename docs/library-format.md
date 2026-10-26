@@ -52,7 +52,7 @@ Without `terminals`, each pole yields a terminal on the top and the bottom side:
 | `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `C`, `DCP` or `DCN`; `L` is a phase decided by what feeds it |
 | `side` | `top` or `bottom` |
 | `net` | terminals of one module that share a net are connected inside it (a terminal bar); without a net a terminal is isolated |
-| `unit` | horizontal position in module units, below the width; not combined with `count` and not allowed on resizable modules |
+| `unit` | horizontal position in module units from the left edge, below the width; not combined with `count`. On a resizable module a negative value counts from the right edge (`-1` is the last unit), and any position must exist at the narrowest width |
 | `count` | 1 to 48 identical terminals named `name1`, `name2`, ... |
 
 A module has at most 64 terminals.
@@ -79,8 +79,8 @@ devices of one kind differ in width between makes: a voltage relay of one make i
 another 2. Set the width of a placed copy in the inspector (*Width*). `widthUnits` must lie inside the range.
 
 Terminal groups, the entries that have a `count`, scale with the width: a 6-unit bar with 12 terminals
-gets 18 at 9 units. A terminal without a `count` stays single. A resizable module cannot use `unit`
-positions, since its terminals are spread over the width.
+gets 18 at 9 units. A terminal without a `count` stays single. Terminals of a resizable module without a
+`unit` are spread over the width; with one they stay at that position from the left, or from the right when it is negative.
 
 Leave `resizable` out for devices whose width follows from their poles, such as breakers.
 

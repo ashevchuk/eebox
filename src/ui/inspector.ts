@@ -24,8 +24,9 @@ import {
   type ModuleRef,
   type Placement,
 } from '../layout/placement';
-import { CABLE_TABLE_NOTE, CROSS_SECTIONS_MM2, INSTALL_METHODS } from '../electrical/cables';
+import { CABLE_TABLE_NOTE, CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
 import {
+  CIRCUIT_KINDS,
   DEFAULT_INSTALL_METHOD,
   DEFAULT_POWER_FACTOR,
   formatAmps,
@@ -43,6 +44,7 @@ import {
   renameNode,
   setNodeConductors,
   setNodeLoad,
+  setWireSection,
   setWireLabel,
   type SchematicNode,
   type Wire,
@@ -88,6 +90,8 @@ export interface InspectContext {
   snapshot: Record<string, ModuleDef>;
   /** Module definitions as the libraries have them now, ignoring the stored ones. */
   fromLibraries: Resolve;
+  /** Cable table and voltage drop norms; the built-in ones when absent. */
+  cableSettings?: CableSettings;
 }
 
 export type EditResult =
@@ -144,7 +148,7 @@ const readonly = (key: string, label: string, value: string | number): Inspector
   key, label, kind: 'readonly', value,
 });
 
-function loadFields(project: Project, resolve: Resolve, node: SchematicNode): InspectorField[] {
+function loadFields(project: Project, resolve: Resolve, node: SchematicNode, settings?: CableSettings): InspectorField[] {
   if (node.kind !== 'load') return [];
   const spec = node.load;
   const fields: InspectorField[] = [
@@ -152,8 +156,10 @@ function loadFields(project: Project, resolve: Resolve, node: SchematicNode): In
     { key: 'powerFactor', label: 'Power factor', kind: 'number', value: spec?.powerFactor ?? '', min: MIN_POWER_FACTOR, max: 1, hint: `from ${MIN_POWER_FACTOR} to 1; empty for ${DEFAULT_POWER_FACTOR}` },
     { key: 'method', label: 'Cable laying', kind: 'select', value: spec?.method ?? DEFAULT_INSTALL_METHOD, options: INSTALL_METHODS, hint: 'IEC reference method' },
     { key: 'crossSection', label: 'Cable', kind: 'select', value: spec?.crossSectionMm2 === undefined ? '' : String(spec.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2; empty for not chosen' },
+    { key: 'lengthM', label: 'Cable length', kind: 'number', value: spec?.lengthM ?? '', hint: 'm from the panel; empty for unknown' },
+    { key: 'circuit', label: 'Circuit', kind: 'select', value: spec?.circuit ?? 'other', options: CIRCUIT_KINDS, hint: 'lighting has a stricter drop limit' },
   ];
-  const report = loadReports(project, resolve).find((r) => r.nodeId === node.id);
+  const report = loadReports(project, resolve, settings).find((r) => r.nodeId === node.id);
   if (!report) return fields;
   fields.push(readonly('current', 'Current', `${formatAmps(report.currentA)} A`));
   if (report.breakerA !== undefined) fields.push(readonly('breaker', 'Breaker', `${report.breakerA} A`));
@@ -161,6 +167,9 @@ function loadFields(project: Project, resolve: Resolve, node: SchematicNode): In
     readonly('minSection', 'Minimum cable', report.minimumSectionMm2 === undefined ? 'larger than the table covers' : `${report.minimumSectionMm2} mm2`),
   );
   if (report.chosenAmpacityA !== undefined) fields.push(readonly('ampacity', 'Cable carries', `${report.chosenAmpacityA} A`));
+  if (report.dropPercent !== undefined) {
+    fields.push(readonly('drop', 'Voltage drop', `${report.dropPercent.toFixed(1)} % (limit ${report.dropLimitPercent} %)`));
+  }
   fields.push(readonly('cableNote', 'Cable table', CABLE_TABLE_NOTE));
   return fields;
 }
@@ -313,6 +322,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         actions: [],
         fields: [
           text('label', 'Label', wire.label ?? ''),
+          { key: 'section', label: 'Cross-section', kind: 'select', value: wire.crossSectionMm2 === undefined ? '' : String(wire.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2, for the ferrules; empty for the load cable' },
           readonly('from', 'From', end(wire.a)),
           readonly('to', 'To', end(wire.b)),
           ...(conductor ? [readonly('conductor', 'Conductor', conductor)] : []),
@@ -330,7 +340,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...(node.conductors
             ? [{ key: 'conductors', label: 'Conductors', kind: 'choices' as const, value: [...node.conductors], options: CONDUCTORS }]
             : [readonly('status', 'Status', 'Its module is not on the panel')]),
-          ...loadFields(ctx.project, ctx.resolve, node),
+          ...loadFields(ctx.project, ctx.resolve, node, ctx.cableSettings),
           integer('nodeX', 'X', node.x, -100000, 100000),
           integer('nodeY', 'Y', node.y, -100000, 100000),
           readonly('id', 'Id', node.id),
@@ -352,6 +362,7 @@ const ERROR_TEXT: Record<string, string> = {
   'invalid-conductors': 'A conductor can be ticked once, and at least one is needed.',
   'not-a-load': 'Only a load has a power.',
   'invalid-load': 'The load data is out of range.',
+  'invalid-section': 'That cross-section is not in the table.',
 };
 
 function describeError(error: { kind: string; with?: string } | string): string {
@@ -362,13 +373,16 @@ function describeError(error: { kind: string; with?: string } | string): string 
 
 const fail = (message: string): EditResult => ({ ok: false, message });
 
-const LOAD_KEYS = ['powerW', 'powerFactor', 'method', 'crossSection'];
+const LOAD_KEYS = ['powerW', 'powerFactor', 'method', 'crossSection', 'lengthM', 'circuit'];
+const TEXT_LOAD_KEYS = ['method', 'circuit'];
 
 const LOAD_FIELD_OF_KEY: Record<string, keyof LoadSpec> = {
   powerW: 'powerW',
   powerFactor: 'powerFactor',
   method: 'method',
   crossSection: 'crossSectionMm2',
+  lengthM: 'lengthM',
+  circuit: 'circuit',
 };
 
 /** The load after one field was edited, undefined when the power was cleared, or a message when the text is no good. */
@@ -377,9 +391,9 @@ function loadAfterEdit(current: LoadSpec | undefined, key: string, text: string)
   if (key === 'powerW' && trimmed === '') return undefined;
   if (key !== 'powerW' && !current) return 'Enter the power first.';
   const number = Number(trimmed);
-  if (trimmed !== '' && key !== 'method' && !Number.isFinite(number)) return 'Enter a number.';
+  if (trimmed !== '' && !TEXT_LOAD_KEYS.includes(key) && !Number.isFinite(number)) return 'Enter a number.';
   const fields: Record<string, number | string | undefined> = { ...current };
-  fields[LOAD_FIELD_OF_KEY[key]!] = trimmed === '' ? undefined : key === 'method' ? trimmed : number;
+  fields[LOAD_FIELD_OF_KEY[key]!] = trimmed === '' ? undefined : TEXT_LOAD_KEYS.includes(key) ? trimmed : number;
   return withValidation(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) as unknown as LoadSpec);
 }
 
@@ -526,6 +540,11 @@ export function applyEdit(
       return fail('That property cannot be edited.');
     }
     case 'wire': {
+      if (key === 'section') {
+        const section = text.trim() === '' ? undefined : Number(text);
+        const result = setWireSection(schematic, target.wire.id, section);
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
+      }
       if (key !== 'label') return fail('That property cannot be edited.');
       const result = setWireLabel(schematic, target.wire.id, text);
       return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));

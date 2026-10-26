@@ -165,7 +165,7 @@ function moduleView(module: ModuleDef): InspectorView {
         select(`t.${i}.conductor`, `T${n} conductor`, t.conductor, CONDUCTORS),
         select(`t.${i}.side`, `T${n} side`, t.side, TERMINAL_SIDES),
         text(`t.${i}.net`, `T${n} net`, t.net ?? ''),
-        integer(`t.${i}.unit`, `T${n} position`, optional(t.unit), 'unit; empty spreads evenly'),
+        integer(`t.${i}.unit`, `T${n} position`, optional(t.unit), 'units from the left, negative from the right; empty spreads evenly'),
         integer(`t.${i}.count`, `T${n} copies`, optional(t.count), 'repeats with numbered names'),
       );
       actions.push({ key: `removeTerminal:${i}`, label: `Remove T${n}` });

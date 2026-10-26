@@ -262,9 +262,36 @@ describe('resizable validation', () => {
     expect(errorPaths(lib({ resizable: { minUnits: 2, maxUnits: 4, step: 2 } }))).toEqual(['modules[0].resizable.step']);
   });
 
-  it('rejects a fixed unit on a terminal of a resizable bar', () => {
-    const terminals = [{ name: 'N', conductor: 'N', side: 'top', unit: 1 }];
-    expect(errorPaths(lib({ terminals }))).toEqual(['modules[0].terminals[0].unit']);
+  const withUnit = (unit: number, module: Record<string, unknown> = {}) =>
+    lib({ terminals: [{ name: 'N', conductor: 'N', side: 'top', unit }], ...module });
+  const unitErrors = (unit: number, module: Record<string, unknown> = {}) => errorPaths(withUnit(unit, module));
+  const accepts = (unit: number, module: Record<string, unknown> = {}) => validateLibrary(withUnit(unit, module)).ok;
+
+  it('accepts a position counted from the left or, when negative, from the right, within the narrowest width', () => {
+    for (const unit of [0, 1, -1, -2]) expect(accepts(unit), String(unit)).toBe(true);
+  });
+
+  it('rejects a position that would not exist at the narrowest width', () => {
+    expect(unitErrors(2)).toEqual(['modules[0].terminals[0].unit']);
+    expect(unitErrors(-3)).toEqual(['modules[0].terminals[0].unit']);
+    expect(unitErrors(0.5)).toEqual(['modules[0].terminals[0].unit']);
+  });
+
+  it('keeps negative positions for resizable modules: a fixed module has no right edge to count from', () => {
+    const fixed = { resizable: undefined, kind: 'breaker', widthUnits: 3 };
+    expect(accepts(2, fixed)).toBe(true);
+    expect(unitErrors(3, fixed)).toEqual(['modules[0].terminals[0].unit']);
+    expect(unitErrors(-1, fixed)).toEqual(['modules[0].terminals[0].unit']);
+  });
+
+  it('places a negative position at the right edge of every width', () => {
+    const relay: ModuleDef = {
+      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
+      terminals: [{ name: 'A1', conductor: 'L', side: 'top', unit: 0 }, { name: '14', conductor: 'C', side: 'bottom', unit: -1 }],
+    };
+    const unitOf = (width: number, id: string) => terminalsOf(relay, width).find((t) => t.id === id)?.unit;
+    expect([1, 2, 4].map((w) => unitOf(w, 'bottom:14'))).toEqual([0, 1, 3]);
+    expect([1, 2, 4].map((w) => unitOf(w, 'top:A1'))).toEqual([0, 0, 0]);
   });
 
   it('marks the bundled bars and combs as resizable', () => {

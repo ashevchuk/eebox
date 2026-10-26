@@ -1,5 +1,6 @@
 import { familyOf, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
+import { DEFAULT_CABLE_SETTINGS, type CableSettings } from './cables';
 import { formatAmps, loadReports, type LoadReport } from './loads';
 import { netContextOf, PASSIVE_KINDS, type NetContext, type Resolve } from './context';
 import type { Net, NetTerminal } from './nets';
@@ -29,14 +30,14 @@ function contextOf(project: Project, resolve: Resolve): Context {
  * Design rules that a wiring can break without being wrong in itself. They are advice, so the
  * result is a list of messages and never prevents anything.
  */
-export function findRuleWarnings(project: Project, resolve: Resolve): string[] {
+export function findRuleWarnings(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): string[] {
   const context = contextOf(project, resolve);
   return [
     ...openEarth(context),
     ...unfedModules(context),
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
-    ...cablesAgainstBreakers(loadReports(project, resolve), context.name),
+    ...cablesAgainstBreakers(loadReports(project, resolve, settings), context.name),
   ];
 }
 
@@ -127,8 +128,17 @@ function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): st
       const reference = report.breakerA !== undefined && report.breakerA >= report.currentA ? `the breaker rating of ${report.breakerA} A` : `the load current of ${formatAmps(report.currentA)} A`;
       warnings.push(`${who}: a ${report.chosenSectionMm2} mm2 cable carries ${report.chosenAmpacityA} A, below ${reference}`);
     }
+    if (report.chosenSectionMm2 !== undefined && report.dropPercent !== undefined && report.dropPercent > report.dropLimitPercent) {
+      warnings.push(
+        `${who}: the voltage drop over ${report.lengthM} m of ${report.chosenSectionMm2} mm2 is ${report.dropPercent.toFixed(1)} %, above the limit of ${report.dropLimitPercent} %`,
+      );
+    }
     if (report.minimumSectionMm2 === undefined) {
-      warnings.push(`${who}: no listed cross-section carries ${formatAmps(report.requiredA)} A`);
+      warnings.push(
+        report.minimumByCurrentMm2 === undefined
+          ? `${who}: no listed cross-section carries ${formatAmps(report.requiredA)} A`
+          : `${who}: no listed cross-section keeps the voltage drop within ${report.dropLimitPercent} %`,
+      );
     }
     return warnings;
   });

@@ -172,6 +172,49 @@ describe('project check', () => {
 /** The messages about load, breaker and cable; the circuits below have neither earth nor RCD on purpose. */
 const cableWarnings = (warnings: string[]) => warnings.filter((w) => /draws|cable|cross-section/.test(w));
 
+describe('voltage drop in Check', () => {
+  const warnings = (spec: Parameters<typeof setNodeLoad>[2]) => {
+    const panel = panelOf([place('p1', 'breaker16', 0, 0)]);
+    let schematic = syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId);
+    schematic = addNode(schematic, { kind: 'source', label: SOURCE, x: 0, y: -300, conductors: ['L', 'N', 'PE'] }).schematic;
+    schematic = addNode(schematic, { kind: 'load', label: 'Pump', x: 0, y: 300, conductors: ['L', 'N', 'PE'] }).schematic;
+    const terminalsOf = nodeTerminalsLookup(panel, resolve);
+    for (const [a, b] of [
+      [{ node: 'n2', terminal: 'bottom:L' }, { node: 'n1', terminal: 'top:L' }],
+      [{ node: 'n1', terminal: 'bottom:L' }, { node: 'n3', terminal: 'top:L' }],
+    ] as const) {
+      const wired = connect(schematic, terminalsOf, a, b);
+      if (!wired.ok) throw new Error(wired.error.kind);
+      schematic = wired.schematic;
+    }
+    const loaded = setNodeLoad(schematic, 'n3', spec);
+    if (!loaded.ok) throw new Error(loaded.error.kind);
+    return findRuleWarnings({ panel, schematic: loaded.schematic }, resolve).filter((w) => /voltage drop/.test(w));
+  };
+
+  it('is quiet for a short run and when no length is given', () => {
+    expect(warnings({ powerW: 2300, crossSectionMm2: 2.5, lengthM: 20 })).toEqual([]);
+    expect(warnings({ powerW: 2300, crossSectionMm2: 1.5 })).toEqual([]);
+  });
+
+  it('reports a chosen cable that drops more than the limit over its length', () => {
+    expect(warnings({ powerW: 3680, crossSectionMm2: 1.5, lengthM: 80 })).toEqual([
+      'Pump [n3]: the voltage drop over 80 m of 1.5 mm2 is 16.7 %, above the limit of 5 %',
+    ]);
+  });
+
+  it('applies the lower limit to a lighting circuit', () => {
+    expect(warnings({ powerW: 3680, crossSectionMm2: 6, lengthM: 80 })).toEqual([]);
+    expect(warnings({ powerW: 3680, crossSectionMm2: 6, lengthM: 80, circuit: 'lighting' })).toEqual([
+      'Pump [n3]: the voltage drop over 80 m of 6 mm2 is 4.2 %, above the limit of 3 %',
+    ]);
+  });
+
+  it('says so when no listed cross-section keeps the drop within the limit', () => {
+    expect(warnings({ powerW: 3680, lengthM: 1000 })).toEqual(['Pump [n3]: no listed cross-section keeps the voltage drop within 5 %']);
+  });
+});
+
 describe('cable against breaker', () => {
   /** Mains -> breaker -> 1-phase load with the given data. */
   function circuit(spec: Parameters<typeof setNodeLoad>[2], breaker = 'breaker16') {

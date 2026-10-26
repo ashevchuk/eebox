@@ -51,7 +51,7 @@ export function buildBom(panel: Panel, resolve: (ref: ModuleRef) => ModuleDef | 
 }
 
 /** Library text is untrusted; a leading formula character would execute in a spreadsheet. */
-function cell(value: string | number | undefined): string {
+export function cell(value: string | number | undefined): string {
   if (value === undefined) return '';
   let text = String(value);
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
