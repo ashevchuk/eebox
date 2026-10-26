@@ -1,3 +1,4 @@
+import { loadSpecProblem, type LoadSpec } from '../electrical/loads';
 import { freeNodeTerminals } from '../electrical/nodeTerminals';
 import type { Terminal } from '../electrical/terminals';
 import { normalizeLabel } from '../layout/labels';
@@ -16,6 +17,8 @@ export interface SchematicNode {
   placementId?: string;
   /** Set for `source` and `load` nodes only: their terminals, one per conductor. */
   conductors?: Conductor[];
+  /** What a `load` node draws; only on load nodes. */
+  load?: LoadSpec;
 }
 
 export interface TerminalRef {
@@ -51,6 +54,8 @@ export type SchematicError =
   | { kind: 'nothing-to-connect' }
   | { kind: 'invalid-label' }
   | { kind: 'not-a-free-node' }
+  | { kind: 'not-a-load' }
+  | { kind: 'invalid-load' }
   | { kind: 'invalid-conductors' };
 
 export type SchematicResult =
@@ -257,6 +262,17 @@ export function setNodeConductors(
       wires,
     },
   };
+}
+
+/** Sets what a load draws, or clears it with `undefined`. */
+export function setNodeLoad(schematic: Schematic, id: string, load: LoadSpec | undefined): SchematicResult {
+  const node = schematic.nodes.find((n) => n.id === id);
+  if (!node) return failure('unknown-node');
+  if (node.kind !== 'load') return failure('not-a-load');
+  if (load && loadSpecProblem(load) !== null) return failure('invalid-load');
+  const { load: _previous, ...rest } = node;
+  const updated: SchematicNode = load ? { ...rest, load } : rest;
+  return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
 }
 
 export function removeWire(schematic: Schematic, id: string): SchematicResult {

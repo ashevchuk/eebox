@@ -43,6 +43,13 @@ class UnionFind {
 
 type Resolve = (ref: ModuleRef) => ModuleDef | undefined;
 
+/** The `NetTerminal.key` of the terminal a wire end points at, whether or not that terminal exists. */
+export function terminalKey(schematic: Project['schematic'], ref: { node: string; terminal: string }): string | undefined {
+  const node = schematic.nodes.find((n) => n.id === ref.node);
+  if (!node) return undefined;
+  return node.kind === 'module' ? `p:${node.placementId}/${ref.terminal}` : `n:${node.id}/${ref.terminal}`;
+}
+
 /**
  * Every comb pin sits over one unit of the rail and touches the first terminal of a compatible
  * family on its side at that unit. A phase pin never touches N or PE terminals, and vice versa.
@@ -103,10 +110,8 @@ export function buildNets(project: Project, resolve: Resolve): Net[] {
   }
 
   const keyOf = (ref: { node: string; terminal: string }): string | undefined => {
-    const node = schematic.nodes.find((n) => n.id === ref.node);
-    if (!node) return undefined;
-    const key = node.kind === 'module' ? `p:${node.placementId}/${ref.terminal}` : `n:${node.id}/${ref.terminal}`;
-    return all.has(key) ? key : undefined;
+    const key = terminalKey(schematic, ref);
+    return key !== undefined && all.has(key) ? key : undefined;
   };
   for (const wire of schematic.wires) {
     const a = keyOf(wire.a);

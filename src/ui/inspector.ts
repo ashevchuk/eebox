@@ -24,6 +24,16 @@ import {
   type ModuleRef,
   type Placement,
 } from '../layout/placement';
+import { CABLE_TABLE_NOTE, CROSS_SECTIONS_MM2, INSTALL_METHODS } from '../electrical/cables';
+import {
+  DEFAULT_INSTALL_METHOD,
+  DEFAULT_POWER_FACTOR,
+  formatAmps,
+  loadReports,
+  loadSpecProblem,
+  MIN_POWER_FACTOR,
+  type LoadSpec,
+} from '../electrical/loads';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
 import { CONDUCTORS, type Conductor, type ModuleDef } from '../library/types';
@@ -32,6 +42,7 @@ import {
   moveNode,
   renameNode,
   setNodeConductors,
+  setNodeLoad,
   setWireLabel,
   type SchematicNode,
   type Wire,
@@ -132,6 +143,27 @@ const integer = (key: string, label: string, value: number, min: number, max: nu
 const readonly = (key: string, label: string, value: string | number): InspectorField => ({
   key, label, kind: 'readonly', value,
 });
+
+function loadFields(project: Project, resolve: Resolve, node: SchematicNode): InspectorField[] {
+  if (node.kind !== 'load') return [];
+  const spec = node.load;
+  const fields: InspectorField[] = [
+    { key: 'powerW', label: 'Power', kind: 'number', value: spec?.powerW ?? '', hint: 'W; empty for none' },
+    { key: 'powerFactor', label: 'Power factor', kind: 'number', value: spec?.powerFactor ?? '', min: MIN_POWER_FACTOR, max: 1, hint: `from ${MIN_POWER_FACTOR} to 1; empty for ${DEFAULT_POWER_FACTOR}` },
+    { key: 'method', label: 'Cable laying', kind: 'select', value: spec?.method ?? DEFAULT_INSTALL_METHOD, options: INSTALL_METHODS, hint: 'IEC reference method' },
+    { key: 'crossSection', label: 'Cable', kind: 'select', value: spec?.crossSectionMm2 === undefined ? '' : String(spec.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2; empty for not chosen' },
+  ];
+  const report = loadReports(project, resolve).find((r) => r.nodeId === node.id);
+  if (!report) return fields;
+  fields.push(readonly('current', 'Current', `${formatAmps(report.currentA)} A`));
+  if (report.breakerA !== undefined) fields.push(readonly('breaker', 'Breaker', `${report.breakerA} A`));
+  fields.push(
+    readonly('minSection', 'Minimum cable', report.minimumSectionMm2 === undefined ? 'larger than the table covers' : `${report.minimumSectionMm2} mm2`),
+  );
+  if (report.chosenAmpacityA !== undefined) fields.push(readonly('ampacity', 'Cable carries', `${report.chosenAmpacityA} A`));
+  fields.push(readonly('cableNote', 'Cable table', CABLE_TABLE_NOTE));
+  return fields;
+}
 
 function moduleDetails(def: ModuleDef | undefined, widthUnits: number): InspectorField[] {
   if (!def) return [];
@@ -298,6 +330,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...(node.conductors
             ? [{ key: 'conductors', label: 'Conductors', kind: 'choices' as const, value: [...node.conductors], options: CONDUCTORS }]
             : [readonly('status', 'Status', 'Its module is not on the panel')]),
+          ...loadFields(ctx.project, ctx.resolve, node),
           integer('nodeX', 'X', node.x, -100000, 100000),
           integer('nodeY', 'Y', node.y, -100000, 100000),
           readonly('id', 'Id', node.id),
@@ -317,6 +350,8 @@ const ERROR_TEXT: Record<string, string> = {
   'modules-do-not-fit': 'Modules on this row would not fit.',
   'rail-not-empty': 'Move the modules off the rows you remove first.',
   'invalid-conductors': 'A conductor can be ticked once, and at least one is needed.',
+  'not-a-load': 'Only a load has a power.',
+  'invalid-load': 'The load data is out of range.',
 };
 
 function describeError(error: { kind: string; with?: string } | string): string {
@@ -326,6 +361,32 @@ function describeError(error: { kind: string; with?: string } | string): string 
 }
 
 const fail = (message: string): EditResult => ({ ok: false, message });
+
+const LOAD_KEYS = ['powerW', 'powerFactor', 'method', 'crossSection'];
+
+const LOAD_FIELD_OF_KEY: Record<string, keyof LoadSpec> = {
+  powerW: 'powerW',
+  powerFactor: 'powerFactor',
+  method: 'method',
+  crossSection: 'crossSectionMm2',
+};
+
+/** The load after one field was edited, undefined when the power was cleared, or a message when the text is no good. */
+function loadAfterEdit(current: LoadSpec | undefined, key: string, text: string): LoadSpec | undefined | string {
+  const trimmed = text.trim();
+  if (key === 'powerW' && trimmed === '') return undefined;
+  if (key !== 'powerW' && !current) return 'Enter the power first.';
+  const number = Number(trimmed);
+  if (trimmed !== '' && key !== 'method' && !Number.isFinite(number)) return 'Enter a number.';
+  const fields: Record<string, number | string | undefined> = { ...current };
+  fields[LOAD_FIELD_OF_KEY[key]!] = trimmed === '' ? undefined : key === 'method' ? trimmed : number;
+  return withValidation(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) as unknown as LoadSpec);
+}
+
+function withValidation(spec: LoadSpec): LoadSpec | string {
+  const problem = loadSpecProblem(spec);
+  return problem === null ? spec : `${problem.charAt(0).toUpperCase()}${problem.slice(1)}.`;
+}
 
 function integerOf(raw: string | string[]): number | null {
   if (Array.isArray(raw) || raw.trim() === '') return null;
@@ -476,6 +537,12 @@ export function applyEdit(
         return result.ok ? withSchematic(result.schematic) : fail(text.trim() === '' ? 'This item needs a label.' : LABEL_MESSAGE);
       }
       if (key === 'nodeX' || key === 'nodeY') return moveNodeTo(node);
+      if (node.kind === 'load' && LOAD_KEYS.includes(key)) {
+        const next = loadAfterEdit(node.load, key, text);
+        if (typeof next === 'string') return fail(next);
+        const result = setNodeLoad(schematic, node.id, next);
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
+      }
       if (key === 'conductors' && Array.isArray(raw)) {
         const result = setNodeConductors(schematic, node.id, raw as Conductor[]);
         if (!result.ok) return fail(describeError(result.error));

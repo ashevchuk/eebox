@@ -470,3 +470,50 @@ describe('updating modules from the libraries', () => {
     expect(elsewhere.ok).toBe(false);
   });
 });
+
+describe('inspector: load power and cable', () => {
+  const withLoad = (): Project => {
+    const base = build();
+    const added = addNode(base.schematic, { kind: 'load', label: 'Oven', x: 0, y: 0, conductors: ['L', 'N', 'PE'] });
+    return { ...base, schematic: added.schematic };
+  };
+  const loadCtx = (project: Project = withLoad()) => ctx({ nodeId: 'n5' }, 'schematic', project);
+
+  it('offers power, power factor, laying method and cable on a load, and nothing of the kind on a source', () => {
+    expect(keysOf(loadCtx())).toEqual(expect.arrayContaining(['powerW', 'powerFactor', 'method', 'crossSection']));
+    expect(keysOf(ctx({ nodeId: 'n4' }, 'schematic', withLoad()))).not.toContain('powerW');
+  });
+
+  it('shows no result until a power is set', () => {
+    expect(keysOf(loadCtx())).not.toContain('current');
+  });
+
+  it('takes a power, then shows the current and the minimum cable with the table caveat', () => {
+    const project = ok(applyEdit(loadCtx(), 'powerW', '2300'));
+    expect(project.schematic.nodes.find((n) => n.id === 'n5')?.load).toEqual({ powerW: 2300 });
+    const c = loadCtx(project);
+    expect(field(c, 'current')?.value).toBe('10 A');
+    expect(field(c, 'minSection')?.value).toBe('1.5 mm2');
+    expect(String(field(c, 'cableNote')?.value)).toMatch(/not verified/i);
+  });
+
+  it('keeps the other fields when one is edited, and clears the whole load with an empty power', () => {
+    let project = ok(applyEdit(loadCtx(), 'powerW', '2300'));
+    project = ok(applyEdit(loadCtx(project), 'powerFactor', '0.8'));
+    project = ok(applyEdit(loadCtx(project), 'method', 'B2'));
+    project = ok(applyEdit(loadCtx(project), 'crossSection', '2.5'));
+    expect(project.schematic.nodes.find((n) => n.id === 'n5')?.load).toEqual({ powerW: 2300, powerFactor: 0.8, method: 'B2', crossSectionMm2: 2.5 });
+    project = ok(applyEdit(loadCtx(project), 'crossSection', ''));
+    expect(project.schematic.nodes.find((n) => n.id === 'n5')?.load).toEqual({ powerW: 2300, powerFactor: 0.8, method: 'B2' });
+    project = ok(applyEdit(loadCtx(project), 'powerW', ''));
+    expect(project.schematic.nodes.find((n) => n.id === 'n5')?.load).toBeUndefined();
+  });
+
+  it('refuses text that is not a number, values out of range, and a cable before a power', () => {
+    expect(message(applyEdit(loadCtx(), 'powerW', 'lots'))).toBe('Enter a number.');
+    expect(message(applyEdit(loadCtx(), 'powerW', '-5'))).toMatch(/power must be above 0/i);
+    expect(message(applyEdit(loadCtx(), 'crossSection', '2.5'))).toBe('Enter the power first.');
+    const project = ok(applyEdit(loadCtx(), 'powerW', '100'));
+    expect(message(applyEdit(loadCtx(project), 'powerFactor', '3'))).toMatch(/power factor/i);
+  });
+});

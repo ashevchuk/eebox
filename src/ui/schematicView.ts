@@ -1,3 +1,4 @@
+import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
 import { FREE_NODE_PRESETS, nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import {
@@ -28,6 +29,7 @@ import {
   type TerminalsOfNode,
 } from '../schematic/model';
 import { CONDUCTORS } from '../library/types';
+import type { Project } from '../project';
 import { Camera, type Bounds, type Point } from '../view/Camera';
 import { CONDUCTOR_COLORS } from '../view/colors';
 import { LEVER_COLORS } from '../view/render';
@@ -53,6 +55,8 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-label': 'Labels are 1 to 60 characters, without line breaks.',
   'not-a-free-node': 'Only a source or a load has conductors of its own.',
   'invalid-conductors': 'A source or load needs at least one conductor, each used once.',
+  'not-a-load': 'Only a load has a power.',
+  'invalid-load': 'The load data is out of range.',
 };
 const COLORS = {
   background: '#0b0c10',
@@ -111,9 +115,12 @@ export class SchematicView implements View {
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
       if (path && conductor) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : CONDUCTOR_COLORS[conductor], 2.5);
     }
+    const currents = this.currents();
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
-      if (path && wire.label) this.drawWireLabel(ctx, wire.label, pathMidpoint(path));
+      const amps = currents.get(wire.id);
+      const text = [wire.label, amps === undefined ? undefined : `${formatAmps(amps)} A`].filter(Boolean).join(' \u00b7 ');
+      if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
     }
     for (const { node } of frame.layout.values()) {
       const selected = node.id === nodeId || (node.placementId !== undefined && node.placementId === placementId);
@@ -299,6 +306,18 @@ export class SchematicView implements View {
       const end = to ? { x: to.x + to.width / 2, y: to.y + to.height / 2 } : this.bundle.cursor;
       this.strokePath(ctx, [{ x: from.x + from.width / 2, y: from.y + from.height / 2 }, end], COLORS.selection, 3, [8, 5]);
     }
+  }
+
+  private currentsCache?: { project: Project; snapshot: Session['snapshot']; libraries: Session['libraries']; value: Map<string, number> };
+
+  /** Wire currents are worth recomputing only when the project, its modules or the libraries changed. */
+  private currents(): Map<string, number> {
+    const { project, snapshot, libraries } = this.session;
+    const cached = this.currentsCache;
+    if (cached && cached.project === project && cached.snapshot === snapshot && cached.libraries === libraries) return cached.value;
+    const value = wireCurrents(project, this.session.resolve);
+    this.currentsCache = { project, snapshot, libraries, value };
+    return value;
   }
 
   private drawWireLabel(ctx: CanvasRenderingContext2D, text: string, at: Point): void {

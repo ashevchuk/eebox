@@ -1,5 +1,7 @@
 import { buildNets, findNetProblems } from '../electrical/nets';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
+import { CROSS_SECTIONS_MM2, INSTALL_METHODS } from '../electrical/cables';
+import { loadSpecProblem, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
   MAX_RAILS,
@@ -163,6 +165,13 @@ const NODE_SPEC: FieldSpec = {
   y: { required: true, check: finiteNumber },
   placementId: { required: false, check: identifier },
   conductors: { required: false, check: conductorsCheck },
+  load: { required: false, check: objectCheck },
+};
+const LOAD_SPEC: FieldSpec = {
+  powerW: { required: true, check: (v) => (typeof v === 'number' && loadSpecProblem({ powerW: v }) === null ? null : `must be above 0 and at most ${MAX_POWER_W}`) },
+  powerFactor: { required: false, check: (v) => (typeof v === 'number' && v >= MIN_POWER_FACTOR && v <= 1 ? null : `must be from ${MIN_POWER_FACTOR} to 1`) },
+  method: { required: false, check: oneOf(INSTALL_METHODS) },
+  crossSectionMm2: { required: false, check: oneOf(CROSS_SECTIONS_MM2) },
 };
 const WIRE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
@@ -179,6 +188,10 @@ function checkNodeShape(node: Record<string, unknown>, path: string, errors: Val
   }
   if (!isModule && node.conductors === undefined) {
     errors.push({ path: `${path}.conductors`, message: 'is required for source and load nodes' });
+  }
+  if (node.load !== undefined) {
+    if (node.kind !== 'load') errors.push({ path: `${path}.load`, message: 'is only allowed on a load node' });
+    else child(node, 'load', LOAD_SPEC, `${path}.load`, errors);
   }
   if (!isModule && node.placementId !== undefined) {
     errors.push({ path: `${path}.placementId`, message: 'is only allowed on a module node' });

@@ -1,14 +1,13 @@
-import type { ModuleRef } from '../layout/placement';
 import { familyOf, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
-import { buildNets, type Net, type NetTerminal } from './nets';
+import { formatAmps, loadReports, type LoadReport } from './loads';
+import { netContextOf, PASSIVE_KINDS, type NetContext, type Resolve } from './context';
+import type { Net, NetTerminal } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
-import { terminalsOf, type Terminal } from './terminals';
+import type { Terminal } from './terminals';
 
-type Resolve = (ref: ModuleRef) => ModuleDef | undefined;
 type Owner = NetTerminal['owner'];
 
-const PASSIVE_KINDS: readonly ModuleDef['kind'][] = ['busbar', 'terminal'];
 const RESIDUAL_CURRENT_KINDS: readonly ModuleDef['kind'][] = ['rcd', 'rcbo'];
 
 /** The label a user gave an owner of terminals, or the name of its module. */
@@ -20,36 +19,10 @@ export function ownerName(project: Project, resolve: Resolve, owner: Owner): str
 
 const isPhase = (terminal: Terminal): boolean => familyOf(terminal.conductor) === 'phase';
 
-interface Context {
-  project: Project;
-  nets: Net[];
-  netOf: Map<string, Net>;
-  /** Placed modules whose definition is known, by placement id. */
-  defs: Map<string, ModuleDef>;
-  /** Terminals of each placed module with their net keys. */
-  terminals: Map<string, { key: string; terminal: Terminal }[]>;
-  name: (owner: Owner) => string;
-}
+type Context = NetContext & { name: (owner: Owner) => string };
 
 function contextOf(project: Project, resolve: Resolve): Context {
-  const nets = buildNets(project, resolve);
-  const netOf = new Map<string, Net>();
-  for (const net of nets) for (const t of net.terminals) netOf.set(t.key, net);
-  const defs = new Map<string, ModuleDef>();
-  const terminals = new Map<string, { key: string; terminal: Terminal }[]>();
-  for (const placement of project.panel.placements) {
-    const def = resolve(placement.module);
-    if (!def) continue;
-    defs.set(placement.id, def);
-    terminals.set(
-      placement.id,
-      terminalsOf(def, placement.widthUnits ?? def.widthUnits).map((terminal) => ({
-        key: `p:${placement.id}/${terminal.id}`,
-        terminal,
-      })),
-    );
-  }
-  return { project, nets, netOf, defs, terminals, name: (owner) => ownerName(project, resolve, owner) };
+  return { ...netContextOf(project, resolve), name: (owner) => ownerName(project, resolve, owner) };
 }
 
 /**
@@ -63,6 +36,7 @@ export function findRuleWarnings(project: Project, resolve: Resolve): string[] {
     ...unfedModules(context),
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
+    ...cablesAgainstBreakers(loadReports(project, resolve), context.name),
   ];
 }
 
@@ -138,5 +112,24 @@ function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals
     return fed.some((net) => reachesSource(net, new Set()))
       ? [`${name({ kind: 'node', id: node.id })} [${node.id}]: it is fed without passing an RCD or RCBO`]
       : [];
+  });
+}
+
+/** A circuit needs load current <= breaker rating <= what the cable carries. */
+function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): string[] {
+  return reports.flatMap((report) => {
+    const who = `${name({ kind: 'node', id: report.nodeId })} [${report.nodeId}]`;
+    const warnings: string[] = [];
+    if (report.breakerA !== undefined && report.currentA > report.breakerA) {
+      warnings.push(`${who}: it draws ${formatAmps(report.currentA)} A but its breaker is rated ${report.breakerA} A`);
+    }
+    if (report.chosenAmpacityA !== undefined && report.chosenAmpacityA < report.requiredA) {
+      const reference = report.breakerA !== undefined && report.breakerA >= report.currentA ? `the breaker rating of ${report.breakerA} A` : `the load current of ${formatAmps(report.currentA)} A`;
+      warnings.push(`${who}: a ${report.chosenSectionMm2} mm2 cable carries ${report.chosenAmpacityA} A, below ${reference}`);
+    }
+    if (report.minimumSectionMm2 === undefined) {
+      warnings.push(`${who}: no listed cross-section carries ${formatAmps(report.requiredA)} A`);
+    }
+    return warnings;
   });
 }

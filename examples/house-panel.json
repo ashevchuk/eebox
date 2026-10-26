@@ -254,7 +254,11 @@
           ],
           "x": 200,
           "y": 800,
-          "id": "n13"
+          "id": "n13",
+          "load": {
+            "powerW": 3000,
+            "crossSectionMm2": 2.5
+          }
         },
         {
           "kind": "load",
@@ -266,7 +270,11 @@
           ],
           "x": 340,
           "y": 800,
-          "id": "n14"
+          "id": "n14",
+          "load": {
+            "powerW": 300,
+            "crossSectionMm2": 1.5
+          }
         },
         {
           "kind": "load",
@@ -280,7 +288,11 @@
           ],
           "x": 560,
           "y": 800,
-          "id": "n15"
+          "id": "n15",
+          "load": {
+            "powerW": 6900,
+            "crossSectionMm2": 6
+          }
         }
       ],
       "wires": [
