@@ -11,6 +11,7 @@ import {
   hitWire,
   pathMidpoint,
   portOf,
+  boundsWithRoutes,
   schematicBounds,
   type Endpoint,
   type Layout,
@@ -147,7 +148,8 @@ export class SchematicView implements View {
   constructor(private readonly session: Session) {}
 
   fitBounds(): Bounds {
-    return schematicBounds(this.frame().layout);
+    const { schematic, layout } = this.frame();
+    return boundsWithRoutes(schematicBounds(layout), routeWires(schematic, layout));
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {

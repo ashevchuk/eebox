@@ -19,6 +19,7 @@ const MIN_WIDTH = 110;
 const NODE_HEIGHT: Record<NodeKind, number> = { source: 44, load: 44, module: 56 };
 export const WIRE_STUB = 18;
 const BOUNDS_PADDING = 40;
+const ROUTE_MARGIN = 10;
 const FREE_SPOT_GAP = 20;
 const FREE_SPOT_STEP = 60;
 const FREE_SPOT_MAX_STEPS = 200;
@@ -180,6 +181,17 @@ export function freeSpot(
     if (isFree(y)) return { x: start.x, y };
   }
   return start;
+}
+
+/** The bounds, grown to take in every point of the wire routes, which may run outside the nodes. */
+export function boundsWithRoutes(bounds: Bounds, routes: Map<string, Point[]>): Bounds {
+  const points = [...routes.values()].flat();
+  return {
+    minX: Math.min(bounds.minX, ...points.map((p) => p.x - ROUTE_MARGIN)),
+    minY: Math.min(bounds.minY, ...points.map((p) => p.y - ROUTE_MARGIN)),
+    maxX: Math.max(bounds.maxX, ...points.map((p) => p.x + ROUTE_MARGIN)),
+    maxY: Math.max(bounds.maxY, ...points.map((p) => p.y + ROUTE_MARGIN)),
+  };
 }
 
 export function schematicBounds(layout: Layout): Bounds {
