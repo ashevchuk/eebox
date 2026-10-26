@@ -211,6 +211,12 @@
         #print-sheet table { width: 100%; border-collapse: collapse; font-size: 9pt; }
         #print-sheet th, #print-sheet td { border: 1px solid #000; padding: 1mm 2mm; text-align: left; }
         #print-sheet tr { break-inside: avoid; }
+        #print-sheet .tile { position: relative; width: 276mm; height: 188mm; overflow: hidden; break-after: page; break-inside: avoid; outline: 0.2mm solid #000; }
+        #print-sheet .tile-drawing { position: absolute; }
+        #print-sheet .tile-drawing svg { max-height: none; display: block; }
+        #print-sheet .tile-guide-x { position: absolute; top: 0; bottom: 0; border-left: 0.2mm dashed #888; }
+        #print-sheet .tile-guide-y { position: absolute; left: 0; right: 0; border-top: 0.2mm dashed #888; }
+        #print-sheet .tile-caption { position: absolute; left: 2mm; bottom: 1mm; font-size: 7pt; background: #fff; padding: 0 1mm; }
         #print-sheet .bom-total { margin: 2mm 0 0; font-size: 10pt; font-weight: 600; }
         .label-heading { margin: 0 0 4mm; font-size: 12pt; }
         .strip-line { margin-bottom: 5mm; break-inside: avoid; }
@@ -300,6 +306,7 @@
           <button class="menu-item" role="menuitem" id="export-circuits" title="Loads with their breaker, cable and voltage drop, and the ferrules needed">Circuits and ferrules (CSV)</button>
           <hr />
           <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the lists">Print…</button>
+          <button class="menu-item" role="menuitem" id="print-full-size" title="Print the panel at 1:1 on overlapping A4 sheets to glue together">Print full size…</button>
           <button class="menu-item" role="menuitem" id="print-labels" title="Print labels for the modules at actual size and markers for the cables">Print labels…</button>
         </div>
       </div>

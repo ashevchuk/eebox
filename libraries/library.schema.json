@@ -244,7 +244,7 @@
         },
         "unit": {
           "type": "number",
-          "description": "Position of the terminal's centre in module units from the left edge, decimals allowed: 0 is the centre of the first unit, 0.5 the border between the first and the second. Spread evenly when omitted. Not allowed with count. It has to lie inside the module, 0.15 of a unit from either edge. On a resizable module a negative value counts from the right edge (-1 is the centre of the last unit), and either kind must exist at the narrowest width."
+          "description": "Position of the terminal's centre in module units from the left edge, decimals allowed: 0 is the centre of the first unit, 0.5 the border between the first and the second. Spread evenly when omitted. Not allowed with count. It has to lie inside the module, 0.15 of a unit from either edge (a quarter of the width on a module narrower than 0.6 units). On a resizable module a negative value counts from the right edge (-1 is the centre of the last unit), and either kind must exist at the narrowest width."
         },
         "count": {
           "type": "integer",

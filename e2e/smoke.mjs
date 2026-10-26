@@ -182,6 +182,24 @@ try {
     expectTrue(await browser.evaluate(`document.querySelectorAll('#print-sheet .marker').length >= 6`), 'cable markers are missing');
   });
 
+  await step('the full-size print cuts the panel into A4 sheets, one printed page each, at true size', async () => {
+    await clickButton('Panel');
+    await browser.evaluate(`window.print = () => {}; document.getElementById('print-full-size').click()`);
+    await browser.waitFor(`document.querySelectorAll('#print-sheet .tile').length >= 2`, 'several sheets');
+    const sheets = await browser.evaluate(`document.querySelectorAll('#print-sheet .tile').length`);
+    await browser.media('print');
+    const measured = await browser.evaluate(`(() => {
+      const svg = document.querySelector('#print-sheet .tile-drawing svg');
+      const wanted = parseFloat(svg.style.width);
+      return { wanted, actual: svg.getBoundingClientRect().width / (96 / 25.4) };
+    })()`);
+    const pdf = await browser.pdf();
+    await browser.media('screen');
+    const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    expectEqual(pages, sheets, 'printed pages');
+    expectTrue(Math.abs(measured.actual - measured.wanted) < 0.5, `drawing is ${measured.actual} mm wide, wanted ${measured.wanted}`);
+  });
+
   await step('the designer adds a terminal by a click, undoes it, and saves a module into My modules', async () => {
     await clickButton('Panel');
     await browser.evaluate(`document.getElementById('new-module').click()`);

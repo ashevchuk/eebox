@@ -54,7 +54,7 @@ Without `terminals`, each pole yields a terminal on the top and the bottom side:
 | `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `C`, `DCP` or `DCN`; `L` is a phase decided by what feeds it |
 | `side` | `top` or `bottom` |
 | `net` | terminals of one module that share a net are connected inside it (a terminal bar); without a net a terminal is isolated |
-| `unit` | position of the terminal's centre along the module, in module units from the left edge; decimals are allowed. `0` is the centre of the first unit and `0.5` the border between the first and the second. It has to lie inside the module and `0.15` of a unit from either edge, so `-0.35` to `width - 0.65`; not combined with `count`. On a resizable module a negative value counts from the right edge (`-1` is the centre of the last unit), and any position must exist at the narrowest width |
+| `unit` | position of the terminal's centre along the module, in module units from the left edge; decimals are allowed. `0` is the centre of the first unit and `0.5` the border between the first and the second. It has to lie inside the module and `0.15` of a unit from either edge (a quarter of the width on a module narrower than 0.6 units, so a 5.2 mm clamp can hold terminals), so `-0.35` to `width - 0.65`; not combined with `count`. On a resizable module a negative value counts from the right edge (`-1` is the centre of the last unit), and any position must exist at the narrowest width |
 | `count` | 1 to 48 identical terminals named `name1`, `name2`, ... |
 
 A module has at most 64 terminals.

@@ -37,6 +37,7 @@ import { editCableSettings } from './ui/cableSettingsDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
+import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
 import { downloadBlob } from './ui/download';
@@ -333,6 +334,13 @@ function removeOrphans(): void {
   else showStatus(`Removed ${nodes(removed)}.${keptWired > 0 ? ` ${stayed}` : ''}`, keptWired > 0);
 }
 
+function printFullSize(): void {
+  const sheet = byId('print-sheet');
+  fillTileSheet(sheet, session, views.panel);
+  window.addEventListener('afterprint', () => sheet.replaceChildren(), { once: true });
+  window.print();
+}
+
 function printLabels(): void {
   const sheet = byId('print-sheet');
   fillLabelSheet(sheet, session);
@@ -557,6 +565,7 @@ byId('open-example').addEventListener('click', async () => {
 byId('print').addEventListener('click', printProject);
 byId('new-module').addEventListener('click', designNewModule);
 byId('print-labels').addEventListener('click', printLabels);
+byId('print-full-size').addEventListener('click', printFullSize);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
     isNew: true,

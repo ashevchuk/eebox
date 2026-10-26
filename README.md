@@ -8,6 +8,14 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 
 ![Wiring schematic](docs/images/schematic.png)
 
+Shift-drag selects several modules at once and dragging one moves them all:
+
+![A rubber band selecting modules](docs/images/selection.png)
+
+A transfer controller and two contactors switch a workshop to the generator when the mains go away (the mains are switched off in this picture):
+
+![Automatic backup with the mains off](docs/images/auto-backup.png)
+
 ## Features
 
 - **Panel layout.** Rails of any length and spacing in 17.5 mm module units. Drag modules from the palette, reorder modules and rails, take modules off a rail onto a shelf and put them back.
@@ -25,6 +33,9 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 - **Check.** Finds overlaps, wrongly joined conductors and orphaned nodes, and warns about design problems: a load without protective earth, a module fed through its outputs only, more current drawn on one phase than a module is rated for, and loads that can be fed without passing an RCD or RCBO.
 - **Module designer.** *New module...* in the sidebar draws a module and lets you place its terminals with the mouse: click the top or bottom half to add one, drag to move it, Delete to remove it, Undo and Redo to take a step back. A click can add a whole kind of terminal with its standard names (coil A1 A2, contacts 13 14, 11 12 14, supply, DC supply, sensor, a row). *Row...* adds any number of terminals to a side at once, spread evenly, and *Block...* makes a terminal block with so many on top and so many below (1 and 1, 1 and 6, 0 and 8, whatever the device has), all one point if you like. Terminals can stand anywhere along the module, not only on a whole unit, and *Spread* evens them out again. *Connect* joins two terminals inside the module, drawn as lines to a common point, and *All terminals: conductor* sets one conductor on all of them. A slider shows the module at another width and a second drawing shows it on a rail as the panel does; *Variants...* makes a copy for every rating, curve or conductor, so a block in five colours is designed once. Start from a template (breaker, contactor, relay, lighting relay, meter, pilot light, power supply, changeover switch) or from nothing; fields for the name, width, ratings and the selected terminal sit beside the drawing. Modules are kept in your own *My modules* library. *edit* on a module in the palette, or *Edit module...* in the inspector of a placed one, opens it again; a module of the bundled library is copied first.
 - **Your own libraries.** Import JSON libraries, search and group the palette, update placed modules from a changed library, or write a library in the built-in editor. See [docs/library-format.md](docs/library-format.md).
+- **Full-size print.** *Export > Print full size...* cuts the panel into overlapping A4 sheets at 1:1, with a dashed line where the next sheet begins, to print at 100 % and glue.
+
+  ![One sheet of a full-size print](docs/images/full-size-sheet.png)
 - **Output.** PNG and SVG on a white ground, parts list and a list of circuits with the ferrules needed (CSV), a print sheet (panel, schematic, parts list, circuits, ferrules), labels for the modules at actual size and markers for the ends of cables, save and open project files, share links, autosave.
 
 ![Library editor](docs/images/library-editor.png)

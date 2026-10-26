@@ -7,6 +7,9 @@
 /** A terminal keeps this far from either edge of the module, which leaves room for its own width. */
 export const TERMINAL_EDGE_MARGIN_UNITS = 0.15;
 
+/** On a module narrower than 0.6 units the margin shrinks to a quarter of the width, so a 5.2 mm clamp can hold a terminal. */
+export const edgeMargin = (width: number): number => Math.min(TERMINAL_EDGE_MARGIN_UNITS, width / 4);
+
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 export interface Range {
@@ -16,7 +19,8 @@ export interface Range {
 
 /** What a module of a fixed width allows, counted from the left. */
 export function fixedRange(width: number): Range {
-  return { min: round(-0.5 + TERMINAL_EDGE_MARGIN_UNITS), max: round(width - 0.5 - TERMINAL_EDGE_MARGIN_UNITS) };
+  const margin = edgeMargin(width);
+  return { min: round(-0.5 + margin), max: round(width - 0.5 - margin) };
 }
 
 /**
@@ -24,9 +28,10 @@ export function fixedRange(width: number): Range {
  * from the left edge when it is not negative and from the right edge when it is.
  */
 export function resizableRanges(narrowest: number): { left: Range; right: Range } {
+  const margin = edgeMargin(narrowest);
   return {
     left: fixedRange(narrowest),
-    right: { min: round(-narrowest - 0.5 + TERMINAL_EDGE_MARGIN_UNITS), max: round(-0.5 - TERMINAL_EDGE_MARGIN_UNITS) },
+    right: { min: round(-narrowest - 0.5 + margin), max: round(-0.5 - margin) },
   };
 }
 
