@@ -1,7 +1,8 @@
+import { drawConductorDot } from './conductorDraw';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
-import { MODULE_UNIT_MM, type ModuleDef, type ModuleKind } from '../library/types';
+import { MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
@@ -158,14 +159,8 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene): void {
   }
 }
 
-function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: string): void {
-  ctx.beginPath();
-  ctx.arc(x, y, PIN_RADIUS, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.lineWidth = 0.6;
-  ctx.strokeStyle = '#14161d';
-  ctx.stroke();
+function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, conductor: Conductor): void {
+  drawConductorDot(ctx, x, y, PIN_RADIUS, conductor, 0.6);
 }
 
 /** Screw terminals of a module: dots in the colour of their conductor, sharing a unit side by side. */
@@ -175,7 +170,7 @@ function drawTerminals(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, w
     const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
     const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * PIN_SPACING;
     const x = r.x + (terminal.unit + 0.5) * MODULE_UNIT_MM + offset;
-    drawPin(ctx, x, terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, theme().conductors[terminal.conductor]);
+    drawPin(ctx, x, terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, terminal.conductor);
   }
 }
 
@@ -196,7 +191,7 @@ function drawComb(
   ctx.strokeRect(r.x, r.y, r.width, r.height);
   for (let unit = 0; unit < widthUnits; unit++) {
     const pin = def.comb.pattern[unit % def.comb.pattern.length]!;
-    drawPin(ctx, r.x + (unit + 0.5) * MODULE_UNIT_MM, r.y + r.height / 2, theme().conductors[pin]);
+    drawPin(ctx, r.x + (unit + 0.5) * MODULE_UNIT_MM, r.y + r.height / 2, pin);
   }
 }
 

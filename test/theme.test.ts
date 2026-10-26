@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONDUCTORS } from '../src/library/types';
-import { DARK_THEME, LIGHT_THEME, theme, withTheme, type Theme } from '../src/view/theme';
+import { DARK_THEME, LIGHT_THEME, conductorStyle, theme, withTheme, type Theme } from '../src/view/theme';
 
 const channel = (hex: string, from: number) => {
   const v = parseInt(hex.slice(from, from + 2), 16) / 255;
@@ -18,8 +18,16 @@ const rgbOf = (css: string) => {
 };
 
 describe.each([['dark', DARK_THEME], ['light', LIGHT_THEME]] as [string, Theme][])('%s theme', (_name, t) => {
-  it('keeps every conductor colour visible on its background', () => {
-    for (const conductor of CONDUCTORS) expect(contrast(t.conductors[conductor], t.background), conductor).toBeGreaterThanOrEqual(3);
+  it('keeps every conductor visible on its background: its colours, or an outline that is', () => {
+    withTheme(t, () => {
+      for (const conductor of CONDUCTORS) {
+        const style = conductorStyle(conductor);
+        const parts = [style.color, ...(style.stripe ? [style.stripe] : [])];
+        const alone = parts.every((c) => contrast(c, t.background) >= 3);
+        const outlined = style.outline !== undefined && contrast(style.outline, t.background) >= 3;
+        expect(alone || outlined, conductor).toBe(true);
+      }
+    });
   });
 
   it('keeps labels readable on the frame and on the wire label chip', () => {

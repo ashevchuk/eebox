@@ -20,10 +20,14 @@ export async function launch({ width = 1516, height = 784 } = {}) {
   const profile = mkdtempSync(join(tmpdir(), 'eebox-e2e-'));
   const flags = ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--disable-gpu', '--hide-scrollbars'];
   if (process.env.CI) flags.push('--no-sandbox');
-  const child = spawn(findBrowser(), [...flags, 'about:blank'], { stdio: 'ignore' });
+  const child = spawn(findBrowser(), [...flags, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  let exitCode = null;
+  child.stderr.on('data', (chunk) => (stderr = (stderr + chunk).slice(-2000)));
+  child.on('exit', (code, signal) => (exitCode = code ?? signal));
 
   let targets;
-  for (let i = 0; i < 100 && !targets; i++) {
+  for (let i = 0; i < 300 && !targets && exitCode === null; i++) {
     try {
       targets = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
     } catch {
@@ -32,7 +36,7 @@ export async function launch({ width = 1516, height = 784 } = {}) {
   }
   if (!targets) {
     child.kill();
-    throw new Error('the browser did not start');
+    throw new Error(`the browser did not start${exitCode === null ? '' : ` (it exited with ${exitCode})`}\n${stderr.trim()}`);
   }
   const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
   await new Promise((resolve) => (ws.onopen = resolve));

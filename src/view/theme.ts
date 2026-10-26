@@ -1,5 +1,5 @@
 import type { Conductor } from '../library/types';
-import { CONDUCTOR_COLORS } from './colors';
+import { EU_SCHEME, styleOf, type ColourScheme, type ConductorStyle, type Ground } from './colourScheme';
 
 /** The colours that depend on the background; everything else reads the same on light and dark. */
 export interface Theme {
@@ -10,7 +10,8 @@ export interface Theme {
   rowLabel: string;
   wireLabelBackground: string;
   wireLabelText: string;
-  conductors: Record<Conductor, string>;
+  /** Whether the ground is dark or light, which decides when a conductor colour needs an outline. */
+  ground: Ground;
 }
 
 export const DARK_THEME: Theme = {
@@ -21,10 +22,10 @@ export const DARK_THEME: Theme = {
   rowLabel: '#9aa1b3',
   wireLabelBackground: 'rgba(11, 12, 16, 0.85)',
   wireLabelText: '#e5e7eb',
-  conductors: CONDUCTOR_COLORS,
+  ground: 'dark',
 };
 
-/** For paper: white ground, dark text, and phase colours that stay visible on white. */
+/** For paper: white ground and dark text. */
 export const LIGHT_THEME: Theme = {
   background: '#ffffff',
   frame: '#6b7280',
@@ -33,10 +34,21 @@ export const LIGHT_THEME: Theme = {
   rowLabel: '#4b5563',
   wireLabelBackground: 'rgba(255, 255, 255, 0.9)',
   wireLabelText: '#111827',
-  conductors: { L: '#b45309', L1: '#78350f', L2: '#111827', L3: '#6b7280', N: '#2563eb', PE: '#16a34a', C: '#7c3aed', DCP: '#dc2626', DCN: '#0891b2' },
+  ground: 'light',
 };
 
 let active: Theme = DARK_THEME;
+let scheme: ColourScheme = EU_SCHEME;
+
+/** The colours conductors are drawn in; the same on the screen, in an export and in print. */
+export function setColourScheme(next: ColourScheme): void {
+  scheme = next;
+}
+
+export const colourScheme = (): ColourScheme => scheme;
+
+/** How to draw a conductor on the ground of the theme in use. */
+export const conductorStyle = (conductor: Conductor): ConductorStyle => styleOf(scheme, conductor, active.ground);
 
 export const theme = (): Theme => active;
 

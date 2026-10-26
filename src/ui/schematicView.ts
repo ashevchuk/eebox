@@ -32,6 +32,7 @@ import {
 import { CONDUCTORS, type Conductor } from '../library/types';
 import type { Project } from '../project';
 import { Camera, type Bounds, type Point } from '../view/Camera';
+import { drawConductorDot, strokeConductor } from '../view/conductorDraw';
 import { theme } from '../view/theme';
 import { LEVER_COLORS } from '../view/render';
 import type { Session } from './session';
@@ -121,8 +122,8 @@ export class SchematicView implements View {
       const conductor = portOf(frame.layout, wire.a)?.terminal.conductor;
       if (!path || !conductor) continue;
       const dead = power.deadWires.has(wire.id);
-      const colour = wire.id === wireId ? COLORS.selection : dead ? COLORS.dead : theme().conductors[conductor];
-      this.strokePath(ctx, path, colour, 2.5, dead ? DEAD_WIRE_DASH : undefined);
+      if (wire.id === wireId || dead) this.strokePath(ctx, path, wire.id === wireId ? COLORS.selection : COLORS.dead, 2.5, dead ? DEAD_WIRE_DASH : undefined);
+      else strokeConductor(ctx, path, conductor, 2.5);
     }
     for (const { node } of frame.layout.values()) {
       const selected = node.id === nodeId || (node.placementId !== undefined && node.placementId === placementId);
@@ -292,7 +293,7 @@ export class SchematicView implements View {
         const b = sorted[i]!;
         const lane = COMB_LINK_OFFSET + CONDUCTORS.indexOf(pin) * COMB_LINK_LANE;
         const y = (a.dir === 1 ? Math.max : Math.min)(a.point.y, b.point.y) + a.dir * lane;
-        this.strokePath(ctx, [a.point, { x: a.point.x, y }, { x: b.point.x, y }, b.point], theme().conductors[pin], 2, [5, 4]);
+        strokeConductor(ctx, [a.point, { x: a.point.x, y }, { x: b.point.x, y }, b.point], pin, 2, [5, 4]);
       }
     }
   }
@@ -398,13 +399,7 @@ export class SchematicView implements View {
     ctx.restore();
 
     for (const { terminal, point } of layout.ports) {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, PORT_RADIUS - 1, 0, Math.PI * 2);
-      ctx.fillStyle = theme().conductors[terminal.conductor];
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#14161d';
-      ctx.stroke();
+      drawConductorDot(ctx, point.x, point.y, PORT_RADIUS - 1, terminal.conductor, 1.5);
     }
   }
 }

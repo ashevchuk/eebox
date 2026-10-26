@@ -19,6 +19,8 @@ import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosa
 import { bomToCsv, buildBom } from './project/bom';
 import { parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
+import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
+import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colourScheme';
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
@@ -26,7 +28,7 @@ import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
 import { circuitSchedule, ferruleCounts, scheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
-import { LIGHT_THEME } from './view/theme';
+import { LIGHT_THEME, setColourScheme } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
 import { openModuleDesigner } from './ui/moduleDesignerView';
@@ -34,6 +36,7 @@ import { MODULE_TEMPLATES } from './ui/moduleTemplates';
 import { EXAMPLES } from './examples';
 import { chooseExample } from './ui/examplesDialog';
 import { editCableSettings } from './ui/cableSettingsDialog';
+import { chooseColours } from './ui/colourDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
@@ -576,6 +579,15 @@ byId('cable-settings').addEventListener('click', async () => {
   if (autosaveStore && !saveCableSettings(autosaveStore, edited)) showStatus('Cable settings are used now but could not be stored.', true);
   session.changed();
 });
+let colourChoice: ColourChoice = DEFAULT_COLOUR_CHOICE;
+byId('colour-scheme').addEventListener('click', async () => {
+  const chosen = await chooseColours(colourChoice);
+  if (!chosen) return;
+  colourChoice = chosen;
+  setColourScheme(coloursOf(chosen));
+  if (autosaveStore && !saveColourChoice(autosaveStore, chosen)) showStatus('The colours are used now but could not be stored.', true);
+  session.changed();
+});
 byId('open-example').addEventListener('click', async () => {
   const example = await chooseExample(EXAMPLES);
   if (!example) return;
@@ -681,6 +693,10 @@ async function init(): Promise<void> {
     const { settings, problem } = loadCableSettings(autosaveStore);
     session.cableSettings = settings;
     if (problem) showStatus(problem, true);
+    const colours = loadColourChoice(autosaveStore);
+    colourChoice = colours.choice;
+    setColourScheme(coloursOf(colours.choice));
+    if (colours.problem) showStatus(colours.problem, true);
   }
   try {
     await seedBundledLibrary(storage, genericIecText);

@@ -329,6 +329,28 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Cancel').click()`);
   });
 
+  await step('the colours of the conductors are chosen in a dialog, saved, and used by the exports', async () => {
+    await clickButton('File');
+    await browser.evaluate(`document.getElementById('colour-scheme').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open] .colours-table')`, 'the colours dialog');
+    expectEqual(await browser.evaluate(`document.querySelectorAll('dialog[open] .colours-table tbody tr').length`), 9, 'one row for each conductor');
+    await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'pue'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click()`);
+    expectEqual(await browser.evaluate(`JSON.parse(localStorage.getItem('eebox:colour-scheme')).scheme`), 'pue', 'stored scheme');
+    await clickButton('Schematic');
+    const svg = await browser.evaluate(`(async () => {
+      let blob = null; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
+      const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () {};
+      document.getElementById('export-svg').click(); await new Promise((r) => setTimeout(r, 400));
+      HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create; return await blob.text();
+    })()`);
+    expectTrue(svg.includes('#e3bd0b') && svg.includes('#d62828'), 'the exported drawing does not use the PUE colours');
+    await browser.evaluate(`(() => { document.getElementById('colour-scheme').click(); })()`);
+    await browser.waitFor(`document.querySelector('dialog[open] .colours-table')`, 'the colours dialog again');
+    await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'eu'; s.dispatchEvent(new Event('change', { bubbles: true })); [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click(); })()`);
+    await clickButton('Panel');
+  });
+
   await step('a source that is off leaves what it feeds dashed and dim in an exported drawing', async () => {
     const project = JSON.parse(example);
     project.project.schematic.nodes.find((n) => n.kind === 'source').off = true;

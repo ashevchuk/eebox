@@ -5,7 +5,7 @@ import { Camera } from '../view/Camera';
 import { railRect } from '../view/geometry';
 import { History } from '../view/history';
 import { render } from '../view/render';
-import { theme } from '../view/theme';
+import { conductorStyle, theme } from '../view/theme';
 import { FieldsView } from './fieldsView';
 import type { InspectorView } from './inspector';
 import { applyEditorAction, applyEditorEdit, describeEditor, validateDraft, type EditorState } from './libraryEditor';
@@ -387,7 +387,6 @@ export class ModuleDesignerView {
 
   private drawStage(): void {
     const { layout } = this;
-    const colours = theme().conductors;
     const svg = svgElement('svg', { width: layout.width, height: layout.height, viewBox: `0 0 ${layout.width} ${layout.height}`, class: 'designer-svg' });
     const zoom = Math.max(1, Math.min(MAX_ZOOM, STAGE_WIDTH_PX / layout.width, STAGE_HEIGHT_PX / layout.height));
     svg.style.width = `${layout.width * zoom}px`;
@@ -425,7 +424,12 @@ export class ModuleDesignerView {
     for (const pin of layout.pins) {
       const entry = pin.source ?? layout.pins.indexOf(pin);
       const marked = entry === this.selected || entry === this.connectFrom;
-      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: layout.pinRadius, fill: colours[pin.terminal.conductor], stroke: marked ? '#f5c518' : '#14161d', 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
+      const style = conductorStyle(pin.terminal.conductor);
+      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: layout.pinRadius, fill: style.color, stroke: marked ? '#f5c518' : (style.outline ?? '#14161d'), 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
+      if (style.stripe) {
+        const r = layout.pinRadius;
+        svg.append(svgElement('path', { d: `M${pin.x} ${pin.y - r}A${r} ${r} 0 0 1 ${pin.x} ${pin.y + r}Z`, fill: style.stripe, 'pointer-events': 'none' }));
+      }
       const stagger = layout.crowded ? (layout.pins.indexOf(pin) % 2) * LABEL_STAGGER_PX : 0;
       const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
       svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, labels[layout.pins.indexOf(pin)]!));
