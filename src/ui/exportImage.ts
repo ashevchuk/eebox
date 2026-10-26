@@ -24,15 +24,18 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
   const savedCamera = { x: camera.x, y: camera.y, scale: camera.scale };
   const savedSelection = session.selection;
   const savedRuler = session.ruler;
+  const savedHover = session.hoverWireId;
   camera.fit(view.fitBounds(), width, height, 0);
   session.selection = {};
   session.ruler = { on: false, line: null };
+  session.hoverWireId = null;
   try {
     view.draw(ctx, width, height, 1);
   } finally {
     Object.assign(camera, savedCamera);
     session.selection = savedSelection;
     session.ruler = savedRuler;
+    session.hoverWireId = savedHover;
   }
 }
 

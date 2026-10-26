@@ -186,6 +186,18 @@ try {
     expectTrue(csv.includes('Ferrule (mm2),Quantity'), 'the circuit list lacks the ferrules');
   });
 
+  await step('the schematic menu separates wires that run close and takes hand-drawn routes off', async () => {
+    const choose = async (item) => {
+      await clickButton('Nodes');
+      await browser.evaluate(`[...document.querySelectorAll('.menu-item')].find((b) => b.textContent.trim() === ${JSON.stringify(item)}).click()`);
+    };
+    const status = () => browser.evaluate(`document.getElementById('status').textContent`);
+    await choose('Separate overlapping wires');
+    expectEqual(await status(), 'No wires lie on top of each other.', 'status after separating wires of the example');
+    await choose('Route all wires automatically');
+    expectEqual(await status(), 'No wire has a route drawn by hand.', 'status after routing automatically');
+  });
+
   await step('the print sheet holds the drawings and tables, and prints on a white ground', async () => {
     await browser.evaluate(`window.print = () => {}; document.getElementById('print').click()`);
     await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length === 2`, 'two drawings on the print sheet');
@@ -344,7 +356,7 @@ try {
       document.getElementById('export-svg').click(); await new Promise((r) => setTimeout(r, 400));
       HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create; return await blob.text();
     })()`);
-    expectTrue(svg.includes('#e3bd0b') && svg.includes('#d62828'), 'the exported drawing does not use the PUE colours');
+    expectTrue(svg.includes('#ffd700') && svg.includes('#ff0000'), 'the exported drawing does not use the PUE colours');
     await browser.evaluate(`(() => { document.getElementById('colour-scheme').click(); })()`);
     await browser.waitFor(`document.querySelector('dialog[open] .colours-table')`, 'the colours dialog again');
     await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'eu'; s.dispatchEvent(new Event('change', { bubbles: true })); [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click(); })()`);

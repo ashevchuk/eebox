@@ -34,7 +34,7 @@ import {
 } from '../library/validate';
 import { CONDUCTORS, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
-import { MAX_LOOP_IMPEDANCE_MOHM, MAX_SHORT_CIRCUIT_KA, findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
+import { MAX_LOOP_IMPEDANCE_MOHM, MAX_SHORT_CIRCUIT_KA, routeProblem, findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
 
 export const PROJECT_FORMAT = 'eebox-project';
 export const PROJECT_VERSION = 1;
@@ -191,12 +191,14 @@ const LOAD_SPEC: FieldSpec = {
   lengthM: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_CABLE_LENGTH_M ? null : `must be above 0 and at most ${MAX_CABLE_LENGTH_M}`) },
   circuit: { required: false, check: oneOf(CIRCUIT_KINDS) },
 };
+const routeProblemCheck = (v: unknown) => routeProblem(v);
 const WIRE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   a: { required: true, check: terminalRefCheck },
   b: { required: true, check: terminalRefCheck },
   label: { required: false, check: labelCheck },
   crossSectionMm2: { required: false, check: oneOf(CROSS_SECTIONS_MM2) },
+  route: { required: false, check: routeProblemCheck },
 };
 
 /** Module nodes take their terminals from the module; source and load nodes carry their own. */

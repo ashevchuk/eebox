@@ -368,6 +368,8 @@
           <button class="menu-item" role="menuitem" id="add-load3" title="Three-phase consumer: L1, L2, L3, N, PE">Load, 3 phases</button>
           <hr />
           <button class="menu-item" role="menuitem" id="sync-modules" title="Add a node for every module on the panel">Sync modules</button>
+          <button class="menu-item" role="menuitem" id="spread-wires" title="Move apart the wires that run on top of each other">Separate overlapping wires</button>
+          <button class="menu-item" role="menuitem" id="route-automatically" title="Take the hand-drawn routes off all wires and let the program route them">Route all wires automatically</button>
           <button class="menu-item" role="menuitem" id="remove-orphans" title="Remove nodes of modules that are gone from the panel, when they have no wires">Remove orphans</button>
         </div>
       </div>
@@ -383,7 +385,7 @@
       <button id="check" title="Look for overlaps, orphaned nodes, wrongly joined conductors and design problems">Check</button>
       <button id="bundle-mode" class="schematic-only" title="While on, drag from a node to another node to wire all poles (same as Shift-drag)">Wire all poles</button>
       <div id="status"></div>
-      <div class="hint schematic-only">Drag terminal to terminal to wire it. Shift-drag, or switch on Wire all poles, from node to node to wire every pole.</div>
+      <div class="hint schematic-only">Drag terminal to terminal to wire it. Shift-drag, or switch on Wire all poles, from node to node to wire every pole. Drag a wire to move it; drag its piece at a terminal sideways to bend it.</div>
     </header>
     <main>
       <aside id="sidebar">

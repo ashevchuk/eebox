@@ -50,6 +50,7 @@ import {
   setNodeLoad,
   setSourceOff,
   setSourceProtection,
+  setWireRoute,
   setWireSection,
   setWireLabel,
   type SchematicNode,
@@ -389,12 +390,13 @@ export function inspect(ctx: InspectContext): InspectorView {
       const conductor = first && terminals(first)?.find((t) => t.id === wire.a.terminal)?.conductor;
       return {
         title: 'Wire',
-        actions: [],
+        actions: wire.route ? [{ key: 'routeAutomatically', label: 'Route automatically' }] : [],
         fields: [
           text('label', 'Label', wire.label ?? ''),
           { key: 'section', label: 'Cross-section', kind: 'select', value: wire.crossSectionMm2 === undefined ? '' : String(wire.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2, for the ferrules; empty for the load cable' },
           readonly('from', 'From', end(wire.a)),
           readonly('to', 'To', end(wire.b)),
+          readonly('route', 'Route', wire.route ? `by hand, ${wire.route.length + 1} bends` : 'automatic'),
           ...(conductor ? [readonly('conductor', 'Conductor', conductor)] : []),
           readonly('id', 'Id', wire.id),
         ],
@@ -694,6 +696,10 @@ export function applyEdit(
 /** Runs an inspector action; returns the project to commit and what should be selected afterwards. */
 export function applyAction(ctx: InspectContext, key: string, options: { confirmed?: boolean } = {}): EditResult {
   const target = targetOf(ctx);
+  if (key === 'routeAutomatically' && target.kind === 'wire') {
+    const result = setWireRoute(ctx.project.schematic, target.wire.id, undefined);
+    return result.ok ? { ok: true, project: { ...ctx.project, schematic: result.schematic } } : fail(describeError(result.error));
+  }
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);
     if (!result.ok) return fail('That module is no longer on the rail.');

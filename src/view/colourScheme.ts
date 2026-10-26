@@ -30,10 +30,10 @@ export const EU_SCHEME: ColourScheme = {
 /** The older Ukrainian and Soviet marking of the phases A, B and C: yellow, green and red. */
 export const PUE_SCHEME: ColourScheme = {
   ...BASE,
-  L1: { color: '#e3bd0b' },
-  L2: { color: '#2f9e44' },
-  L3: { color: '#d62828' },
-  N: { color: '#4aa3ff' },
+  L1: { color: '#ffd700' },
+  L2: { color: '#008000' },
+  L3: { color: '#ff0000' },
+  N: { color: '#0057ff' },
   PE: GREEN_YELLOW,
 };
 

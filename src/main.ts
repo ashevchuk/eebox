@@ -170,7 +170,9 @@ window.addEventListener('pointermove', (e) => {
     panFrom = { x: e.clientX, y: e.clientY };
     requestRender();
   }
-  activeView().pointerMove(e, worldPoint(e), isOverCanvas(e));
+  const world = worldPoint(e);
+  activeView().pointerMove(e, world, isOverCanvas(e));
+  if (isOverCanvas(e) && !(session.mode === 'panel' && session.ruler.on)) canvas.style.cursor = activeView().cursorAt?.(world) ?? '';
 });
 
 window.addEventListener('pointerup', (e) => {
@@ -216,6 +218,8 @@ window.addEventListener('keydown', (e) => {
   } else if (e.code === 'KeyR' && !mod && session.mode === 'panel') {
     session.ruler = { on: !session.ruler.on, line: null };
     session.changed();
+  } else if (e.code === 'Escape' && activeView().cancel?.()) {
+    e.preventDefault();
   } else if (e.code === 'Escape' && session.ruler.on) {
     session.ruler = { on: false, line: null };
     session.changed();
@@ -635,6 +639,8 @@ byId('bundle-mode').addEventListener('click', () => {
   syncUi();
 });
 byId('sync-modules').addEventListener('click', () => schematicView.syncModules());
+byId('route-automatically').addEventListener('click', () => schematicView.routeAllAutomatically());
+byId('spread-wires').addEventListener('click', () => schematicView.spreadWires());
 byId('remove-orphans').addEventListener('click', removeOrphans);
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());

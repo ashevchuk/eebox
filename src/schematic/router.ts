@@ -1,15 +1,16 @@
 import type { Point } from '../view/Camera';
 import { WIRE_STUB, portOf, wirePath, type Layout, type Rect } from './geometry';
+import { pathFromLanes } from './manualRoute';
 import type { Schematic } from './model';
 
 /** Space kept free around every node, so wires do not graze it. */
 const CLEARANCE = 8;
 /** Distance between the parallel lanes a wire may take beside a node or in a gap. */
-const LANE = 6;
+const LANE = 10;
 const LANES_AROUND_NODE = 3;
 const LANES_IN_GAP = 2;
 const BEND_COST = 24;
-const OVERLAP_COST_PER_PX = 3;
+const OVERLAP_COST_PER_PX = 6;
 const MAX_EXPANSIONS = 60000;
 
 type Direction = 0 | 1 | 2 | 3;
@@ -160,6 +161,23 @@ function search(s: Search, from: Endpoint, to: Endpoint): Array<[number, number]
   return undefined;
 }
 
+/** Marks the grid edges a hand-drawn wire runs along as taken, so wires routed after it keep off them. */
+function markUsed(s: Search, path: Point[]): void {
+  const index = (values: number[], v: number) => values.findIndex((x) => Math.abs(x - v) <= 0.01);
+  for (let k = 1; k < path.length; k++) {
+    const a = path[k - 1]!;
+    const b = path[k]!;
+    const [i1, j1, i2, j2] = [index(s.xs, a.x), index(s.ys, a.y), index(s.xs, b.x), index(s.ys, b.y)];
+    if (i1 < 0 || j1 < 0 || i2 < 0 || j2 < 0) continue;
+    const di = Math.sign(i2 - i1);
+    const dj = Math.sign(j2 - j1);
+    for (let i = i1, j = j1; i !== i2 || j !== j2; i += di, j += dj) {
+      const id = edgeId(s.ys.length, i, j, i + di, j + dj);
+      s.used.set(id, (s.used.get(id) ?? 0) + 1);
+    }
+  }
+}
+
 function withoutRedundantPoints(points: Point[]): Point[] {
   const kept: Point[] = [];
   for (const p of points) {
@@ -176,7 +194,7 @@ let cache: { signature: string; routes: Map<string, Point[]> } | undefined;
 
 function signatureOf(schematic: Schematic, layout: Layout): string {
   const nodes = [...layout.values()].map((n) => [n.node.id, n.rect.x, n.rect.y, n.rect.width, n.rect.height, n.ports.map((p) => p.terminal.id)]);
-  const wires = schematic.wires.map((w) => [w.id, w.a.node, w.a.terminal, w.b.node, w.b.terminal]);
+  const wires = schematic.wires.map((w) => [w.id, w.a.node, w.a.terminal, w.b.node, w.b.terminal, w.route]);
   return JSON.stringify([nodes, wires]);
 }
 
@@ -201,6 +219,11 @@ export function routeWires(schematic: Schematic, layout: Layout): Map<string, Po
     return [{ wire, from: make(a.point, a.terminal.side), to: make(b.point, b.terminal.side), sides: [a.terminal.side, b.terminal.side] as const }];
   });
 
+  const manual = new Map<string, Point[]>();
+  for (const { wire, from, to, sides } of endpoints) {
+    if (wire.route) manual.set(wire.id, pathFromLanes({ point: from.port, side: sides[0] }, { point: to.port, side: sides[1] }, wire.route));
+  }
+
   const obstacles = [...layout.values()].map((n) => inflate(n.rect));
   const xValues: number[] = [];
   const yValues: number[] = [];
@@ -208,6 +231,12 @@ export function routeWires(schematic: Schematic, layout: Layout): Map<string, Po
     for (let k = 0; k < LANES_AROUND_NODE; k++) {
       xValues.push(o.x - k * LANE, o.x + o.width + k * LANE);
       yValues.push(o.y - k * LANE, o.y + o.height + k * LANE);
+    }
+  }
+  for (const path of manual.values()) {
+    for (const p of path) {
+      xValues.push(p.x);
+      yValues.push(p.y);
     }
   }
   for (const { from, to } of endpoints) {
@@ -227,7 +256,12 @@ export function routeWires(schematic: Schematic, layout: Layout): Map<string, Po
   const inClearance = (p: Point) => obstacles.some((o) => p.x > o.x && p.x < o.x + o.width && p.y > o.y && p.y < o.y + o.height);
 
   const routes = new Map<string, Point[]>();
+  for (const [id, path] of manual) {
+    routes.set(id, path);
+    markUsed(s, path);
+  }
   for (const { wire, from, to, sides } of endpoints) {
+    if (manual.has(wire.id)) continue;
     const found = search(s, from, to) ?? (inClearance(from.stub) || inClearance(to.stub) ? search(bodies, from, to) : undefined);
     if (!found) {
       routes.set(wire.id, wirePath({ point: from.port, side: sides[0] }, { point: to.port, side: sides[1] }, 0));

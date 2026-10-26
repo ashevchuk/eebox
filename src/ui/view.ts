@@ -9,4 +9,8 @@ export interface View {
   pointerMove(e: PointerEvent, world: Point, overCanvas: boolean): void;
   pointerUp(e: PointerEvent, world: Point): void;
   deleteSelection(): void;
+  /** The mouse cursor for a point, when the view wants one other than the default. */
+  cursorAt?(world: Point): string | undefined;
+  /** Gives up what a drag in progress was doing; true when there was one. */
+  cancel?(): boolean;
 }

@@ -43,7 +43,24 @@ export interface Wire {
   label?: string;
   /** Cross-section of the conductor, which decides the size of the ferrules on its ends. */
   crossSectionMm2?: number;
+  /**
+   * A route drawn by hand: the coordinates of the interior segments, y first and then x, y, ...,
+   * an odd number of them. The ends follow the terminals; see `schematic/manualRoute.ts`.
+   */
+  route?: number[];
 }
+
+export const MAX_ROUTE_LANES = 15;
+export const MAX_ROUTE_COORDINATE = 100_000;
+
+export const routeProblem = (route: unknown): string | null =>
+  Array.isArray(route) &&
+  route.length >= 1 &&
+  route.length <= MAX_ROUTE_LANES &&
+  route.length % 2 === 1 &&
+  route.every((v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= MAX_ROUTE_COORDINATE)
+    ? null
+    : `must be an odd number (1 to ${MAX_ROUTE_LANES}) of coordinates within ${MAX_ROUTE_COORDINATE}`;
 
 export interface Schematic {
   nodes: SchematicNode[];
@@ -67,6 +84,7 @@ export type SchematicError =
   | { kind: 'not-a-source' }
   | { kind: 'invalid-load' }
   | { kind: 'invalid-section' }
+  | { kind: 'invalid-route' }
   | { kind: 'invalid-conductors' };
 
 export type SchematicResult =
@@ -299,6 +317,28 @@ export function setSourceProtection(schematic: Schematic, id: string, key: Sourc
   const { [key]: _previous, ...rest } = node;
   const updated: SchematicNode = value === undefined ? rest : { ...rest, [key]: value };
   return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
+}
+
+/** Gives a wire a route drawn by hand, or clears it with `undefined` so the wire is routed automatically. */
+export function setWireRoute(schematic: Schematic, id: string, route: number[] | undefined): SchematicResult {
+  if (!schematic.wires.some((w) => w.id === id)) return failure('unknown-wire');
+  if (route !== undefined && routeProblem(route) !== null) return failure('invalid-route');
+  const wires = schematic.wires.map((w) => {
+    if (w.id !== id) return w;
+    const { route: _previous, ...rest } = w;
+    return route === undefined ? rest : { ...rest, route: [...route] };
+  });
+  return { ok: true, schematic: { ...schematic, wires } };
+}
+
+/** Takes the hand-drawn route off every wire, so the router lays them all out again. */
+export function clearWireRoutes(schematic: Schematic): { schematic: Schematic; cleared: number } {
+  const cleared = schematic.wires.filter((w) => w.route).length;
+  const wires = schematic.wires.map((w) => {
+    const { route: _route, ...rest } = w;
+    return rest;
+  });
+  return { schematic: cleared === 0 ? schematic : { ...schematic, wires }, cleared };
 }
 
 /** Sets the cross-section of a wire, or clears it with `undefined`. */

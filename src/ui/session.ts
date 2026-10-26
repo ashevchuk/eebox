@@ -43,6 +43,8 @@ export class Session {
   cableSettings: CableSettings = DEFAULT_CABLE_SETTINGS;
   mode: Mode = 'panel';
   selection: Selection = {};
+  /** The wire under the pointer in the schematic, highlighted on the screen; it is left out of exports. */
+  hoverWireId: string | null = null;
   /** The ruler of the panel view: whether it is on and the last thing measured. Not part of the project. */
   ruler: { on: boolean; line: RulerLine | null } = { on: false, line: null };
   notify: (message: string, isError?: boolean) => void = () => {};
