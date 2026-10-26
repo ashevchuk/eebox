@@ -307,6 +307,40 @@ export function syncModuleNodes(
   return result;
 }
 
+const hasWires = (schematic: Schematic, nodeId: string) =>
+  schematic.wires.some((w) => w.a.node === nodeId || w.b.node === nodeId);
+
+const withoutNodes = (schematic: Schematic, ids: Set<string>): Schematic => ({
+  ...schematic,
+  nodes: schematic.nodes.filter((n) => !ids.has(n.id)),
+});
+
+/** Drops the node of a module that has just left the panel for good, unless wires hang on it. */
+export function removeUnwiredNodeOf(schematic: Schematic, placementId: string): Schematic {
+  const gone = new Set(
+    schematic.nodes.filter((n) => n.placementId === placementId && !hasWires(schematic, n.id)).map((n) => n.id),
+  );
+  return gone.size === 0 ? schematic : withoutNodes(schematic, gone);
+}
+
+/**
+ * Removes module nodes whose module is neither on a rail nor on the shelf, as long as no wire is
+ * on them; a node with wires stays, so that nothing is lost without the user seeing it.
+ */
+export function removeOrphanNodes(
+  schematic: Schematic,
+  panel: Panel,
+): { schematic: Schematic; removed: number; keptWired: number } {
+  const known = new Set([...panel.placements, ...panel.shelf].map((p) => p.id));
+  const orphans = schematic.nodes.filter((n) => n.kind === 'module' && !(n.placementId && known.has(n.placementId)));
+  const unwired = new Set(orphans.filter((n) => !hasWires(schematic, n.id)).map((n) => n.id));
+  return {
+    schematic: unwired.size === 0 ? schematic : withoutNodes(schematic, unwired),
+    removed: unwired.size,
+    keptWired: orphans.length - unwired.size,
+  };
+}
+
 /** Audits a schematic against its panel; also catches files edited by hand. */
 export function findProblems(
   schematic: Schematic,

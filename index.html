@@ -46,6 +46,32 @@
         cursor: pointer;
       }
       button.active { border-color: var(--accent); color: var(--accent); }
+      .toolbar-group { display: flex; gap: 4px; }
+      .toolbar-separator { align-self: stretch; width: 1px; margin: 2px 4px; background: var(--border); }
+      .menu { position: relative; }
+      .menu-button::after { content: ' \25BE'; color: var(--text-dim); }
+      .menu-button[aria-expanded='true'] { border-color: var(--accent); color: var(--accent); }
+      .menu-list {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 40;
+        min-width: 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 4px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      }
+      .menu-list[hidden] { display: none; }
+      .menu-list hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
+      .menu-row { display: flex; gap: 6px; padding: 2px 0; }
+      .menu-row select { flex: 1; min-width: 0; }
+      .menu-list .menu-item { display: block; width: 100%; padding: 5px 10px; text-align: left; background: transparent; border: 0; border-radius: 4px; }
+      .menu-list .menu-item:hover:not(:disabled), .menu-list .menu-item:focus-visible { background: var(--bg); outline: none; }
       body[data-mode='panel'] .schematic-only,
       body[data-mode='schematic'] .panel-only,
       body[data-mode='schematic'] #sidebar { display: none; }
@@ -201,36 +227,64 @@
   <body data-mode="panel">
     <header>
       <strong>eebox</strong>
-      <button id="mode-panel">Panel</button>
-      <button id="mode-schematic">Schematic</button>
-      <select id="enclosure" class="panel-only" title="Enclosure"></select>
-      <button id="new-panel" class="panel-only">New panel</button>
-      <button id="add-source1" class="schematic-only" title="Single-phase mains: L, N, PE">+ Source 1ph</button>
-      <button id="add-source3" class="schematic-only" title="Three-phase mains: L1, L2, L3, N, PE">+ Source 3ph</button>
-      <button id="add-load1" class="schematic-only" title="Single-phase consumer: L, N, PE">+ Load 1ph</button>
-      <button id="add-load3" class="schematic-only" title="Three-phase consumer: L1, L2, L3, N, PE">+ Load 3ph</button>
+      <div class="toolbar-group">
+        <button id="mode-panel">Panel</button>
+        <button id="mode-schematic">Schematic</button>
+      </div>
+      <div class="menu">
+        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">File</button>
+        <div class="menu-list" role="menu" hidden>
+          <div class="menu-row panel-only">
+            <select id="enclosure" title="Enclosure"></select>
+            <button id="new-panel">New panel</button>
+          </div>
+          <hr class="panel-only" />
+          <label class="menu-item file-button" role="menuitem" tabindex="0">
+            Open…
+            <input id="open-project" type="file" accept=".json,application/json" hidden />
+          </label>
+          <button class="menu-item" role="menuitem" id="save-project">Save</button>
+          <button class="menu-item" role="menuitem" id="share-link">Share link</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="new-library" title="Start a library of your own">New library…</button>
+          <label class="menu-item file-button" role="menuitem" tabindex="0">
+            Import library…
+            <input id="import" type="file" accept=".json,application/json" multiple hidden />
+          </label>
+        </div>
+      </div>
+      <div class="menu">
+        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">Export</button>
+        <div class="menu-list" role="menu" hidden>
+          <button class="menu-item" role="menuitem" id="export-png">PNG image</button>
+          <button class="menu-item" role="menuitem" id="export-svg">SVG image</button>
+          <button class="menu-item" role="menuitem" id="export-bom">Parts list (CSV)</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the parts list">Print…</button>
+        </div>
+      </div>
+      <div class="menu schematic-only">
+        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">Nodes</button>
+        <div class="menu-list" role="menu" hidden>
+          <button class="menu-item" role="menuitem" id="add-source1" title="Single-phase mains: L, N, PE">Source, 1 phase</button>
+          <button class="menu-item" role="menuitem" id="add-source3" title="Three-phase mains: L1, L2, L3, N, PE">Source, 3 phases</button>
+          <button class="menu-item" role="menuitem" id="add-load1" title="Single-phase consumer: L, N, PE">Load, 1 phase</button>
+          <button class="menu-item" role="menuitem" id="add-load3" title="Three-phase consumer: L1, L2, L3, N, PE">Load, 3 phases</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="sync-modules" title="Add a node for every module on the panel">Sync modules</button>
+          <button class="menu-item" role="menuitem" id="remove-orphans" title="Remove nodes of modules that are gone from the panel, when they have no wires">Remove orphans</button>
+        </div>
+      </div>
+      <span class="toolbar-separator"></span>
+      <div class="toolbar-group">
+        <button id="undo">Undo</button>
+        <button id="redo">Redo</button>
+        <button id="delete-selection" title="Remove the selected item (Delete)" disabled>Delete</button>
+        <button id="fit">Fit</button>
+      </div>
+      <span class="toolbar-separator"></span>
+      <button id="check" title="Look for overlaps, orphaned nodes, wrongly joined conductors and design problems">Check</button>
       <button id="bundle-mode" class="schematic-only" title="While on, drag from a node to another node to wire all poles (same as Shift-drag)">Wire all poles</button>
-      <button id="sync-modules" class="schematic-only" title="Add a node for every module on the panel">Sync modules</button>
-      <button id="check" title="Look for overlaps, orphaned nodes and wrongly joined conductors">Check</button>
-      <button id="undo">Undo</button>
-      <button id="redo">Redo</button>
-      <button id="delete-selection" title="Remove the selected item (Delete)" disabled>Delete</button>
-      <button id="fit">Fit</button>
-      <label class="file-button">
-        Open…
-        <input id="open-project" type="file" accept=".json,application/json" hidden />
-      </label>
-      <button id="save-project">Save</button>
-      <button id="share-link">Share link</button>
-      <button id="export-png">PNG</button>
-      <button id="export-svg">SVG</button>
-      <button id="export-bom">BOM CSV</button>
-      <button id="print" title="Print the panel, the schematic and the parts list">Print</button>
-      <button id="new-library" title="Start a library of your own">New library…</button>
-      <label class="file-button">
-        Import library…
-        <input id="import" type="file" accept=".json,application/json" multiple hidden />
-      </label>
       <div id="status"></div>
       <div class="hint schematic-only">Drag terminal to terminal to wire it. Shift-drag, or switch on Wire all poles, from node to node to wire every pole.</div>
     </header>

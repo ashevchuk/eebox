@@ -2,12 +2,13 @@ import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import {
   insertPlacement,
   nextPlacementId,
-  removePlacement,
   type ModuleRef,
   type Panel,
   type ShelfItem,
 } from '../layout/placement';
 import { placeFromShelf } from '../layout/shelf';
+import type { Project } from '../project';
+import { deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
@@ -149,8 +150,15 @@ export class PanelView implements View {
   deleteSelection(): void {
     const { placementId, combId } = this.session.selection;
     const panel = this.session.project.panel;
-    const result = combId ? removeComb(panel, combId) : placementId ? removePlacement(panel, placementId) : null;
-    if (result?.ok) this.session.commit({ ...this.session.project, panel: result.panel });
+    const project = this.session.project;
+    let next: Project | null = null;
+    if (combId) {
+      const result = removeComb(panel, combId);
+      if (result.ok) next = { ...project, panel: result.panel };
+    } else if (placementId) {
+      next = deletePlacement(project, placementId);
+    }
+    if (next) this.session.commit(next);
     this.session.select({});
   }
 

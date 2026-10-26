@@ -18,11 +18,12 @@ import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosa
 import { bomToCsv, buildBom } from './project/bom';
 import { parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
-import { emptySchematic } from './schematic/model';
+import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
+import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
 import { ShelfView } from './ui/shelfView';
@@ -305,6 +306,16 @@ function printProject(): void {
   window.print();
 }
 
+function removeOrphans(): void {
+  const { project } = session;
+  const { schematic, removed, keptWired } = removeOrphanNodes(project.schematic, project.panel);
+  if (removed > 0) session.commit({ ...project, schematic });
+  const nodes = (n: number) => `${n} orphaned node${n === 1 ? '' : 's'}`;
+  const stayed = `${nodes(keptWired)} with wires stayed: delete them yourself if the wires are not needed.`;
+  if (removed === 0) showStatus(keptWired > 0 ? `Nothing to remove: ${stayed}` : 'There are no orphaned nodes.', keptWired > 0);
+  else showStatus(`Removed ${nodes(removed)}.${keptWired > 0 ? ` ${stayed}` : ''}`, keptWired > 0);
+}
+
 function exportSvg(): void {
   const stem = fileStem(session.project.panel.title, 'panel');
   downloadBlob(new Blob([renderToSvg(activeView(), session)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
@@ -431,6 +442,7 @@ window.addEventListener(
 
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
+initMenus();
 byId('print').addEventListener('click', printProject);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
@@ -461,6 +473,7 @@ byId('bundle-mode').addEventListener('click', () => {
   syncUi();
 });
 byId('sync-modules').addEventListener('click', () => schematicView.syncModules());
+byId('remove-orphans').addEventListener('click', removeOrphans);
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
 new ResizeObserver(resizeCanvas).observe(stageWrap);
