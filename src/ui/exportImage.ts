@@ -23,13 +23,16 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
   const { camera } = view;
   const savedCamera = { x: camera.x, y: camera.y, scale: camera.scale };
   const savedSelection = session.selection;
+  const savedRuler = session.ruler;
   camera.fit(view.fitBounds(), width, height, 0);
   session.selection = {};
+  session.ruler = { on: false, line: null };
   try {
     view.draw(ctx, width, height, 1);
   } finally {
     Object.assign(camera, savedCamera);
     session.selection = savedSelection;
+    session.ruler = savedRuler;
   }
 }
 

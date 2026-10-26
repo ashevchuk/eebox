@@ -37,6 +37,7 @@ import { editCableSettings } from './ui/cableSettingsDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
 import { fillPrintSheet } from './ui/printSheet';
+import { selectedIds } from './ui/selection';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
@@ -104,8 +105,11 @@ function syncUi(): void {
   byId('mode-panel').classList.toggle('active', session.mode === 'panel');
   byId('mode-schematic').classList.toggle('active', session.mode === 'schematic');
   byId('bundle-mode').classList.toggle('active', schematicView.bundleMode);
-  const { placementId, combId, nodeId, wireId } = session.selection;
-  deleteButton.disabled = !(session.mode === 'panel' ? placementId || combId : nodeId || wireId);
+  byId('ruler').classList.toggle('active', session.ruler.on);
+  canvas.style.cursor = session.mode === 'panel' && session.ruler.on ? 'crosshair' : '';
+  const { nodeId, wireId } = session.selection;
+  const chosen = selectedIds(session.selection);
+  deleteButton.disabled = !(session.mode === 'panel' ? chosen.placements.length + chosen.combs.length > 0 : nodeId || wireId);
 }
 
 session.subscribe(() => {
@@ -206,6 +210,12 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'KeyV') panelView.paste();
     else if (e.code === 'KeyD') panelView.duplicateSelection();
     else panelView.selectAll();
+  } else if (e.code === 'KeyR' && !mod && session.mode === 'panel') {
+    session.ruler = { on: !session.ruler.on, line: null };
+    session.changed();
+  } else if (e.code === 'Escape' && session.ruler.on) {
+    session.ruler = { on: false, line: null };
+    session.changed();
   } else if (e.code === 'Delete' || e.code === 'Backspace') {
     activeView().deleteSelection();
   }
@@ -576,6 +586,10 @@ byId('mode-panel').addEventListener('click', () => setMode('panel'));
 byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
 byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
+byId('ruler').addEventListener('click', () => {
+  session.ruler = { on: !session.ruler.on, line: null };
+  session.changed();
+});
 byId('save-project').addEventListener('click', () =>
   downloadBlob(
     new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }),

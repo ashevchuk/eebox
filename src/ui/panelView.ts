@@ -17,8 +17,12 @@ import { Camera } from '../view/Camera';
 import { FRAME_PADDING, combAtPoint, frameRect, itemsInRect, placementAt, railAtPoint, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
 import { render, type Ghost } from '../view/render';
 import { groupSelection, selectedIds, toggleItem } from './selection';
+import { edgeLines, snapToEdges } from '../view/ruler';
 import type { Session } from './session';
 import type { View } from './view';
+
+/** How close, in screen pixels, a ruler end has to come to an edge to be drawn onto it. */
+const RULER_SNAP_PX = 7;
 
 interface Drag {
   kind: 'placement' | 'comb';
@@ -42,6 +46,7 @@ export class PanelView implements View {
   private drag: Drag | null = null;
   private clip: Clip | null = null;
   private band: { from: Point; to: Point } | null = null;
+  private measuring = false;
 
   constructor(private readonly session: Session) {}
 
@@ -65,6 +70,7 @@ export class PanelView implements View {
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
+        ruler: this.session.ruler.line,
       },
       width,
       height,
@@ -90,7 +96,24 @@ export class PanelView implements View {
     this.pointerMove(e, world, false);
   }
 
+  /** A point of the drawing drawn to the nearest edge within a few pixels of the screen. */
+  private snapped(world: Point): Point {
+    const info = (item: { module: ModuleRef; widthUnits?: number }) => {
+      const def = this.session.resolve(item.module);
+      return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
+    };
+    const edges = edgeLines(this.session.project.panel, this.session.widthOf, info);
+    return snapToEdges(world, edges, RULER_SNAP_PX / this.camera.scale);
+  }
+
   pointerDown(e: PointerEvent, world: Point): boolean {
+    if (this.session.ruler.on) {
+      const start = this.snapped(world);
+      this.session.ruler.line = { a: start, b: start };
+      this.measuring = true;
+      this.session.changed();
+      return true;
+    }
     const panel = this.session.project.panel;
     const comb = combAtPoint(
       panel,
@@ -151,6 +174,11 @@ export class PanelView implements View {
   }
 
   pointerMove(_e: PointerEvent, world: Point, overCanvas: boolean): void {
+    if (this.measuring && this.session.ruler.line) {
+      this.session.ruler.line = { a: this.session.ruler.line.a, b: this.snapped(world) };
+      this.session.changed();
+      return;
+    }
     if (this.band) {
       this.band = { ...this.band, to: world };
       this.session.changed();
@@ -179,6 +207,13 @@ export class PanelView implements View {
   }
 
   pointerUp(): void {
+    if (this.measuring) {
+      this.measuring = false;
+      const line = this.session.ruler.line;
+      if (line && line.a.x === line.b.x && line.a.y === line.b.y) this.session.ruler.line = null;
+      this.session.changed();
+      return;
+    }
     if (this.band) {
       const area: Rect = rectBetween(this.band.from, this.band.to);
       this.band = null;

@@ -1,3 +1,4 @@
+import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
 import { MODULE_UNIT_MM, type ModuleDef, type ModuleKind } from '../library/types';
@@ -28,6 +29,8 @@ export interface Scene {
   ghost: Ghost | null;
   /** A rubber band being dragged to select several items, in world coordinates. */
   band?: Rect | null;
+  /** What the ruler has measured, in world coordinates. */
+  ruler?: RulerLine | null;
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -219,6 +222,44 @@ function drawModule(
   drawTerminals(ctx, def, r, widthUnits);
 }
 
+const RULER_COLOR = '#f5c518';
+
+/** A line with a tick at each end and its length beside it; sizes are given in screen pixels so it reads at any zoom. */
+function drawRuler(ctx: CanvasRenderingContext2D, line: RulerLine, scale: number): void {
+  const px = 1 / scale;
+  const { a, b } = line;
+  ctx.save();
+  ctx.strokeStyle = RULER_COLOR;
+  ctx.fillStyle = RULER_COLOR;
+  ctx.lineWidth = 1.5 * px;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  const angle = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2;
+  for (const end of [a, b]) {
+    ctx.beginPath();
+    ctx.moveTo(end.x - Math.cos(angle) * 6 * px, end.y - Math.sin(angle) * 6 * px);
+    ctx.lineTo(end.x + Math.cos(angle) * 6 * px, end.y + Math.sin(angle) * 6 * px);
+    ctx.stroke();
+  }
+  const lines = describeMeasurement(measurement(line));
+  const size = 12 * px;
+  ctx.font = `${size}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const width = Math.max(...lines.map((text) => ctx.measureText(text).width)) + 10 * px;
+  const height = lines.length * size * 1.3 + 6 * px;
+  const x = (a.x + b.x) / 2 - width / 2;
+  const y = (a.y + b.y) / 2 - height - 8 * px;
+  ctx.fillStyle = 'rgba(20, 22, 29, 0.92)';
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = '#f5f5f5';
+  lines.forEach((text, i) => ctx.fillText(text, x + 5 * px, y + 3 * px + i * size * 1.3));
+  ctx.restore();
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   camera: Camera,
@@ -298,6 +339,8 @@ export function render(
       : moduleRect(panel, rail, slot, widthUnits);
     fillRect(ctx, area, color);
   }
+
+  if (scene.ruler) drawRuler(ctx, scene.ruler, camera.scale);
 
   if (scene.band) {
     ctx.fillStyle = 'rgba(245, 197, 24, 0.12)';

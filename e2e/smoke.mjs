@@ -120,6 +120,18 @@ try {
     expectTrue(Math.abs(after[1] - after[0] - (before[1] - before[0])) < 1e-6, 'the distance between them to stay');
   });
 
+  await step('the ruler is switched on with R, a drag measures without changing the project, Escape switches it off', async () => {
+    const key = (code) => browser.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: '${code}', bubbles: true }))`);
+    const modules = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 1300)); return JSON.stringify(JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.placements); })()`);
+    const before = await modules();
+    await key('KeyR');
+    expectEqual(await browser.evaluate(`document.getElementById('ruler').classList.contains('active')`), true, 'ruler button after R');
+    await browser.mouse('mousePressed', 600, 300); await browser.mouse('mouseMoved', 700, 350); await browser.mouse('mouseMoved', 800, 420); await browser.mouse('mouseReleased', 800, 420);
+    await key('Escape');
+    expectEqual(await browser.evaluate(`document.getElementById('ruler').classList.contains('active')`), false, 'ruler button after Escape');
+    expectEqual(await modules(), before, 'modules after measuring');
+  });
+
   await step('copies of the selected modules are added edge to edge from the inspector', async () => {
     await browser.evaluate(`(() => {
       const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label').textContent === 'Add copies');

@@ -7,6 +7,7 @@ import type { Project } from '../project';
 import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
 import { emptySchematic } from '../schematic/model';
 import { groupSelection, selectedIds } from './selection';
+import type { RulerLine } from '../view/ruler';
 import { History } from '../view/history';
 
 export type Mode = 'panel' | 'schematic';
@@ -42,6 +43,8 @@ export class Session {
   cableSettings: CableSettings = DEFAULT_CABLE_SETTINGS;
   mode: Mode = 'panel';
   selection: Selection = {};
+  /** The ruler of the panel view: whether it is on and the last thing measured. Not part of the project. */
+  ruler: { on: boolean; line: RulerLine | null } = { on: false, line: null };
   notify: (message: string, isError?: boolean) => void = () => {};
   private readonly history = new History<Document>({ project: emptyProject(), snapshot: {} });
   private readonly listeners = new Set<() => void>();
