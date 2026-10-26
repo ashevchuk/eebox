@@ -25,7 +25,7 @@ import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
-import { circuitSchedule, ferruleCounts, scheduleToCsv, wireList, wireListToCsv } from './electrical/schedule';
+import { circuitSchedule, ferruleCounts, scheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
 import { LIGHT_THEME } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
@@ -375,6 +375,17 @@ function exportCircuits(): void {
   downloadBlob(new Blob(['\uFEFF', scheduleToCsv(circuits, ferrules)], { type: 'text/csv;charset=utf-8' }), `${stem}-circuits.csv`);
 }
 
+function exportWireLabels(): void {
+  const labels = wireEndLabels(wireList(session.project, session.resolve));
+  if (labels.length === 0) {
+    showStatus('There are no wires yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', wireEndLabelsToCsv(labels)], { type: 'text/csv;charset=utf-8' }), `${stem}-wire-labels.csv`);
+  showStatus(`${labels.length} labels saved.`);
+}
+
 function exportWires(): void {
   const rows = wireList(session.project, session.resolve);
   if (rows.length === 0) {
@@ -602,6 +613,7 @@ byId('export-svg').addEventListener('click', exportSvg);
 byId('export-bom').addEventListener('click', exportBom);
 byId('export-circuits').addEventListener('click', exportCircuits);
 byId('export-wires').addEventListener('click', exportWires);
+byId('export-wire-labels').addEventListener('click', exportWireLabels);
 for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));
 }

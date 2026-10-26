@@ -314,6 +314,21 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Cancel').click()`);
   });
 
+  await step('the cable settings form outlines a changed cell, refuses a wrong one and exports a file', async () => {
+    await clickButton('File');
+    await browser.evaluate(`document.getElementById('cable-settings').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open] .settings-table')`, 'the cable settings form');
+    const type = (index, value) => browser.evaluate(`(() => { const i = document.querySelectorAll('dialog[open] .settings-table input')[${index}]; i.value = '${value}'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const state = () => browser.evaluate(`({ changed: document.querySelectorAll('dialog[open] input.changed').length, invalid: document.querySelectorAll('dialog[open] input.invalid').length, save: [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').disabled })`);
+    await type(10, '29');
+    expectEqual(await state(), { changed: 1, invalid: 0, save: false }, 'after a valid edit');
+    await type(12, '1');
+    expectEqual((await state()).save, true, 'Save with a wrong cell');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Reset to built-in values').click()`);
+    expectEqual(await state(), { changed: 0, invalid: 0, save: false }, 'after the reset');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Cancel').click()`);
+  });
+
   await step('a source that is off leaves what it feeds dashed and dim in an exported drawing', async () => {
     const project = JSON.parse(example);
     project.project.schematic.nodes.find((n) => n.kind === 'source').off = true;

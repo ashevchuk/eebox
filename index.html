@@ -91,8 +91,26 @@
       .examples-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
       .example-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; }
       .example-item span { color: var(--text-dim); font-size: 12px; }
-      .settings-dialog { width: min(780px, 94vw); }
-      .settings-text { width: 100%; height: 340px; resize: vertical; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+      .app-dialog.settings-dialog { width: min(820px, 96vw); max-width: 96vw; }
+      .settings-scroll { max-height: min(62vh, 560px); overflow-y: auto; padding-right: 6px; }
+      .settings-group { margin: 0 0 14px; }
+      .settings-group h3 { margin: 0 0 4px; font-size: 13px; }
+      .settings-hint { margin: 0 0 8px; color: var(--text-dim); font-size: 12px; }
+      .settings-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      .settings-table th { padding: 2px 3px; font-size: 11px; font-weight: 500; color: var(--text-dim); text-align: center; }
+      .settings-table th:first-child, .settings-table td:first-child { width: 150px; text-align: left; font-size: 12px; white-space: normal; }
+      .settings-table td:first-child { white-space: nowrap; }
+      .settings-table td { padding: 1px 2px; }
+      .settings-table tr.first-of-method td { border-top: 1px solid var(--border); }
+      .settings-table input, .settings-field input { width: 100%; box-sizing: border-box; padding: 2px 4px; font: inherit; text-align: right; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 3px; }
+      .settings-table input.changed, .settings-field input.changed { border-color: var(--accent); }
+      .settings-table input.invalid, .settings-field input.invalid { border-color: var(--error); background: rgba(239, 68, 68, 0.12); }
+      .settings-field { display: grid; grid-template-columns: 150px 90px auto; gap: 8px; align-items: center; margin: 3px 0; }
+      .settings-label { font-size: 12px; }
+      .settings-unit { color: var(--text-dim); font-size: 12px; }
+      .settings-trips { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 16px; }
+      .settings-actions { justify-content: space-between; align-items: center; }
+      .settings-actions .settings-files { display: flex; gap: 8px; margin-right: auto; }
       .settings-dialog .editor-errors { max-height: 120px; margin: 6px 0; padding: 4px 0; border: 0; }
       .menu-row { display: flex; gap: 6px; padding: 2px 0; }
       .menu-row select { flex: 1; min-width: 0; }
@@ -322,6 +340,7 @@
           <button class="menu-item" role="menuitem" id="export-svg">SVG image</button>
           <button class="menu-item" role="menuitem" id="export-bom">Parts list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wires" title="Every wire with its two ends, conductor, cross-section, length and current">Wire list (CSV)</button>
+          <button class="menu-item" role="menuitem" id="export-wire-labels" title="One label for each end of each wire, for a label printer: semicolon-separated, UTF-8">Wire end labels (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-circuits" title="Loads with their breaker, cable and voltage drop, and the ferrules needed">Circuits and ferrules (CSV)</button>
           <hr />
           <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the lists">Print…</button>

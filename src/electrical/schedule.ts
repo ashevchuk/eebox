@@ -178,3 +178,44 @@ export function wireListToCsv(rows: WireRow[]): string {
   const line = (cells: readonly string[]) => cells.map(cell).join(',');
   return `${[line(WIRE_HEADER), ...rows.map((row) => line(wireCells(row)))].join('\r\n')}\r\n`;
 }
+
+export interface WireEndLabel {
+  /** What this end of the wire is joined to: this end, an arrow, the far end. */
+  text: string;
+  /** Wire label, conductor and cross-section. */
+  detail: string;
+  copies: number;
+}
+
+const withoutSide = (end: string) => end.replace(/ \((top|bottom)\)$/, '');
+
+/**
+ * One label for each end of each wire, as a marker sleeve or a flag on the wire shows it: where this
+ * end is, an arrow, and where the other end goes, so either end tells where to look.
+ */
+export function wireEndLabels(rows: WireRow[]): WireEndLabel[] {
+  return rows.flatMap((row) => {
+    const here = withoutSide(row.from);
+    const there = withoutSide(row.to);
+    const detail = [row.label, row.conductor, row.sectionMm2 === undefined ? undefined : `${row.sectionMm2} mm2`].filter(Boolean).join(', ');
+    return [
+      { text: `${here} \u2192 ${there}`, detail, copies: 1 },
+      { text: `${there} \u2192 ${here}`, detail, copies: 1 },
+    ];
+  });
+}
+
+export const WIRE_LABEL_HEADER = ['Label 1', 'Label 2', 'Copies'] as const;
+
+/** Quotes what a spreadsheet or a label program would take for more than one cell; the delimiter is a semicolon. */
+function labelCell(value: string | number): string {
+  let text = String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return /[";\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** For label printers: one label per row, semicolons between the columns, and a header row. */
+export function wireEndLabelsToCsv(labels: WireEndLabel[]): string {
+  const line = (cells: ReadonlyArray<string | number>) => cells.map(labelCell).join(';');
+  return `${[line(WIRE_LABEL_HEADER), ...labels.map((l) => line([l.text, l.detail, l.copies]))].join('\r\n')}\r\n`;
+}
