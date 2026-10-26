@@ -10,7 +10,8 @@ import {
 } from '../src/schematic/model';
 import { applyAction, applyEdit, inspect, type InspectContext, type InspectorField } from '../src/ui/inspector';
 import type { Mode, Selection } from '../src/ui/session';
-import { combAt, panelOf, place, resolve } from './fixtures';
+import { combAt, defs, panelOf, place, resolve } from './fixtures';
+import type { ModuleDef } from '../src/library/types';
 
 function build(): Project {
   const panel = panelOf(
@@ -33,9 +34,12 @@ function build(): Project {
   return { panel, schematic };
 }
 
-const ctx = (selection: Selection, mode: Mode = 'panel', project: Project = build()): InspectContext => ({
-  project, selection, mode, resolve,
-});
+const ctx = (
+  selection: Selection,
+  mode: Mode = 'panel',
+  project: Project = build(),
+  libraries: Partial<Pick<InspectContext, 'snapshot' | 'fromLibraries'>> = {},
+): InspectContext => ({ project, selection, mode, resolve, snapshot: {}, fromLibraries: resolve, ...libraries });
 const fieldsOf = (c: InspectContext) => inspect(c)?.fields ?? [];
 const field = (c: InspectContext, key: string): InspectorField | undefined => fieldsOf(c).find((f) => f.key === key);
 const keysOf = (c: InspectContext) => fieldsOf(c).map((f) => f.key);
@@ -401,5 +405,68 @@ describe('take off', () => {
   it('refuses an unknown action', () => {
     const result = applyAction(ctx({ placementId: 'p1' }), 'explode');
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('updating modules from the libraries', () => {
+  const stored = { 'lib/nbar': defs.nbar! };
+  const fromLibraries = (overrides: Record<string, ModuleDef | undefined>) => (ref: { libraryId: string; moduleId: string }) =>
+    ref.moduleId in overrides ? overrides[ref.moduleId] : resolve(ref);
+  const renamed = fromLibraries({ nbar: { ...defs.nbar!, name: 'N bar v2' } });
+  const fewerTerminals = fromLibraries({
+    nbar: {
+      ...defs.nbar!,
+      terminals: [
+        { name: 'N', conductor: 'N', side: 'top', net: 'N', count: 2 },
+        { name: 'Nb', conductor: 'N', side: 'bottom', net: 'N', count: 2 },
+      ],
+    },
+  });
+  const widerBar = fromLibraries({ nbar: { ...defs.nbar!, widthUnits: 8 } });
+
+  it('says the stored data matches, and offers nothing, when it does', () => {
+    const view = inspect(ctx({}, 'panel', build(), { snapshot: stored }));
+    expect(view.fields.find((f) => f.key === 'libraries')?.value).toBe('matches the libraries');
+    expect(view.actions).toEqual([]);
+  });
+
+  it('counts the modules that differ or have vanished, and offers the update', () => {
+    const view = inspect(ctx({}, 'panel', build(), { snapshot: stored, fromLibraries: renamed }));
+    expect(view.fields.find((f) => f.key === 'libraries')?.value).toBe('1 differ from the libraries');
+    expect(view.actions).toEqual([{ key: 'updateModules', label: 'Update modules from libraries' }]);
+    const gone = inspect(ctx({}, 'panel', build(), { snapshot: stored, fromLibraries: fromLibraries({ nbar: undefined }) }));
+    expect(gone.fields.find((f) => f.key === 'libraries')?.value).toBe('1 no longer in any library');
+    expect(gone.actions).toEqual([]);
+  });
+
+  it('takes the new definitions over at once when it harms nothing, and says so', () => {
+    const result = applyAction(ctx({}, 'panel', build(), { snapshot: stored, fromLibraries: renamed }), 'updateModules');
+    if (!result.ok) throw new Error(result.message);
+    expect(result.snapshot?.['lib/nbar']?.name).toBe('N bar v2');
+    expect(result.message).toBe('Updated 1 module from the libraries.');
+    expect(result.project).toEqual(build());
+  });
+
+  it('asks first when wires would be removed, then does it', () => {
+    const c = ctx({}, 'panel', build(), { snapshot: stored, fromLibraries: fewerTerminals });
+    const asked = applyAction(c, 'updateModules');
+    expect(asked).toMatchObject({ ok: false, needsConfirm: { message: expect.stringContaining('removes 1 wire') } });
+    const confirmed = applyAction(c, 'updateModules', { confirmed: true });
+    if (!confirmed.ok) throw new Error(confirmed.message);
+    expect(confirmed.project.schematic.wires.map((w) => w.id)).toEqual(['w1', 'w3']);
+  });
+
+  it('asks first when the new definitions cause problems, and names them', () => {
+    const base = build();
+    const crowded: Project = { ...base, panel: { ...base.panel, placements: base.panel.placements.map((p) => (p.id === 'p3' ? { ...p, slot: 1 } : p)) } };
+    const c = ctx({}, 'panel', crowded, { snapshot: stored, fromLibraries: widerBar });
+    expect(applyAction(c, 'updateModules')).toMatchObject({ ok: false, needsConfirm: { message: expect.stringContaining('causes') } });
+  });
+
+  it('refuses when nothing differs, and on anything but the panel', () => {
+    const same = applyAction(ctx({}, 'panel', build(), { snapshot: stored }), 'updateModules');
+    expect(same).toEqual({ ok: false, message: 'The modules already match the libraries.' });
+    const elsewhere = applyAction(ctx({ placementId: 'p1' }, 'panel', build(), { snapshot: stored, fromLibraries: renamed }), 'updateModules');
+    expect(elsewhere.ok).toBe(false);
   });
 });

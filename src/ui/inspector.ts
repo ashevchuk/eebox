@@ -25,6 +25,7 @@ import {
   type Placement,
 } from '../layout/placement';
 import { terminalsOf } from '../electrical/terminals';
+import { moduleDifferences, planModuleUpdate } from '../project/sync';
 import { CONDUCTORS, type Conductor, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import {
@@ -38,7 +39,7 @@ import {
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import type { Mode, Selection } from './session';
 
-export type FieldKind = 'text' | 'integer' | 'readonly' | 'choices';
+export type FieldKind = 'text' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
 
 export interface InspectorField {
   key: string;
@@ -48,7 +49,7 @@ export interface InspectorField {
   min?: number;
   max?: number;
   placeholder?: string;
-  /** For `choices`: everything that can be ticked, in display order. */
+  /** For `choices` and `select`: what can be ticked or picked, in display order; '' means none. */
   options?: readonly string[];
   hint?: string;
 }
@@ -72,10 +73,22 @@ export interface InspectContext {
   selection: Selection;
   mode: Mode;
   resolve: Resolve;
+  /** The module definitions stored with the project. */
+  snapshot: Record<string, ModuleDef>;
+  /** Module definitions as the libraries have them now, ignoring the stored ones. */
+  fromLibraries: Resolve;
 }
 
 export type EditResult =
-  | { ok: true; project: Project; selection?: Selection }
+  | {
+      ok: true;
+      project: Project;
+      selection?: Selection;
+      /** Set when the stored module definitions change too. */
+      snapshot?: Record<string, ModuleDef>;
+      /** Something worth telling the user about what was done. */
+      message?: string;
+    }
   | { ok: false; message: string; needsConfirm?: { message: string } };
 
 type Target =
@@ -173,9 +186,14 @@ export function inspect(ctx: InspectContext): InspectorView {
     case 'panel': {
       const { panel } = project;
       const longest = Math.max(0, ...panel.railLengthsUnits);
+      const { changed, missing } = moduleDifferences(project, ctx.snapshot, ctx.fromLibraries);
+      const differences = [
+        changed.length > 0 ? `${changed.length} differ from the libraries` : '',
+        missing.length > 0 ? `${missing.length} no longer in any library` : '',
+      ].filter(Boolean);
       return {
         title: 'Panel',
-        actions: [],
+        actions: changed.length > 0 ? [{ key: 'updateModules', label: 'Update modules from libraries' }] : [],
         fields: [
           text('title', 'Title', panel.title ?? '', 'Untitled panel'),
           integer('rows', 'Rows', panel.railLengthsUnits.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
@@ -185,6 +203,7 @@ export function inspect(ctx: InspectContext): InspectorView {
             'Contents',
             `${panel.placements.length} modules, ${panel.combs.length} combs, ${panel.shelf.length} on the shelf`,
           ),
+          readonly('libraries', 'Module data', differences.length > 0 ? differences.join(', ') : 'matches the libraries'),
         ],
       };
     }
@@ -472,7 +491,7 @@ export function applyEdit(
 
 
 /** Runs an inspector action; returns the project to commit and what should be selected afterwards. */
-export function applyAction(ctx: InspectContext, key: string): EditResult {
+export function applyAction(ctx: InspectContext, key: string, options: { confirmed?: boolean } = {}): EditResult {
   const target = targetOf(ctx);
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);
@@ -481,6 +500,24 @@ export function applyAction(ctx: InspectContext, key: string): EditResult {
       ok: true,
       project: { ...ctx.project, panel: result.panel },
       selection: target.node ? { nodeId: target.node.id } : {},
+    };
+  }
+  if (key === 'updateModules' && target.kind === 'panel') {
+    const plan = planModuleUpdate(ctx.project, ctx.snapshot, ctx.fromLibraries);
+    if (plan.changed.length === 0) return fail('The modules already match the libraries.');
+    const effects = [
+      plan.droppedWires > 0 ? `removes ${plural(plan.droppedWires, 'wire')} from terminals that no longer exist` : '',
+      plan.newProblems.length > 0 ? `causes ${plural(plan.newProblems.length, 'problem')}: ${plan.newProblems.slice(0, 3).join('; ')}` : '',
+    ].filter(Boolean);
+    if (effects.length > 0 && !options.confirmed) {
+      const names = plan.changed.slice(0, 3).map((c) => c.name).join(', ');
+      return { ok: false, message: '', needsConfirm: { message: `Updating ${plural(plan.changed.length, 'module')} (${names}) ${effects.join(' and ')}. Continue?` } };
+    }
+    return {
+      ok: true,
+      project: plan.project,
+      snapshot: plan.snapshot,
+      message: `Updated ${plural(plan.changed.length, 'module')} from the libraries.`,
     };
   }
   return fail('That action is not available here.');

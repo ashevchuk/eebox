@@ -92,6 +92,12 @@ export interface Library {
   schemaVersion: typeof SCHEMA_VERSION;
   id: string;
   name: string;
+  /** Free-form version of the library's content, shown so two copies can be told apart. */
+  version?: string;
+  vendor?: string;
+  /** Where the library comes from; only http and https links are accepted. */
+  url?: string;
+  description?: string;
   modules: ModuleDef[];
   enclosures: EnclosureDef[];
 }

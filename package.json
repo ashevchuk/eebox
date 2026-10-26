@@ -10,6 +10,7 @@
     "build:dist-file": "tsc --noEmit && vite build --config vite.config.file.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "gen:library": "vite-node scripts/generate-generic-library.ts",
     "test:watch": "vitest"
   },
   "devDependencies": {

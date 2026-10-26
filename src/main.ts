@@ -4,12 +4,14 @@ import type { ModuleRef } from './layout/placement';
 import {
   IndexedDbLibraryStorage,
   MemoryLibraryStorage,
-  importLibrary,
+  importLibraryText,
   seedBundledLibrary,
   type LibraryStorage,
 } from './library/storage';
 import type { Library, ModuleDef } from './library/types';
 import type { ValidationError } from './library/validate';
+import { GENERIC_LIBRARY_ID } from './library/genericSeries';
+import { describeDiff } from './library/compare';
 import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
@@ -19,6 +21,9 @@ import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
+import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
+import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
+import { PaletteView } from './ui/paletteView';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
 import { downloadBlob } from './ui/download';
@@ -33,7 +38,6 @@ import type { Point } from './view/Camera';
 const byId = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const canvas = byId<HTMLCanvasElement>('stage');
 const stageWrap = byId<HTMLElement>('stage-wrap');
-const paletteEl = byId<HTMLElement>('palette');
 const enclosureSelect = byId<HTMLSelectElement>('enclosure');
 const statusEl = byId<HTMLElement>('status');
 const undoButton = byId<HTMLButtonElement>('undo');
@@ -41,6 +45,7 @@ const redoButton = byId<HTMLButtonElement>('redo');
 const deleteButton = byId<HTMLButtonElement>('delete-selection');
 const ctx = canvas.getContext('2d')!;
 
+const bundledLibraryId = GENERIC_LIBRARY_ID;
 const storage: LibraryStorage =
   typeof indexedDB === 'undefined' ? new MemoryLibraryStorage() : new IndexedDbLibraryStorage();
 const session = new Session();
@@ -190,52 +195,6 @@ window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') spaceHeld = false;
 });
 
-function renderPalette(): void {
-  paletteEl.replaceChildren();
-  if (session.libraries.length === 0) {
-    const hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = 'No libraries. Import a library JSON file.';
-    paletteEl.append(hint);
-  }
-  for (const library of session.libraries) {
-    const title = document.createElement('div');
-    title.className = 'library-title';
-    const name = document.createElement('span');
-    name.textContent = library.name;
-    name.title = library.id;
-    const exportButton = document.createElement('button');
-    exportButton.textContent = 'export';
-    exportButton.addEventListener('click', () => downloadLibrary(library));
-    const removeButton = document.createElement('button');
-    removeButton.textContent = '×';
-    removeButton.title = 'Remove library';
-    removeButton.addEventListener('click', () => void removeLibrary(library));
-    title.append(name, exportButton, removeButton);
-    paletteEl.append(title);
-
-    for (const def of library.modules) {
-      paletteEl.append(paletteItem(library, def));
-    }
-  }
-}
-
-function paletteItem(library: Library, def: ModuleDef): HTMLElement {
-  const item = document.createElement('div');
-  item.className = 'module';
-  item.textContent = def.name;
-  const detail = document.createElement('small');
-  detail.textContent = ` ${def.widthUnits}u · ${def.kind}`;
-  item.append(detail);
-  const ref: ModuleRef = { libraryId: library.id, moduleId: def.id };
-  item.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    item.setPointerCapture(e.pointerId);
-    panelView.startPaletteDrag(e, def, ref, worldPoint(e));
-  });
-  return item;
-}
-
 function renderEnclosureSelect(): void {
   const previous = enclosureSelect.value;
   enclosureSelect.replaceChildren();
@@ -252,7 +211,7 @@ function renderEnclosureSelect(): void {
 
 async function refreshLibraries(): Promise<void> {
   session.libraries = await storage.list();
-  renderPalette();
+  palette.render();
   renderEnclosureSelect();
   session.changed();
 }
@@ -353,6 +312,20 @@ function exportBom(): void {
   downloadBlob(new Blob(['\uFEFF', bomToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-bom.csv`);
 }
 
+function openEditor(library: Library, options: EditorOptions): void {
+  openLibraryEditor(library, options, {
+    libraries: () => session.libraries,
+    bundledId: bundledLibraryId,
+    save: async (saved, replacesId) => {
+      await storage.put(saved);
+      if (replacesId && replacesId !== saved.id) await storage.remove(replacesId);
+      await refreshLibraries();
+    },
+    exportLibrary: downloadLibrary,
+    askConfirmation: (message, confirmLabel) => confirmDialog(message, confirmLabel),
+  });
+}
+
 async function removeLibrary(library: Library): Promise<void> {
   await storage.remove(library.id);
   await refreshLibraries();
@@ -362,13 +335,29 @@ async function importFiles(files: FileList | File[]): Promise<void> {
   const lines: string[] = [];
   let failed = false;
   for (const file of files) {
-    const result = await importLibrary(storage, await file.text());
-    if (result.ok) {
-      lines.push(`Imported "${result.library.name}"`);
-      continue;
+    const outcome = await importLibraryText(storage, await file.text(), bundledLibraryId, (incoming, before, diff) => {
+      const versions = `${before.version ?? 'no version'} to ${incoming.version ?? 'no version'}`;
+      return confirmDialog(
+        `Replace "${incoming.name}" (${versions})? ${describeDiff(diff)}. Projects keep their own copy of each module until you update them.`,
+        'Replace',
+      );
+    });
+    if (outcome.kind === 'invalid') {
+      failed = true;
+      lines.push(...describeErrors(file.name, outcome.errors));
+    } else if (outcome.kind === 'reserved') {
+      failed = true;
+      lines.push(`${file.name}: the id "${outcome.library.id}" belongs to the bundled library; give yours another id.`);
+    } else {
+      const { name } = outcome.library;
+      const text = {
+        same: `"${name}" is already up to date.`,
+        imported: `Imported "${name}".`,
+        replaced: `Replaced "${name}".`,
+        kept: `Kept the existing "${name}".`,
+      }[outcome.kind];
+      lines.push(text);
     }
-    failed = true;
-    lines.push(...describeErrors(file.name, result.errors));
   }
   await refreshLibraries();
   showStatus(lines.join('\n'), failed);
@@ -404,6 +393,18 @@ byId<HTMLInputElement>('open-project').addEventListener('change', async (e) => {
   else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, file.name);
 });
 
+const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette-search'), session, {
+  onDragStart: (e, def, ref) => panelView.startPaletteDrag(e, def, ref, worldPoint(e)),
+  onExport: downloadLibrary,
+  onRemove: (library) => void removeLibrary(library),
+  onEdit: (library) => openEditor(structuredClone(library), { isNew: false, originalId: library.id }),
+  onCopy: (library) => {
+    const id = uniqueId(`my-${library.id}`, session.libraries.map((l) => l.id));
+    openEditor(copyLibrary(library, id, `My ${library.name}`), { isNew: true, originalId: null });
+  },
+  isBundled: (library) => library.id === bundledLibraryId,
+});
+
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
 const inspector = new InspectorView(byId('inspector-content'), session, (message) =>
@@ -422,6 +423,12 @@ window.addEventListener(
 
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
+byId('new-library').addEventListener('click', () =>
+  openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
+    isNew: true,
+    originalId: null,
+  }),
+);
 byId('mode-panel').addEventListener('click', () => setMode('panel'));
 byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
 byId('new-panel').addEventListener('click', () => void newPanel());
@@ -461,13 +468,13 @@ const AUTOSAVE_DELAY_MS = 500;
 
 /** Only started after the initial project is restored, so the empty startup state cannot overwrite a saved one. */
 function startAutosave(store: KeyValueStore): void {
-  let lastSaved: Project | null = null;
+  let lastSaved: object | null = null;
   let timer: number | undefined;
   session.subscribe(() => {
-    if (session.project === lastSaved) return;
+    if (session.revision === lastSaved) return;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      lastSaved = session.project;
+      lastSaved = session.revision;
       if (!saveAutosave(store, session.toFile())) showStatus('Autosave failed: browser storage is unavailable or full.', true);
     }, AUTOSAVE_DELAY_MS);
   });

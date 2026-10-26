@@ -23,7 +23,7 @@ export type ParseResult =
 export type FieldCheck = (value: unknown) => string | null;
 export type FieldSpec = Record<string, { required: boolean; check: FieldCheck }>;
 
-const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -76,14 +76,14 @@ export const MODULE_SPEC: FieldSpec = {
   resizable: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
 };
 
-const MAX_TERMINALS_PER_MODULE = 64;
-const MAX_TERMINAL_GROUP = 48;
-const MAX_COMB_PATTERN = 8;
+export const MAX_TERMINALS_PER_MODULE = 64;
+export const MAX_TERMINAL_GROUP = 48;
+export const MAX_COMB_PATTERN = 8;
 
 const nonNegativeInteger: FieldCheck = (v) =>
   Number.isInteger(v) && (v as number) >= 0 ? null : 'must be a non-negative integer';
 
-const TERMINAL_SPEC: FieldSpec = {
+export const TERMINAL_SPEC: FieldSpec = {
   name: { required: true, check: identifier },
   conductor: { required: true, check: oneOf(CONDUCTORS) },
   side: { required: true, check: oneOf(TERMINAL_SIDES) },
@@ -103,12 +103,12 @@ const boundedUnits: FieldCheck = (v) =>
     ? null
     : `must be a whole number from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
 
-const RESIZE_SPEC: FieldSpec = {
+export const RESIZE_SPEC: FieldSpec = {
   minUnits: { required: true, check: boundedUnits },
   maxUnits: { required: true, check: boundedUnits },
 };
 
-const COMB_SPEC: FieldSpec = {
+export const COMB_SPEC: FieldSpec = {
   pattern: {
     required: true,
     check: (v) =>
@@ -184,13 +184,47 @@ export function validateModuleDeep(
   }
 }
 
-const ENCLOSURE_SPEC: FieldSpec = {
+export const ENCLOSURE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   name: { required: true, check: nonEmptyString },
   railLengthsUnits: { required: true, check: railLengthsCheck },
 };
 
-const LIBRARY_SPEC: FieldSpec = {
+export const MAX_VERSION_LENGTH = 40;
+export const MAX_URL_LENGTH = 300;
+export const MAX_DESCRIPTION_LENGTH = 300;
+
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+const versionCheck: FieldCheck = (v) =>
+  typeof v === 'string' && v.trim() === v && v.length >= 1 && v.length <= MAX_VERSION_LENGTH && !CONTROL_CHARACTERS.test(v)
+    ? null
+    : `must be 1 to ${MAX_VERSION_LENGTH} characters, without control characters or surrounding spaces`;
+
+/** Shown as a link, so only the web schemes are allowed: no javascript: or data: URLs. */
+export const urlCheck: FieldCheck = (v) => {
+  if (typeof v !== 'string' || v.length > MAX_URL_LENGTH || /\s/.test(v) || CONTROL_CHARACTERS.test(v)) {
+    return `must be an http or https address of at most ${MAX_URL_LENGTH} characters, without spaces`;
+  }
+  try {
+    const { protocol } = new URL(v);
+    return protocol === 'http:' || protocol === 'https:' ? null : 'must start with http:// or https://';
+  } catch {
+    return 'must be a valid address';
+  }
+};
+
+const descriptionCheck: FieldCheck = (v) =>
+  typeof v === 'string' && v.trim() === v && v.length >= 1 && v.length <= MAX_DESCRIPTION_LENGTH && !CONTROL_CHARACTERS.test(v)
+    ? null
+    : `must be 1 to ${MAX_DESCRIPTION_LENGTH} characters on one line, without surrounding spaces`;
+
+export const LIBRARY_SPEC: FieldSpec = {
+  $schema: { required: false, check: (v) => (typeof v === 'string' && v.length <= MAX_URL_LENGTH ? null : 'must be a string') },
+  version: { required: false, check: versionCheck },
+  vendor: { required: false, check: labelCheck },
+  url: { required: false, check: urlCheck },
+  description: { required: false, check: descriptionCheck },
   schemaVersion: {
     required: true,
     check: (v) =>
@@ -273,6 +307,10 @@ export function validateLibrary(raw: unknown): ParseResult {
       schemaVersion: SCHEMA_VERSION,
       id: root.id as string,
       name: root.name as string,
+      ...(root.version !== undefined ? { version: root.version as string } : {}),
+      ...(root.vendor !== undefined ? { vendor: root.vendor as string } : {}),
+      ...(root.url !== undefined ? { url: root.url as string } : {}),
+      ...(root.description !== undefined ? { description: root.description as string } : {}),
       modules,
       enclosures,
     },

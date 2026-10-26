@@ -23,18 +23,32 @@ export const emptyProject = (): Project => ({
   schematic: emptySchematic(),
 });
 
+/** One step of history: the project and the definitions of the modules it was drawn with. */
+interface Document {
+  project: Project;
+  /** Module definitions stored with the project; they win over libraries so a design stays reproducible. */
+  snapshot: Record<string, ModuleDef>;
+}
+
 /** State shared by the panel and schematic views. */
 export class Session {
   libraries: Library[] = [];
   mode: Mode = 'panel';
   selection: Selection = {};
   notify: (message: string, isError?: boolean) => void = () => {};
-  private readonly history = new History<Project>(emptyProject());
-  /** Module definitions stored in the loaded project; they win over libraries so a design stays reproducible. */
-  private snapshot = new Map<string, ModuleDef>();
+  private readonly history = new History<Document>({ project: emptyProject(), snapshot: {} });
   private readonly listeners = new Set<() => void>();
 
   get project(): Project {
+    return this.history.current.project;
+  }
+
+  get snapshot(): Record<string, ModuleDef> {
+    return this.history.current.snapshot;
+  }
+
+  /** Changes whenever the project or its module definitions do; what autosave watches. */
+  get revision(): object {
     return this.history.current;
   }
 
@@ -46,9 +60,12 @@ export class Session {
     return this.history.canRedo;
   }
 
-  readonly resolve = (ref: ModuleRef): ModuleDef | undefined =>
-    this.snapshot.get(moduleKey(ref)) ??
+  /** The definition in the libraries only, ignoring what the project stored. */
+  readonly libraryResolve = (ref: ModuleRef): ModuleDef | undefined =>
     this.libraries.find((l) => l.id === ref.libraryId)?.modules.find((m) => m.id === ref.moduleId);
+
+  readonly resolve = (ref: ModuleRef): ModuleDef | undefined =>
+    this.snapshot[moduleKey(ref)] ?? this.libraryResolve(ref);
 
   private readonly lookups = lookupsOf(this.resolve);
   readonly widthOf = this.lookups.widthOf;
@@ -68,8 +85,9 @@ export class Session {
     this.changed();
   }
 
-  commit(project: Project): void {
-    this.history.commit(project);
+  /** Commits a change; pass `snapshot` when the stored module definitions change with it. */
+  commit(project: Project, snapshot: Record<string, ModuleDef> = this.snapshot): void {
+    this.history.commit({ project, snapshot });
     this.changed();
   }
 
@@ -94,8 +112,7 @@ export class Session {
   }
 
   private replace(project: Project, modules: Record<string, ModuleDef>): void {
-    this.history.reset(project);
-    this.snapshot = new Map(Object.entries(modules));
+    this.history.reset({ project, snapshot: modules });
     this.selection = {};
     this.changed();
   }

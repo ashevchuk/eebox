@@ -1,5 +1,6 @@
+import { planImport, type LibraryDiff } from './compare';
 import type { Library } from './types';
-import { parseLibraryJson, type ParseResult } from './validate';
+import { parseLibraryJson, type ValidationError } from './validate';
 
 export interface LibraryStorage {
   list(): Promise<Library[]>;
@@ -82,12 +83,33 @@ export async function seedBundledLibrary(storage: LibraryStorage, text: string):
   if (stored.length === 0 || outdated) await storage.put(parsed.library);
 }
 
-/** Stores the library only if it validates; a library with the same id is replaced. */
-export async function importLibrary(
+export type ImportOutcome =
+  | { kind: 'invalid'; errors: ValidationError[] }
+  | { kind: 'reserved'; library: Library }
+  | { kind: 'same'; library: Library }
+  | { kind: 'imported'; library: Library }
+  | { kind: 'replaced'; library: Library }
+  | { kind: 'kept'; library: Library };
+
+/**
+ * Imports a library file. A library is stored only if it validates; one that would replace a
+ * different library with the same id is stored only if `confirmReplace` agrees; the id of the
+ * bundled library is never accepted, because it is refreshed at start-up.
+ */
+export async function importLibraryText(
   storage: LibraryStorage,
   text: string,
-): Promise<ParseResult> {
-  const result = parseLibraryJson(text);
-  if (result.ok) await storage.put(result.library);
-  return result;
+  bundledId: string,
+  confirmReplace: (incoming: Library, before: Library, diff: LibraryDiff) => Promise<boolean>,
+): Promise<ImportOutcome> {
+  const parsed = parseLibraryJson(text);
+  if (!parsed.ok) return { kind: 'invalid', errors: parsed.errors };
+  const { library } = parsed;
+  const plan = planImport(await storage.list(), library, bundledId);
+  if (plan.kind === 'reserved' || plan.kind === 'same') return { kind: plan.kind, library };
+  if (plan.kind === 'replace' && !(await confirmReplace(library, plan.before, plan.diff))) {
+    return { kind: 'kept', library };
+  }
+  await storage.put(library);
+  return { kind: plan.kind === 'new' ? 'imported' : 'replaced', library };
 }

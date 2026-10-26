@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import genericIecText from '../libraries/generic-iec.json?raw';
-import { MemoryLibraryStorage, importLibrary, seedBundledLibrary } from '../src/library/storage';
+import { MemoryLibraryStorage, importLibraryText, seedBundledLibrary } from '../src/library/storage';
 import type { Library } from '../src/library/types';
 import { exportLibraryJson, parseLibraryJson, validateLibrary } from '../src/library/validate';
 
@@ -88,30 +88,62 @@ describe('library export/import', () => {
   });
 });
 
-describe('importLibrary', () => {
+describe('importLibraryText', () => {
+  const BUNDLED = 'generic-iec';
+  const mine = (extra: Record<string, unknown> = {}) => JSON.stringify({ ...minimalLibrary(), ...extra });
+  const always = async () => true;
+  const never = async () => false;
+  const ids = async (storage: MemoryLibraryStorage) => (await storage.list()).map((l) => l.id);
+
   it('stores a valid library', async () => {
     const storage = new MemoryLibraryStorage();
-    const result = await importLibrary(storage, genericIecText);
-    expect(result.ok).toBe(true);
-    expect((await storage.list()).map((l) => l.id)).toEqual(['generic-iec']);
+    const outcome = await importLibraryText(storage, mine(), BUNDLED, always);
+    expect(outcome.kind).toBe('imported');
+    expect(await ids(storage)).toEqual(['mine']);
   });
 
-  it('leaves storage untouched on an invalid library', async () => {
+  it('leaves storage untouched on an invalid library, and reports why', async () => {
     const storage = new MemoryLibraryStorage();
-    await importLibrary(storage, genericIecText);
-    const result = await importLibrary(storage, '{"schemaVersion": 1}');
-    expect(result.ok).toBe(false);
-    expect((await storage.list()).map((l) => l.id)).toEqual(['generic-iec']);
+    await importLibraryText(storage, mine(), BUNDLED, always);
+    const outcome = await importLibraryText(storage, '{"schemaVersion": 1}', BUNDLED, always);
+    expect(outcome.kind).toBe('invalid');
+    if (outcome.kind === 'invalid') expect(outcome.errors.length).toBeGreaterThan(0);
+    expect(await ids(storage)).toEqual(['mine']);
   });
 
-  it('replaces a library that has the same id', async () => {
+  it('says so, without asking, when the same library is imported again', async () => {
     const storage = new MemoryLibraryStorage();
-    await importLibrary(storage, genericIecText);
-    const replacement = { ...minimalLibrary(), id: 'generic-iec' };
-    await importLibrary(storage, JSON.stringify(replacement));
-    const [stored] = await storage.list();
-    expect(stored?.name).toBe('Mine');
-    expect(await storage.list()).toHaveLength(1);
+    await importLibraryText(storage, mine(), BUNDLED, always);
+    let asked = false;
+    const outcome = await importLibraryText(storage, mine(), BUNDLED, async () => ((asked = true), true));
+    expect(outcome.kind).toBe('same');
+    expect(asked).toBe(false);
+  });
+
+  it('replaces a different library with the same id after the user agrees, and shows what differs', async () => {
+    const storage = new MemoryLibraryStorage();
+    await importLibraryText(storage, mine(), BUNDLED, always);
+    const updated = mine({ name: 'Mine v2', version: '2', modules: [{ id: 'm1', kind: 'breaker', name: 'M1', widthUnits: 2, poles: 1 }] });
+    let shown: unknown;
+    const outcome = await importLibraryText(storage, updated, BUNDLED, async (_incoming, _before, diff) => ((shown = diff), true));
+    expect(outcome.kind).toBe('replaced');
+    expect((await storage.list())[0]?.name).toBe('Mine v2');
+    expect(shown).toMatchObject({ modules: { changed: ['M1'] }, metadata: ['name', 'version'] });
+  });
+
+  it('keeps the existing library when the user declines the replacement', async () => {
+    const storage = new MemoryLibraryStorage();
+    await importLibraryText(storage, mine(), BUNDLED, always);
+    const outcome = await importLibraryText(storage, mine({ name: 'Other' }), BUNDLED, never);
+    expect(outcome.kind).toBe('kept');
+    expect((await storage.list())[0]?.name).toBe('Mine');
+  });
+
+  it('refuses the id of the bundled library, stored or not', async () => {
+    const storage = new MemoryLibraryStorage();
+    const outcome = await importLibraryText(storage, mine({ id: BUNDLED }), BUNDLED, always);
+    expect(outcome.kind).toBe('reserved');
+    expect(await ids(storage)).toEqual([]);
   });
 });
 
@@ -191,5 +223,49 @@ describe('seedBundledLibrary', () => {
 
   it('reports a broken bundled library instead of ignoring it', async () => {
     await expect(seedBundledLibrary(new MemoryLibraryStorage(), '{"schemaVersion":1}')).rejects.toThrow('bundled library is invalid');
+  });
+});
+
+describe('library metadata', () => {
+  const withMeta = (meta: Record<string, unknown>) => ({ ...minimalLibrary(), ...meta });
+
+  it('accepts and keeps version, vendor, url and description in a fixed order', () => {
+    const result = validateLibrary(
+      withMeta({ description: 'Generic devices', url: 'https://example.com/lib', vendor: 'Example Ltd', version: '2.1' }),
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(Object.keys(result.library)).toEqual([
+      'schemaVersion', 'id', 'name', 'version', 'vendor', 'url', 'description', 'modules', 'enclosures',
+    ]);
+  });
+
+  it('round-trips the metadata through export', () => {
+    const first = validateLibrary(withMeta({ version: '3', vendor: 'V', url: 'http://example.com', description: 'D' }));
+    if (!first.ok) throw new Error('should load');
+    expect(parseLibraryJson(exportLibraryJson(first.library))).toEqual(first);
+  });
+
+  it('accepts a $schema pointer and drops it, so editors can validate the file', () => {
+    const result = validateLibrary(withMeta({ $schema: './library.schema.json' }));
+    expect(result.ok && '$schema' in result.library).toBe(false);
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ['url', 'javascript:alert(1)', 'must start with http'],
+    ['url', 'data:text/html,<script>', 'must start with http'],
+    ['url', 'not a url', 'without spaces'],
+    ['url', 'https://' + 'a'.repeat(300), 'at most 300'],
+    ['url', 'ftp://example.com', 'must start with http'],
+    ['version', ' 1', 'surrounding spaces'],
+    ['version', 'x'.repeat(41), '1 to 40'],
+    ['vendor', 'a\nb', '1 to 60'],
+    ['description', 'line one\nline two', 'one line'],
+    ['description', 'x'.repeat(301), '1 to 300'],
+  ])('rejects a bad %s (%j)', (field, value, message) => {
+    const result = validateLibrary(withMeta({ [field]: value }));
+    if (result.ok) throw new Error('expected a failure');
+    expect(result.errors.map((e) => e.path)).toEqual([field]);
+    expect(result.errors[0]?.message).toContain(message);
   });
 });

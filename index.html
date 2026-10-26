@@ -109,6 +109,19 @@
       .module:hover { border-color: var(--accent); }
       .module small { color: var(--text-dim); }
       #palette .hint { color: var(--text-dim); }
+      #palette-search {
+        width: 100%;
+        margin: 8px 0 4px;
+        font: inherit;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 3px 8px;
+      }
+      .palette-group { margin: 2px 0; }
+      .palette-group > summary { cursor: pointer; color: var(--text-dim); padding: 2px 0; user-select: none; }
+      .library-title small, .library-title a { color: var(--text-dim); font-weight: normal; font-size: 11px; }
       #panel-settings { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
       #shelf { padding: 8px 0; border-bottom: 1px solid var(--border); }
       #shelf h3 { margin: 0 0 6px; font-size: 13px; }
@@ -132,6 +145,26 @@
       }
       .app-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
       .app-dialog p { margin: 0 0 14px; }
+      .editor-dialog { width: min(1100px, 94vw); height: min(760px, 88vh); max-width: none; padding: 0; overflow: hidden; }
+      .editor-dialog[open] { display: grid; grid-template-rows: auto 1fr auto; }
+      .editor-dialog header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+      .editor-dialog header h2 { margin: 0 8px 0 0; font-size: 14px; }
+      .editor-status { flex: 1; color: var(--text-dim); }
+      .editor-status.error { color: var(--error); }
+      .editor-body { display: grid; grid-template-columns: 300px 1fr; min-height: 0; }
+      .editor-list { overflow-y: auto; padding: 8px; border-right: 1px solid var(--border); }
+      .editor-list h3 { margin: 12px 0 4px; font-size: 12px; color: var(--text-dim); }
+      .editor-list input[type='search'] { width: 100%; margin: 6px 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+      .editor-tools { display: flex; gap: 6px; }
+      .editor-tools select { flex: 1; min-width: 0; }
+      .editor-item { padding: 2px 8px; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .editor-item:hover { background: var(--bg); }
+      .editor-item.selected { background: var(--bg); outline: 1px solid var(--accent); }
+      .editor-item.failed::after { content: ' !'; color: var(--error); }
+      .editor-fields { overflow-y: auto; padding: 8px 14px; }
+      .editor-fields select, .inspector-control select { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; }
+      .editor-errors { max-height: 140px; overflow-y: auto; padding: 6px 12px; border-top: 1px solid var(--border); color: var(--error); white-space: pre-line; font-size: 12px; }
+      .editor-errors:empty { display: none; }
       .app-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
       button.primary { border-color: var(--accent); color: var(--accent); }
       #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
@@ -176,6 +209,7 @@
       <button id="export-png">PNG</button>
       <button id="export-svg">SVG</button>
       <button id="export-bom">BOM CSV</button>
+      <button id="new-library" title="Start a library of your own">New library…</button>
       <label class="file-button">
         Import library…
         <input id="import" type="file" accept=".json,application/json" multiple hidden />
@@ -187,6 +221,7 @@
       <aside id="sidebar">
         <section id="panel-settings"></section>
         <section id="shelf"></section>
+        <input id="palette-search" type="search" placeholder="Search modules: c16 2p, 30ma, rcd…" autocomplete="off" />
         <div id="palette"></div>
       </aside>
       <div id="stage-wrap"><canvas id="stage"></canvas></div>
