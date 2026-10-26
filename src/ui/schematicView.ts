@@ -50,7 +50,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'unknown-wire': 'Unknown wire.',
   'same-terminal': 'A terminal cannot be wired to itself.',
   'duplicate-wire': 'These terminals are already wired.',
-  'incompatible-conductors': 'Phase, neutral and earth cannot be wired to each other.',
+  'incompatible-conductors': 'Phase, neutral, earth and control conductors cannot be wired to each other.',
   'nothing-to-connect': 'No matching terminals to wire between these nodes.',
   'invalid-label': 'Labels are 1 to 60 characters, without line breaks.',
   'not-a-free-node': 'Only a source or a load has conductors of its own.',

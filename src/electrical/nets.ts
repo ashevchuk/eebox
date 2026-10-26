@@ -23,7 +23,7 @@ export interface CombContact {
   terminalId: string;
 }
 
-export type NetProblem = { kind: 'mixed-families' | 'mixed-phases'; net: Net };
+export type NetProblem = { kind: 'mixed-families' | 'mixed-phases' | 'mixed-polarity'; net: Net };
 
 class UnionFind {
   private readonly parent = new Map<string, string>();
@@ -133,7 +133,7 @@ export function buildNets(project: Project, resolve: Resolve): Net[] {
     .sort((a, b) => a.terminals[0]!.key.localeCompare(b.terminals[0]!.key));
 }
 
-/** A net that joins different families is a short circuit; two different fixed phases are a phase conflict. */
+/** A net that joins different families is a short circuit; so are two different fixed phases or DC plus and minus. */
 export function findNetProblems(nets: Net[]): NetProblem[] {
   const problems: NetProblem[] = [];
   for (const net of nets) {
@@ -142,6 +142,8 @@ export function findNetProblems(nets: Net[]): NetProblem[] {
       problems.push({ kind: 'mixed-families', net });
     } else if (new Set(conductors.filter((c) => c === 'L1' || c === 'L2' || c === 'L3')).size > 1) {
       problems.push({ kind: 'mixed-phases', net });
+    } else if (conductors.includes('DCP') && conductors.includes('DCN')) {
+      problems.push({ kind: 'mixed-polarity', net });
     }
   }
   return problems;

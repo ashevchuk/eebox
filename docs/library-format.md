@@ -49,13 +49,23 @@ Without `terminals`, each pole yields a terminal on the top and the bottom side:
 | Field | Notes |
 | --- | --- |
 | `name` | identifier; unique per side |
-| `conductor` | `L`, `L1`, `L2`, `L3`, `N` or `PE`; `L` is a phase decided by what feeds it |
+| `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `C`, `DCP` or `DCN`; `L` is a phase decided by what feeds it |
 | `side` | `top` or `bottom` |
 | `net` | terminals of one module that share a net are connected inside it (a terminal bar); without a net a terminal is isolated |
 | `unit` | horizontal position in module units, below the width; not combined with `count` and not allowed on resizable modules |
 | `count` | 1 to 48 identical terminals named `name1`, `name2`, ... |
 
 A module has at most 64 terminals.
+
+### Conductor families
+
+Wires join terminals of one family only: the phases (`L`, `L1`-`L3`), `N`, `PE`, and the control
+family (`C`, `DCP`, `DCN`). Use `C` for relay contacts and signal wires and `DCP`/`DCN` for the plus
+and minus of a DC supply, so that 24 V and dry contacts never share a net with mains conductors.
+A net that joins `DCP` and `DCN` is reported by Check as a short circuit.
+
+A device with two supplies, such as a changeover switch, lists both inputs as separate terminals on
+the top side and gives them no `net`, because nothing joins them inside the module.
 
 ### Comb
 

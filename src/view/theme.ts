@@ -33,7 +33,7 @@ export const LIGHT_THEME: Theme = {
   rowLabel: '#4b5563',
   wireLabelBackground: 'rgba(255, 255, 255, 0.9)',
   wireLabelText: '#111827',
-  conductors: { L: '#b45309', L1: '#78350f', L2: '#111827', L3: '#6b7280', N: '#2563eb', PE: '#16a34a' },
+  conductors: { L: '#b45309', L1: '#78350f', L2: '#111827', L3: '#6b7280', N: '#2563eb', PE: '#16a34a', C: '#7c3aed', DCP: '#dc2626', DCN: '#0891b2' },
 };
 
 let active: Theme = DARK_THEME;

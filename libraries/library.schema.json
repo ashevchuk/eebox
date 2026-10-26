@@ -71,7 +71,10 @@
         "L2",
         "L3",
         "N",
-        "PE"
+        "PE",
+        "C",
+        "DCP",
+        "DCN"
       ],
       "description": "L is a phase decided by what feeds it; L1 to L3 are fixed phases."
     },

@@ -170,8 +170,195 @@ function combs(): ModuleDef[] {
   ];
 }
 
+const top = (name: string, conductor: TerminalDef['conductor']): TerminalDef => ({ name, conductor, side: 'top' });
+const bottom = (name: string, conductor: TerminalDef['conductor']): TerminalDef => ({ name, conductor, side: 'bottom' });
+
+/** The change-over contact of a relay: common, normally closed, normally open. */
+const changeOverContact = (): TerminalDef[] => [bottom('11', 'C'), bottom('12', 'C'), bottom('14', 'C')];
+
+const SWITCHED_LOAD_RATING_A = 16;
+
+/** Monitoring relays measure the supply on their top terminals and switch a contact at the bottom. */
+function monitoringRelays(): ModuleDef[] {
+  return [
+    {
+      id: 'vrelay-1p',
+      kind: 'relay',
+      name: 'Voltage monitoring relay 1P',
+      widthUnits: 1,
+      poles: 2,
+      terminals: [top('L', 'L'), top('N', 'N'), ...changeOverContact()],
+    },
+    {
+      id: 'vrelay-3pn',
+      kind: 'relay',
+      name: 'Voltage monitoring relay 3P+N',
+      widthUnits: 2,
+      poles: 4,
+      terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), top('N', 'N'), ...changeOverContact()],
+    },
+    {
+      id: 'phase-relay-3p',
+      kind: 'relay',
+      name: 'Phase sequence and failure relay 3P',
+      widthUnits: 1,
+      poles: 3,
+      terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), ...changeOverContact()],
+    },
+    {
+      id: 'phase-relay-3pn',
+      kind: 'relay',
+      name: 'Phase sequence and failure relay 3P+N',
+      widthUnits: 1,
+      poles: 4,
+      terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), top('N', 'N'), ...changeOverContact()],
+    },
+  ];
+}
+
+/** Lighting relays switch one phase: the load current enters at the top and leaves at the bottom. */
+function lightingRelays(): ModuleDef[] {
+  return [
+    {
+      id: 'impulse-relay-1p',
+      kind: 'relay',
+      name: 'Impulse relay 1P 16 A',
+      widthUnits: 1,
+      poles: 2,
+      ratedCurrentA: SWITCHED_LOAD_RATING_A,
+      terminals: [top('1', 'L'), top('A1', 'L'), bottom('2', 'L'), bottom('A2', 'N')],
+    },
+    {
+      id: 'stair-timer-1p',
+      kind: 'relay',
+      name: 'Staircase timer 1P 16 A',
+      widthUnits: 1,
+      poles: 2,
+      ratedCurrentA: SWITCHED_LOAD_RATING_A,
+      terminals: [top('L', 'L'), top('P', 'L'), top('N', 'N'), bottom('LO', 'L')],
+    },
+    {
+      id: 'twilight-switch-1p',
+      kind: 'relay',
+      name: 'Twilight switch 1P 16 A',
+      widthUnits: 1,
+      poles: 2,
+      ratedCurrentA: SWITCHED_LOAD_RATING_A,
+      terminals: [top('L', 'L'), top('N', 'N'), top('S1', 'C'), top('S2', 'C'), bottom('LO', 'L')],
+    },
+    {
+      id: 'time-switch-1p',
+      kind: 'relay',
+      name: 'Daily time switch 1P 16 A',
+      widthUnits: 2,
+      poles: 2,
+      ratedCurrentA: SWITCHED_LOAD_RATING_A,
+      terminals: [top('L', 'L'), top('N', 'N'), bottom('LO', 'L')],
+    },
+  ];
+}
+
+function metersAndSmallDevices(): ModuleDef[] {
+  return [
+    { id: 'kwh-1p-40', kind: 'meter', name: 'Energy meter 1P 40 A', widthUnits: 2, poles: 2, ratedCurrentA: 40 },
+    { id: 'kwh-3p-63', kind: 'meter', name: 'Energy meter 3P+N 63 A', widthUnits: 4, poles: 4, ratedCurrentA: 63 },
+    {
+      id: 'pilot-light-230',
+      kind: 'other',
+      name: 'Pilot light 230 V',
+      widthUnits: 1,
+      poles: 2,
+      terminals: [top('L', 'L'), top('N', 'N')],
+    },
+    {
+      id: 'psu-24v-1a',
+      kind: 'psu',
+      name: 'Power supply 24 V DC, 1 A',
+      widthUnits: 2,
+      poles: 2,
+      terminals: [top('L', 'L'), top('N', 'N'), bottom('24V', 'DCP'), bottom('0V', 'DCN')],
+    },
+    {
+      id: 'psu-24v-2a5',
+      kind: 'psu',
+      name: 'Power supply 24 V DC, 2.5 A',
+      widthUnits: 4,
+      poles: 2,
+      terminals: [top('L', 'L'), top('N', 'N'), bottom('24V', 'DCP'), bottom('0V', 'DCN')],
+    },
+    {
+      id: 'din-socket-16',
+      kind: 'other',
+      name: 'DIN rail socket 16 A',
+      widthUnits: 3,
+      poles: 2,
+      ratedCurrentA: SWITCHED_LOAD_RATING_A,
+      terminals: [top('L', 'L'), top('N', 'N'), top('PE', 'PE')],
+    },
+  ];
+}
+
+const CHANGEOVER_VARIANTS = [
+  { poles: 2, conductors: ['L', 'N'], ratings: [40, 63] },
+  { poles: 4, conductors: ['L1', 'L2', 'L3', 'N'], ratings: [63, 100] },
+] as const;
+
+/**
+ * Manual changeover switches I-0-II for a backup input: two supplies on top, one output at the
+ * bottom. Nothing joins the inputs inside the module, so two different sources never end up on one net.
+ */
+function changeoverSwitches(): ModuleDef[] {
+  return CHANGEOVER_VARIANTS.flatMap(({ poles, conductors, ratings }) =>
+    ratings.map(
+      (rating): ModuleDef => ({
+        id: `changeover-${poles}p-${rating}`,
+        kind: 'switch',
+        name: `Changeover switch I-0-II ${poleLabel(poles)} ${rating}A`,
+        widthUnits: poles + 2,
+        poles,
+        ratedCurrentA: rating,
+        terminals: [
+          ...conductors.map((c) => top(`${c}a`, c)),
+          ...conductors.map((c) => top(`${c}b`, c)),
+          ...conductors.map((c) => bottom(c, c)),
+        ],
+      }),
+    ),
+  );
+}
+
+/** Watches two supplies and gives dry contacts to close the contactor of either and to start a generator. */
+function transferController(): ModuleDef[] {
+  const sense = (suffix: string) => (['L1', 'L2', 'L3', 'N'] as const).map((c) => top(`${c}${suffix}`, c));
+  const contact = (name: string) => [bottom(`${name}1`, 'C'), bottom(`${name}2`, 'C')];
+  return [
+    {
+      id: 'ats-controller-3pn',
+      kind: 'relay',
+      name: 'Automatic transfer controller 3P+N',
+      widthUnits: 4,
+      poles: 4,
+      terminals: [...sense('a'), ...sense('b'), ...contact('CA'), ...contact('CB'), ...contact('GS')],
+    },
+  ];
+}
+
 export function genericModules(): ModuleDef[] {
-  return [...breakers(), ...rcds(), ...rcbos(), ...switches(), ...surgeProtectors(), ...contactors(), ...bars(), ...combs()];
+  return [
+    ...breakers(),
+    ...rcds(),
+    ...rcbos(),
+    ...switches(),
+    ...surgeProtectors(),
+    ...contactors(),
+    ...monitoringRelays(),
+    ...lightingRelays(),
+    ...metersAndSmallDevices(),
+    ...changeoverSwitches(),
+    ...transferController(),
+    ...bars(),
+    ...combs(),
+  ];
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -184,9 +371,9 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '2';
+export const GENERIC_LIBRARY_VERSION = '3';
 export const GENERIC_LIBRARY_DESCRIPTION =
-  'Generic IEC devices from standard rating series. Widths are typical (one 17.5 mm unit per pole) and not taken from any manufacturer; check the datasheet before ordering.';
+  'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 
 /** The text of `libraries/generic-iec.json`: one module per line, so diffs stay readable. */
 export function genericLibraryText(): string {

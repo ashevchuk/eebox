@@ -220,6 +220,12 @@ function validateModules(raw: unknown, errors: ValidationError[]): Record<string
   return modules;
 }
 
+const NET_PROBLEM_TEXT = {
+  'mixed-phases': 'different phases joined',
+  'mixed-polarity': 'DC plus and minus joined',
+  'mixed-families': 'phase, neutral, earth or control conductors joined',
+} as const;
+
 /** Everything wrong with a project that is still loadable: overlaps, orphans, bad wiring. */
 export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => ModuleDef | undefined): string[] {
   const widthOf = (item: { module: ModuleRef; widthUnits?: number }) =>
@@ -258,7 +264,7 @@ export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => M
   });
   const nets = findNetProblems(buildNets(project, resolve)).map(
     (p) =>
-      `${p.kind === 'mixed-phases' ? 'different phases joined' : 'phase, neutral or earth joined'}: ${p.net.terminals
+      `${NET_PROBLEM_TEXT[p.kind]}: ${p.net.terminals
         .map((t) => `${ownerName(project, resolve, t.owner)} [${t.owner.id}] ${t.terminal.id}`)
         .join(', ')}`,
   );

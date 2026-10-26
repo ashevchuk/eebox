@@ -60,7 +60,7 @@ describe('groupByKind', () => {
   it('orders the groups like the kinds are defined and leaves out empty ones', () => {
     const kinds = groupByKind(modules).map((g) => g.kind);
     expect(kinds).toEqual(MODULE_KINDS.filter((k) => modules.some((m) => m.kind === k)));
-    expect(kinds).not.toContain('meter');
+    expect(kinds).not.toContain('terminal');
   });
 
   it('keeps every module exactly once and the order the library gave', () => {

@@ -8,4 +8,7 @@ export const CONDUCTOR_COLORS: Record<Conductor, string> = {
   L3: '#d1d5db',
   N: '#3b82f6',
   PE: '#84cc16',
+  C: '#a78bfa',
+  DCP: '#ef4444',
+  DCN: '#22d3ee',
 };

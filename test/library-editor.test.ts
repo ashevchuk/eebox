@@ -263,7 +263,7 @@ describe('editing a module', () => {
   it('reads the pin pattern in any case, separated by spaces or commas, and refuses unknown conductors', () => {
     const s = on('comb');
     expect(moduleOf(edit(s, 'combPattern', 'l1, l2  L3').draft, 'comb').comb?.pattern).toEqual(['L1', 'L2', 'L3']);
-    expect(refused(applyEditorEdit(s, 'combPattern', 'L1 Q'))).toBe('Unknown conductor "Q"; use L, L1, L2, L3, N, PE.');
+    expect(refused(applyEditorEdit(s, 'combPattern', 'L1 Q'))).toBe('Unknown conductor "Q"; use L, L1, L2, L3, N, PE, C, DCP, DCN.');
     expect(moduleOf(edit(s, 'combSide', 'bottom').draft, 'comb').comb).toEqual({ pattern: ['L'], side: 'bottom' });
   });
 

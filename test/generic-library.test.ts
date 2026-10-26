@@ -22,7 +22,7 @@ describe('the bundled library', () => {
   });
 
   it('is valid and has metadata that says where the numbers come from', () => {
-    expect(library.version).toBe('2');
+    expect(library.version).toBe('3');
     expect(library.description).toMatch(/not taken from any manufacturer/);
   });
 
@@ -97,5 +97,53 @@ describe('the bundled library', () => {
     const rows = new Set(library.enclosures.map((e) => e.railLengthsUnits.length));
     expect([...rows].sort()).toEqual([1, 2, 3, 4, 5]);
     expect(library.enclosures.every((e) => new Set(e.railLengthsUnits).size === 1)).toBe(true);
+  });
+});
+
+describe('devices with control circuits', () => {
+  const terminals = (id: string) => byId.get(id)!.terminals!;
+  const sideOf = (id: string, name: string) => terminals(id).find((t) => t.name === name)?.side;
+  const contactsOf = (id: string) => terminals(id).filter((t) => t.conductor === 'C');
+
+  it('gives every monitoring relay a change-over contact on the bottom and its supply on top', () => {
+    for (const id of ['vrelay-1p', 'vrelay-3pn', 'phase-relay-3p', 'phase-relay-3pn']) {
+      expect(contactsOf(id).map((t) => `${t.name}:${t.side}`), id).toEqual(['11:bottom', '12:bottom', '14:bottom']);
+      expect(terminals(id).filter((t) => t.conductor !== 'C').every((t) => t.side === 'top'), id).toBe(true);
+    }
+  });
+
+  it('switches a lighting load from the top to the bottom and keeps a twilight sensor on control terminals', () => {
+    for (const id of ['impulse-relay-1p', 'stair-timer-1p', 'twilight-switch-1p', 'time-switch-1p']) {
+      expect(byId.get(id)?.ratedCurrentA, id).toBe(16);
+      expect(terminals(id).some((t) => t.side === 'top' && t.conductor === 'L'), id).toBe(true);
+      expect(terminals(id).some((t) => t.side === 'bottom' && t.conductor === 'L'), id).toBe(true);
+    }
+    expect(contactsOf('twilight-switch-1p').map((t) => t.name)).toEqual(['S1', 'S2']);
+  });
+
+  it('lets a power supply feed from L and N and give plus and minus of 24 V', () => {
+    for (const id of ['psu-24v-1a', 'psu-24v-2a5']) {
+      expect(terminals(id).filter((t) => t.side === 'bottom').map((t) => t.conductor), id).toEqual(['DCP', 'DCN']);
+      expect(terminals(id).filter((t) => t.side === 'top').map((t) => t.conductor), id).toEqual(['L', 'N']);
+    }
+  });
+
+  it('gives a changeover switch two supply inputs of the same conductors and one output, never joined inside', () => {
+    for (const id of ['changeover-2p-40', 'changeover-2p-63', 'changeover-4p-63', 'changeover-4p-100']) {
+      const def = byId.get(id)!;
+      const topTerminals = terminals(id).filter((t) => t.side === 'top');
+      const output = terminals(id).filter((t) => t.side === 'bottom').map((t) => t.conductor);
+      expect(topTerminals.map((t) => t.conductor), id).toEqual([...output, ...output]);
+      expect(terminals(id).some((t) => t.net !== undefined), id).toBe(false);
+      expect(def.kind).toBe('switch');
+    }
+    expect(sideOf('changeover-4p-63', 'L1a')).toBe('top');
+    expect(sideOf('changeover-4p-63', 'L1b')).toBe('top');
+    expect(sideOf('changeover-4p-63', 'L1')).toBe('bottom');
+  });
+
+  it('gives the transfer controller sensing inputs for both supplies and dry contacts for the contactors and a generator', () => {
+    expect(contactsOf('ats-controller-3pn').map((t) => t.name)).toEqual(['CA1', 'CA2', 'CB1', 'CB2', 'GS1', 'GS2']);
+    expect(terminals('ats-controller-3pn').filter((t) => t.side === 'top')).toHaveLength(8);
   });
 });

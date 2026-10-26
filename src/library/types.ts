@@ -18,13 +18,18 @@ export const MODULE_KINDS = [
 ] as const;
 export type ModuleKind = (typeof MODULE_KINDS)[number];
 
-/** `L` is a phase that is decided by what feeds it; `L1`..`L3` are fixed phases. */
-export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE'] as const;
+/**
+ * `L` is a phase that is decided by what feeds it; `L1`..`L3` are fixed phases. `C` is a control or
+ * signal conductor, such as a relay contact; `DCP` and `DCN` are the plus and minus of a DC supply.
+ */
+export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'C', 'DCP', 'DCN'] as const;
 export type Conductor = (typeof CONDUCTORS)[number];
-export type ConductorFamily = 'phase' | 'N' | 'PE';
+export type ConductorFamily = 'phase' | 'N' | 'PE' | 'control';
+
+const CONTROL_CONDUCTORS: readonly Conductor[] = ['C', 'DCP', 'DCN'];
 
 export const familyOf = (conductor: Conductor): ConductorFamily =>
-  conductor === 'N' || conductor === 'PE' ? conductor : 'phase';
+  conductor === 'N' || conductor === 'PE' ? conductor : CONTROL_CONDUCTORS.includes(conductor) ? 'control' : 'phase';
 
 export const TERMINAL_SIDES = ['top', 'bottom'] as const;
 export type TerminalSide = (typeof TERMINAL_SIDES)[number];

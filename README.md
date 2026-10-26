@@ -11,8 +11,8 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 ## Features
 
 - **Panel layout.** Rails of any length and spacing in 17.5 mm module units. Drag modules from the palette, reorder modules and rails, take modules off a rail onto a shelf and put them back.
-- **Poles and conductors.** A module has real terminals: L, L1-L3, N and PE per pole, top and bottom. Neutral and earth bars have custom widths, comb bus bars distribute phases to the modules under them.
-- **Wiring schematic.** Wire terminal to terminal, or wire all poles of two nodes at once. Wires obey conductor families (phase to phase, N to N, PE to PE), are routed around nodes and can carry labels.
+- **Poles and conductors.** A module has real terminals: L, L1-L3, N and PE per pole, top and bottom, and control terminals (relay contacts, signals, 24 V DC) that cannot be wired to mains conductors. Neutral and earth bars have custom widths, comb bus bars distribute phases to the modules under them.
+- **Wiring schematic.** Wire terminal to terminal, or wire all poles of two nodes at once. Wires obey conductor families (phase to phase, N to N, PE to PE, control to control), are routed around nodes and can carry labels.
 - **Labels on everything.** Modules, rails, wires, terminals, sources, loads and the drawing itself.
 - **Object inspector.** Edit the properties of whatever is selected, with validation. Changes that would remove wires ask first.
 - **Loads and cables.** Give a load its power and power factor to see the current on every wire, from the load up to the source, and the smallest cable cross-section for the circuit. A cable you pick is checked against the breaker. The cable table is a reference only, see the limits below.
@@ -26,7 +26,7 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 
 Open the page, drag modules from the palette onto a rail, switch to *Schematic* and wire them. To see a finished design, open [`examples/house-panel.json`](examples/house-panel.json) with *Open...*.
 
-The bundled *Generic IEC modules* library is generated from standard rating series. Its widths are typical values and do not come from any manufacturer, so import your own library for real parts.
+The bundled *Generic IEC modules* library is generated from standard rating series and covers breakers, RCDs, RCBOs, switches, contactors, voltage and phase monitoring relays, lighting relays, changeover switches for a backup input, a transfer controller, meters and small devices. Its widths are typical values and do not come from any manufacturer, so import your own library for real parts.
 
 ## Development
 
