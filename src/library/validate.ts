@@ -1,5 +1,6 @@
 import { isStoredLabel } from '../layout/labels';
 import { MAX_LABEL_LENGTH, MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../layout/limits';
+import { positionProblem } from './positions';
 import {
   CONDUCTORS,
   MODULE_KINDS,
@@ -80,14 +81,14 @@ export const MAX_TERMINALS_PER_MODULE = 64;
 export const MAX_TERMINAL_GROUP = 48;
 export const MAX_COMB_PATTERN = 8;
 
-const wholeNumber: FieldCheck = (v) => (Number.isInteger(v) ? null : 'must be a whole number');
+const finiteNumber: FieldCheck = (v) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a number');
 
 export const TERMINAL_SPEC: FieldSpec = {
   name: { required: true, check: identifier },
   conductor: { required: true, check: oneOf(CONDUCTORS) },
   side: { required: true, check: oneOf(TERMINAL_SIDES) },
   net: { required: false, check: identifier },
-  unit: { required: false, check: wholeNumber },
+  unit: { required: false, check: finiteNumber },
   count: {
     required: false,
     check: (v) =>
@@ -138,19 +139,10 @@ function checkResizable(def: Record<string, unknown>, path: string, errors: Vali
   return minUnits;
 }
 
-/**
- * A position counts from the left edge; on a resizable module a negative one counts from the right
- * edge. Either must exist at every width the module can have, so it is bounded by the narrowest one.
- */
+/** A position is a number of units from the left edge, or from the right when it is negative on a resizable module. */
 function checkUnit(unit: number, narrowest: number | undefined, width: number, path: string, errors: ValidationError[]): void {
-  if (narrowest === undefined) {
-    if (unit < 0) errors.push({ path, message: 'cannot be negative: only a resizable module can count from the right edge' });
-    else if (unit >= width) errors.push({ path, message: `must be less than the module width (${width})` });
-  } else if (unit >= narrowest) {
-    errors.push({ path, message: `must be less than the narrowest width (${narrowest}); use a negative position to count from the right edge` });
-  } else if (unit < -narrowest) {
-    errors.push({ path, message: `must not be further from the right edge than the narrowest width (${narrowest})` });
-  }
+  const problem = positionProblem(unit, narrowest, width);
+  if (problem) errors.push({ path, message: problem });
 }
 
 /** Checks that need more than one field of a module: terminals against width, combs against kind. */

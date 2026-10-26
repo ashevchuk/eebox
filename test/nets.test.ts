@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildNets, combContacts, findNetProblems, type Net } from '../src/electrical/nets';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
+import type { ModuleDef } from '../src/library/types';
 import type { Project } from '../src/project';
 import { addNode, connect, emptySchematic, syncModuleNodes, type Schematic } from '../src/schematic/model';
 import { combAt, panelOf, place, resolve } from './fixtures';
@@ -162,5 +163,30 @@ describe('findNetProblems', () => {
       wires: [{ id: 'w1', a: { node: 'n1', terminal: 'top:L1' }, b: { node: 'n2', terminal: 'top:L2' } }],
     };
     expect(findNetProblems(buildNets({ panel, schematic: bridged }, resolve)).map((p) => p.kind)).toEqual(['mixed-phases']);
+  });
+});
+
+describe('combContacts with a terminal between two units', () => {
+  it('lets a comb pin touch the terminal in the unit its centre falls in', () => {
+    const block: ModuleDef = {
+      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1,
+      terminals: [
+        { name: 'A', conductor: 'L1', side: 'top', unit: 0.25 },
+        { name: 'B', conductor: 'L2', side: 'top', unit: 0.75 },
+        { name: 'C', conductor: 'L3', side: 'top', unit: 1.25 },
+      ],
+    };
+    const panel = panelOf([place('p1', 'blk', 0, 0)], [combAt('c1', 'comb3', 0, 0)]);
+    const touching = combContacts(panel, (r) => (r.moduleId === 'blk' ? block : resolve(r))).map((c) => `${c.terminalId}:${c.pin}`);
+    expect(touching).toEqual(['top:A:L1', 'top:B:L2']);
+  });
+
+  it('touches only the first terminal of a unit, however many fall in it', () => {
+    const block: ModuleDef = {
+      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 1, poles: 1,
+      terminals: [{ name: 'A', conductor: 'L1', side: 'top', unit: -0.2 }, { name: 'B', conductor: 'L1', side: 'top', unit: 0.3 }],
+    };
+    const panel = panelOf([place('p1', 'blk', 0, 0)], [combAt('c1', 'comb3', 0, 0)]);
+    expect(combContacts(panel, (r) => (r.moduleId === 'blk' ? block : resolve(r))).map((c) => c.terminalId)).toEqual(['top:A']);
   });
 });

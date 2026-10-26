@@ -138,6 +138,34 @@ try {
     await browser.waitFor(`document.querySelector('#palette .module')?.textContent.includes('Smoke test module')`, 'the new module in the palette');
   });
 
+  await step('the designer builds a distribution block of one input and six outputs, with a variant for each conductor', async () => {
+    await browser.evaluate(`document.getElementById('new-module').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open]')`, 'the designer');
+    await browser.evaluate(`(() => {
+      const field = (t) => [...document.querySelectorAll('.designer-fields .inspector-field')].find((r) => r.innerText.startsWith(t)).querySelector('input,select');
+      for (const [label, value] of [['Name', 'Block 125'], ['Kind', 'terminal'], ['Width', '2']]) { const f = field(label); f.value = value; f.dispatchEvent(new Event('change', { bubbles: true })); }
+      [...document.querySelectorAll('.designer-toolbar button')].find((b) => b.textContent === 'Block…').click();
+    })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog dialog[open]')`, 'the block dialog');
+    await browser.evaluate(`(() => {
+      const d = document.querySelector('.designer-dialog dialog'); const c = [...d.querySelectorAll('label input, label select')];
+      c[0].value = '1'; c[1].value = '6'; c[2].value = 'N'; c[3].checked = true;
+      [...d.querySelectorAll('button')].find((b) => b.textContent === 'OK').click();
+    })()`);
+    await browser.waitFor(`document.querySelectorAll('.designer-pin').length === 7`, 'seven terminals');
+    expectEqual(await browser.evaluate(`document.querySelector('.designer-dialog .editor-errors').textContent`), '', 'problems with the block');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-toolbar button')].find((b) => b.textContent === 'Variants…').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog dialog[open] input')`, 'the variants dialog');
+    await browser.evaluate(`(() => {
+      const d = document.querySelector('.designer-dialog dialog'); d.querySelectorAll('input')[2].value = 'L1 L2 L3 N PE';
+      [...d.querySelectorAll('button')].find((b) => b.textContent === 'Make variants').click();
+    })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog .editor-status')?.textContent.includes('Made 5 variants')`, 'five variants');
+    expectEqual(await browser.evaluate(`document.querySelector('.designer-dialog .editor-errors').textContent`), '', 'problems with the variants');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click()`);
+  });
+
   await step('an example is chosen from the File menu and loads without problems', async () => {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('open-example').click()`);

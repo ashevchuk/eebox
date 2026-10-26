@@ -274,7 +274,19 @@ describe('resizable validation', () => {
   it('rejects a position that would not exist at the narrowest width', () => {
     expect(unitErrors(2)).toEqual(['modules[0].terminals[0].unit']);
     expect(unitErrors(-3)).toEqual(['modules[0].terminals[0].unit']);
-    expect(unitErrors(0.5)).toEqual(['modules[0].terminals[0].unit']);
+    expect(unitErrors(1.5)).toEqual(['modules[0].terminals[0].unit']);
+  });
+
+  it('accepts a fractional position as long as it is inside the module and 0.15 of a unit from its edges', () => {
+    for (const unit of [0.5, 1.25, 1.35, -0.35, -0.65, -1.5, -2.35]) expect(accepts(unit), String(unit)).toBe(true);
+    for (const unit of [-0.4, 1.4, -0.6, -2.4]) expect(accepts(unit), String(unit)).toBe(false);
+  });
+
+  it('accepts a fractional position on a fixed module, and refuses one outside it or one that is not a number', () => {
+    const fixed = { resizable: undefined, kind: 'breaker', widthUnits: 2 };
+    for (const unit of [0, 0.25, 0.5, 1.3, -0.35]) expect(accepts(unit, fixed), String(unit)).toBe(true);
+    for (const unit of [-0.4, 1.4, 2, -1]) expect(unitErrors(unit, fixed), String(unit)).toEqual(['modules[0].terminals[0].unit']);
+    expect(errorPaths(lib({ terminals: [{ name: 'N', conductor: 'N', side: 'top', unit: 'left' }] }))).toEqual(['modules[0].terminals[0].unit']);
   });
 
   it('keeps negative positions for resizable modules: a fixed module has no right edge to count from', () => {

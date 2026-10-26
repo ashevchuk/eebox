@@ -69,7 +69,7 @@ export function combContacts(panel: Project['panel'], resolve: Resolve): CombCon
         const terminal = terminalsOf(placed, placement.widthUnits ?? placed.widthUnits).find(
           (t) =>
             t.side === side &&
-            placement.slot + t.unit === unit &&
+            placement.slot + Math.floor(t.unit + 0.5) === unit &&
             familyOf(t.conductor) === familyOf(pin),
         );
         if (terminal) contacts.push({ combId: comb.id, pin, placementId: placement.id, terminalId: terminal.id });

@@ -1,3 +1,4 @@
+import { leftPosition } from '../library/positions';
 import type { Conductor, ModuleDef, TerminalDef, TerminalSide } from '../library/types';
 
 export interface Terminal {
@@ -85,7 +86,7 @@ export function terminalsOf(def: ModuleDef, widthUnits: number = def.widthUnits)
   drafts.forEach((d) => perSide[d.side]++);
   return drafts.map((d) => {
     const index = seen[d.side]++;
-    const unit = d.unit === undefined ? Math.floor((index * widthUnits) / perSide[d.side]) : d.unit < 0 ? widthUnits + d.unit : d.unit;
+    const unit = d.unit === undefined ? Math.floor((index * widthUnits) / perSide[d.side]) : leftPosition(d.unit, widthUnits, def.resizable !== undefined);
     return { ...d, unit };
   });
 }

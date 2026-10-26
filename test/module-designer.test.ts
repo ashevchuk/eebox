@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { emptyMyLibrary, MY_LIBRARY_ID } from '../src/library/myModules';
-import { SCHEMA_VERSION, type Library, type ModuleDef, type TerminalDef } from '../src/library/types';
+import { SCHEMA_VERSION, type Conductor, type Library, type ModuleDef, type TerminalDef } from '../src/library/types';
 import { validateLibrary } from '../src/library/validate';
 import {
+  netCentre,
+  pinLabels,
+  addRow,
+  evenPositions,
+  makeBlock,
+  setAllConductors,
+  spreadSide,
+  POSITION_STEP,
   addPreset,
   addTerminalAt,
   connectTerminals,
@@ -83,9 +91,9 @@ describe('pinAt and slotAt', () => {
   });
 
   it('turns a point on the body into a unit and a side, and refuses a point outside it', () => {
-    expect(slotAt(layout, layout.body.x + 5, layout.body.y + 10)).toEqual({ unit: 0, side: 'top' });
-    expect(slotAt(layout, layout.body.x + UNIT_PX + 5, layout.body.y + layout.body.height - 10)).toEqual({ unit: 1, side: 'bottom' });
-    expect(slotAt(layout, layout.body.x + layout.body.width, layout.body.y + 5)).toEqual({ unit: 1, side: 'top' });
+    expect(slotAt(layout, layout.body.x + UNIT_PX * 0.5, layout.body.y + 10)).toEqual({ unit: 0, side: 'top' });
+    expect(slotAt(layout, layout.body.x + UNIT_PX * 1.5, layout.body.y + layout.body.height - 10)).toEqual({ unit: 1, side: 'bottom' });
+    expect(slotAt(layout, layout.body.x + layout.body.width, layout.body.y + 5)).toEqual({ unit: 1.25, side: 'top' });
     expect(slotAt(layout, layout.body.x - 5, layout.body.y + 5)).toBeNull();
     expect(slotAt(layout, layout.body.x + 5, layout.body.y + layout.body.height + 60)).toBeNull();
   });
@@ -387,5 +395,273 @@ describe('repairPositions', () => {
   it('leaves terminals that have no position of their own alone', () => {
     const draft = libraryOf(fixed({ minUnits: 2, maxUnits: 6 }, [{ name: 'G', conductor: 'N', side: 'top', count: 2 }, at(2)]));
     expect(units(repairPositions(draft, 'm'))).toEqual([undefined, -1]);
+  });
+});
+
+describe('slotAt in steps of a quarter unit', () => {
+  const layout = designerLayout(relay);
+
+  it('gives the centre of the unit under the pointer, and the quarter steps between centres', () => {
+    const at = (units: number) => slotAt(layout, layout.body.x + (units + 0.5) * UNIT_PX, layout.body.y + 10)!.unit;
+    expect([0, 0.2, 0.3, 0.5, 0.74, 1].map(at)).toEqual([0, 0.25, 0.25, 0.5, 0.75, 1]);
+    expect(POSITION_STEP).toBe(0.25);
+  });
+
+  it('never gives a position outside what a module of that width allows', () => {
+    const edge = (x: number) => slotAt(layout, layout.body.x + x, layout.body.y + 10)!.unit;
+    expect(edge(0)).toBe(-0.25);
+    expect(edge(layout.body.width)).toBe(1.25);
+    expect(validateLibrary(libraryOf({ ...relay, resizable: undefined, terminals: [{ name: 'A', conductor: 'L', side: 'top', unit: edge(0) }] })).ok).toBe(true);
+  });
+});
+
+describe('storedUnit keeps what is valid and tidies what is not', () => {
+  const resizable: ModuleDef = { ...relay, widthUnits: 4, resizable: { minUnits: 2, maxUnits: 6 } };
+
+  it('leaves a fractional position that exists at the narrowest width', () => {
+    expect(storedUnit(resizable, 0.75)).toBe(0.75);
+    expect(storedUnit(resizable, 3.25)).toBe(-0.75);
+  });
+
+  it('moves a position in the middle of a wide module to the nearest unit that does exist', () => {
+    expect(storedUnit({ ...resizable, widthUnits: 8 }, 3.5, 8)).toBe(1);
+    expect(storedUnit({ ...resizable, widthUnits: 8 }, 4.5, 8)).toBe(-2);
+  });
+});
+
+describe('evenPositions', () => {
+  it('puts each terminal in the middle of an equal share of the width', () => {
+    expect(evenPositions(1, 3)).toEqual([1]);
+    expect(evenPositions(2, 2)).toEqual([0, 1]);
+    expect(evenPositions(3, 3)).toEqual([0, 1, 2]);
+    expect(evenPositions(3, 2)).toEqual([-0.167, 0.5, 1.167]);
+    expect(evenPositions(6, 2)).toEqual([-0.333, 0, 0.333, 0.667, 1, 1.333]);
+  });
+
+  it('spreads the terminals between the outermost positions the module allows when equal shares would not fit', () => {
+    expect(evenPositions(8, 2)).toEqual([-0.35, -0.107, 0.136, 0.379, 0.621, 0.864, 1.107, 1.35]);
+  });
+
+  it('never goes outside what a module of that width allows, for any count that fits', () => {
+    for (const width of [1, 2, 3, 6]) {
+      for (let count = 1; count <= 12; count++) {
+        const positions = evenPositions(count, width);
+        const range = { min: Math.min(...positions), max: Math.max(...positions) };
+        expect(range.min, `${count} in ${width}`).toBeGreaterThanOrEqual(-0.35);
+        expect(range.max, `${count} in ${width}`).toBeLessThanOrEqual(width - 0.65);
+      }
+    }
+  });
+});
+
+describe('addRow', () => {
+  const block: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1, terminals: [] };
+  const spec = { side: 'bottom' as const, count: 6, conductor: 'N' as const, prefix: 'OUT', joined: true };
+  const entries = (draft: Library) => draft.modules[0]!.terminals!;
+
+  it('adds the terminals of a row, numbered, one conductor, spread over the width and joined by one net', () => {
+    const result = addRow(libraryOf(block), 'blk', spec);
+    if (!result.ok) throw new Error(result.message);
+    expect(entries(result.draft).map((t) => t.name)).toEqual(['OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6']);
+    expect(new Set(entries(result.draft).map((t) => t.net))).toEqual(new Set(['NET1']));
+    expect(entries(result.draft).every((t) => t.conductor === 'N' && t.side === 'bottom')).toBe(true);
+    expect(entries(result.draft).map((t) => t.unit)).toEqual(evenPositions(6, 2));
+    expect(validateLibrary(result.draft).ok).toBe(true);
+  });
+
+  it('adds a row of one without a number in its name, and a row that is not joined without a net', () => {
+    const result = addRow(libraryOf(block), 'blk', { ...spec, count: 1, prefix: 'IN', side: 'top', joined: false });
+    if (!result.ok) throw new Error(result.message);
+    expect(entries(result.draft)).toEqual([{ name: 'IN', conductor: 'N', side: 'top', unit: 0.5 }]);
+  });
+
+  it('gives a second joined row a net of its own', () => {
+    const first = addRow(libraryOf(block), 'blk', spec);
+    if (!first.ok) throw new Error(first.message);
+    const second = addRow(first.draft, 'blk', { ...spec, side: 'top', count: 2, prefix: 'IN' });
+    if (!second.ok) throw new Error(second.message);
+    expect(new Set(entries(second.draft).map((t) => t.net))).toEqual(new Set(['NET1', 'NET2']));
+  });
+
+  it('adds a group with a count to a module whose width can change, so that it grows with the module', () => {
+    const resizable: ModuleDef = { ...block, resizable: { minUnits: 2, maxUnits: 8 } };
+    const result = addRow(libraryOf(resizable), 'blk', spec);
+    if (!result.ok) throw new Error(result.message);
+    expect(entries(result.draft)).toEqual([{ name: 'OUT', conductor: 'N', side: 'bottom', count: 6, net: 'NET1' }]);
+    expect(validateLibrary(result.draft).ok).toBe(true);
+  });
+
+  it('refuses a count out of range, a name that is not an identifier, a name already taken, and a missing module', () => {
+    expect(addRow(libraryOf(block), 'blk', { ...spec, count: 0 })).toMatchObject({ ok: false });
+    expect(addRow(libraryOf(block), 'blk', { ...spec, count: 49 })).toMatchObject({ ok: false });
+    expect(addRow(libraryOf(block), 'blk', { ...spec, prefix: '+' })).toMatchObject({ ok: false });
+    const once = addRow(libraryOf(block), 'blk', spec);
+    if (!once.ok) throw new Error(once.message);
+    expect(addRow(once.draft, 'blk', spec)).toEqual({ ok: false, message: 'The bottom side already has a terminal named OUT1.' });
+    expect(addRow(libraryOf(), 'blk', spec)).toEqual({ ok: false, message: 'That module does not exist.' });
+  });
+});
+
+describe('spreadSide', () => {
+  const crowded: ModuleDef = {
+    id: 'm', kind: 'terminal', name: 'M', widthUnits: 2, poles: 1,
+    terminals: [
+      { name: 'C', conductor: 'N', side: 'bottom', unit: 1 },
+      { name: 'A', conductor: 'N', side: 'bottom', unit: 0 },
+      { name: 'B', conductor: 'N', side: 'bottom', unit: 0 },
+      { name: 'X', conductor: 'N', side: 'top', unit: 0 },
+    ],
+  };
+
+  it('spaces the terminals of a side evenly, in the order they stood in, and leaves the other side alone', () => {
+    const result = spreadSide(libraryOf(crowded), 'm', 'bottom');
+    if (!result.ok) throw new Error(result.message);
+    const byName = Object.fromEntries(result.draft.modules[0]!.terminals!.map((t) => [t.name, t.unit]));
+    expect(byName).toEqual({ A: -0.167, B: 0.5, C: 1.167, X: 0 });
+  });
+
+  it('refuses a side without terminals and a resizable module, which keeps terminals at its edges', () => {
+    expect(spreadSide(libraryOf({ ...crowded, terminals: [crowded.terminals![3]!] }), 'm', 'bottom')).toMatchObject({ ok: false });
+    expect(spreadSide(libraryOf({ ...crowded, resizable: { minUnits: 2, maxUnits: 4 } }), 'm', 'bottom')).toMatchObject({ ok: false });
+  });
+});
+
+describe('makeBlock', () => {
+  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1 };
+  const shape = (draft: Library) => draft.modules[0]!.terminals!.map((t) => `${t.side}:${t.name}`);
+
+  it('builds one input on top and six outputs below, all one point', () => {
+    const result = makeBlock(libraryOf(plain), 'blk', { top: 1, bottom: 6, conductor: 'L1', joined: true });
+    if (!result.ok) throw new Error(result.message);
+    expect(shape(result.draft)).toEqual(['top:IN', 'bottom:OUT1', 'bottom:OUT2', 'bottom:OUT3', 'bottom:OUT4', 'bottom:OUT5', 'bottom:OUT6']);
+    expect(new Set(result.draft.modules[0]!.terminals!.map((t) => t.net))).toEqual(new Set(['NET1']));
+    expect(validateLibrary(result.draft).ok).toBe(true);
+  });
+
+  it('builds the other shapes a person asks for: one and one, and eight on one side only', () => {
+    const pair = makeBlock(libraryOf(plain), 'blk', { top: 1, bottom: 1, conductor: 'N', joined: true });
+    if (!pair.ok) throw new Error(pair.message);
+    expect(shape(pair.draft)).toEqual(['top:IN', 'bottom:OUT']);
+    const eight = makeBlock(libraryOf(plain), 'blk', { top: 0, bottom: 8, conductor: 'PE', joined: true });
+    if (!eight.ok) throw new Error(eight.message);
+    expect(shape(eight.draft)).toHaveLength(8);
+    expect(eight.draft.modules[0]!.terminals!.every((t) => t.side === 'bottom' && t.conductor === 'PE')).toBe(true);
+    expect(validateLibrary(eight.draft).ok).toBe(true);
+  });
+
+  it('replaces what was there, and leaves terminals separate when they are not joined', () => {
+    const had = makeBlock(libraryOf({ ...plain, terminals: [{ name: 'OLD', conductor: 'L', side: 'top' }] }), 'blk', { top: 2, bottom: 2, conductor: 'L', joined: false });
+    if (!had.ok) throw new Error(had.message);
+    expect(shape(had.draft)).not.toContain('top:OLD');
+    expect(had.draft.modules[0]!.terminals!.some((t) => t.net !== undefined)).toBe(false);
+  });
+
+  it('refuses fewer than two terminals, a count out of range, a comb and a missing module', () => {
+    expect(makeBlock(libraryOf(plain), 'blk', { top: 1, bottom: 0, conductor: 'L', joined: true })).toMatchObject({ ok: false });
+    expect(makeBlock(libraryOf(plain), 'blk', { top: 60, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
+    expect(makeBlock(libraryOf(plain), 'blk', { top: 1.5, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
+    expect(makeBlock(libraryOf(), 'blk', { top: 1, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
+    const comb: ModuleDef = { id: 'blk', kind: 'comb', name: 'C', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } };
+    expect(makeBlock(libraryOf(comb), 'blk', { top: 1, bottom: 1, conductor: 'L', joined: true })).toEqual({ ok: false, message: 'A comb has no terminals.' });
+  });
+
+  it('makes groups with a count, one per side, on a module whose width can change', () => {
+    const resizable: ModuleDef = { ...plain, resizable: { minUnits: 2, maxUnits: 6 } };
+    const result = makeBlock(libraryOf(resizable), 'blk', { top: 1, bottom: 6, conductor: 'N', joined: true });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.draft.modules[0]!.terminals).toEqual([
+      { name: 'IN', conductor: 'N', side: 'top', net: 'NET1' },
+      { name: 'OUT', conductor: 'N', side: 'bottom', count: 6, net: 'NET1' },
+    ]);
+    expect(validateLibrary(result.draft).ok).toBe(true);
+  });
+});
+
+describe('conductors of a whole module', () => {
+  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1 };
+  const block = (conductor: Conductor): ModuleDef => ({ ...plain, terminals: [{ name: 'A', conductor, side: 'top' }, { name: 'B', conductor, side: 'bottom' }] });
+
+  it('puts one conductor on every terminal, also of a module whose terminals come from its poles', () => {
+    const result = setAllConductors(libraryOf(plain), 'blk', 'PE');
+    if (!result.ok) throw new Error(result.message);
+    expect(result.draft.modules[0]!.terminals!.map((t) => t.conductor)).toEqual(['PE', 'PE']);
+    expect(setAllConductors(libraryOf(), 'blk', 'N')).toMatchObject({ ok: false });
+  });
+
+  it('makes a variant for each conductor, with the conductor in id and name and on all terminals', () => {
+    const result = makeVariants(libraryOf(block('L')), 'blk', [], [], ['L1', 'L2', 'L3', 'N', 'PE']);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.ids).toEqual(['blk-l1', 'blk-l2', 'blk-l3', 'blk-n', 'blk-pe']);
+    expect(result.draft.modules.map((m) => m.name)).toEqual(['Block', 'Block L1', 'Block L2', 'Block L3', 'Block N', 'Block PE']);
+    expect(result.draft.modules[4]!.terminals!.map((t) => t.conductor)).toEqual(['N', 'N']);
+    expect(result.draft.modules[0]!.terminals!.map((t) => t.conductor)).toEqual(['L', 'L']);
+    expect(validateLibrary(result.draft).ok).toBe(true);
+  });
+
+  it('crosses conductors with ratings, and refuses to make nothing', () => {
+    const crossed = makeVariants(libraryOf(block('L')), 'blk', [63, 125], [], ['N', 'PE']);
+    if (!crossed.ok) throw new Error(crossed.message);
+    expect(crossed.ids).toEqual(['blk-63a-n', 'blk-125a-n', 'blk-63a-pe', 'blk-125a-pe']);
+    expect(makeVariants(libraryOf(block('L')), 'blk', [], [], [])).toEqual({ ok: false, message: 'Give at least one rating, curve or conductor.' });
+  });
+});
+
+describe('the layout of a crowded module', () => {
+  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, poles: 1, terminals: [] };
+
+  it('draws smaller pins and marks the layout crowded when eight terminals stand in two units', () => {
+    const result = addRow(libraryOf(eight), 'e', { side: 'bottom', count: 8, conductor: 'N', prefix: 'T', joined: false });
+    if (!result.ok) throw new Error(result.message);
+    const layout = designerLayout(result.draft.modules[0]!);
+    expect(layout.crowded).toBe(true);
+    expect(layout.pinRadius).toBeLessThan(6);
+    expect(layout.pinRadius).toBeGreaterThanOrEqual(3);
+    const xs = layout.pins.map((p) => p.x);
+    expect(new Set(xs).size).toBe(8);
+  });
+
+  it('keeps full size pins when there is room', () => {
+    const layout = designerLayout({ id: 'p', kind: 'breaker', name: 'P', widthUnits: 2, poles: 1 });
+    expect(layout.pinRadius).toBe(6);
+    expect(layout.crowded).toBe(false);
+  });
+
+  it('makes the pins a little smaller where two share a unit, side by side', () => {
+    expect(designerLayout(relay).pinRadius).toBeCloseTo(5.46, 2);
+  });
+});
+
+describe('pin labels and the centre of a net', () => {
+  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, poles: 1, terminals: [] };
+  const withRow = (prefix: string) => {
+    const result = addRow(libraryOf(eight), 'e', { side: 'bottom', count: 8, conductor: 'N', prefix, joined: false });
+    if (!result.ok) throw new Error(result.message);
+    return designerLayout(result.draft.modules[0]!);
+  };
+
+  it('write the full names while the pins have room', () => {
+    expect(pinLabels(designerLayout(relay))).toEqual(['A1', 'A2', '14']);
+  });
+
+  it('write only the numbers when the pins are crowded and share the letters before them', () => {
+    expect(pinLabels(withRow('OUT'))).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+  });
+
+  it('keep the names of a pair that stands side by side, such as the two ends of a coil', () => {
+    expect(designerLayout(relay).crowded).toBe(true);
+    expect(pinLabels(designerLayout(relay))).toEqual(['A1', 'A2', '14']);
+  });
+
+  it('keep the names of a crowded side whose pins do not share a prefix', () => {
+    const mixed: ModuleDef = { ...eight, terminals: [
+      ...['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((n, i): TerminalDef => ({ name: `${n}1`, conductor: 'N', side: 'bottom', unit: -0.3 + i * 0.25 })),
+    ] };
+    expect(pinLabels(designerLayout(mixed))).toEqual(['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1', 'H1']);
+  });
+
+  it('is the middle of the pins that a net is drawn to', () => {
+    const layout = designerLayout(relay);
+    const pins = [layout.pins[0]!, layout.pins[2]!];
+    expect(netCentre(pins)).toEqual({ x: (pins[0]!.x + pins[1]!.x) / 2, y: (pins[0]!.y + pins[1]!.y) / 2 });
   });
 });

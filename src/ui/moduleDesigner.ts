@@ -1,5 +1,6 @@
 import { terminalSources, terminalsOf, type Terminal } from '../electrical/terminals';
 import { createPanel } from '../layout/panel';
+import { fixedRange, isValidPosition, leftPosition } from '../library/positions';
 import type { ModuleRef, Panel, Placement } from '../layout/placement';
 import type { Conductor, Library, ModuleDef, TerminalDef, TerminalSide, TripCurve } from '../library/types';
 
@@ -9,6 +10,11 @@ const BODY_HEIGHT = 190;
 const PIN_INSET = 18;
 const PIN_SPACING_PX = 13;
 const PIN_HIT_RADIUS = 10;
+const MIN_PIN_RADIUS = 3;
+const MAX_PIN_RADIUS = 6;
+const PIN_GAP_SHARE = 0.42;
+const CROWDED_GAP_PX = 22;
+const MIN_PINS_TO_ABBREVIATE = 3;
 const EDGE_TOLERANCE_PX = 14;
 
 export interface DesignerPin {
@@ -23,6 +29,10 @@ export interface DesignerLayout {
   width: number;
   height: number;
   widthUnits: number;
+  /** Radius of a pin: smaller when terminals stand close together. */
+  pinRadius: number;
+  /** True when neighbouring pins are so close that their names would overlap on one line. */
+  crowded: boolean;
   body: { x: number; y: number; width: number; height: number };
   pins: DesignerPin[];
 }
@@ -42,7 +52,13 @@ export function designerLayout(def: ModuleDef, widthUnits: number = def.widthUni
       y: terminal.side === 'top' ? body.y + PIN_INSET : body.y + body.height - PIN_INSET,
     };
   });
-  return { width: body.width + 2 * MARGIN, height: body.height + 2 * MARGIN, widthUnits, body, pins };
+  const gaps = (['top', 'bottom'] as const).flatMap((side) => {
+    const xs = pins.filter((p) => p.terminal.side === side).map((p) => p.x).sort((a, b) => a - b);
+    return xs.slice(1).map((x, i) => x - xs[i]!);
+  });
+  const tightest = Math.min(Infinity, ...gaps);
+  const pinRadius = Math.max(MIN_PIN_RADIUS, Math.min(MAX_PIN_RADIUS, tightest * PIN_GAP_SHARE));
+  return { width: body.width + 2 * MARGIN, height: body.height + 2 * MARGIN, widthUnits, pinRadius, crowded: tightest < CROWDED_GAP_PX, body, pins };
 }
 
 /** The pin under a point, the nearest one when several are within reach. */
@@ -59,26 +75,36 @@ export function pinAt(layout: DesignerLayout, x: number, y: number): DesignerPin
   return best;
 }
 
-/** The unit and side a point on the body stands for, or null outside the body and a little around it. */
+/** Positions are offered in steps of a quarter unit, 4.4 mm, which keeps terminals apart and lines them up. */
+export const POSITION_STEP = 0.25;
+
+/**
+ * The position along the module and the side a point on the body stands for, snapped to a quarter
+ * unit and kept inside the module; null outside the body and a little around it.
+ */
 export function slotAt(layout: DesignerLayout, x: number, y: number): { unit: number; side: TerminalSide } | null {
   const { body, widthUnits } = layout;
   const inside =
     x >= body.x && x <= body.x + body.width && y >= body.y - EDGE_TOLERANCE_PX && y <= body.y + body.height + EDGE_TOLERANCE_PX;
   if (!inside) return null;
-  const unit = Math.min(widthUnits - 1, Math.max(0, Math.floor((x - body.x) / UNIT_PX)));
+  const { min, max } = fixedRange(widthUnits);
+  const snapped = Math.round((((x - body.x) / UNIT_PX) - 0.5) / POSITION_STEP) * POSITION_STEP;
+  const unit = Math.min(Math.floor(max / POSITION_STEP) * POSITION_STEP, Math.max(Math.ceil(min / POSITION_STEP) * POSITION_STEP, snapped));
   return { unit, side: y < body.y + body.height / 2 ? 'top' : 'bottom' };
 }
 
 /**
- * How a unit on the drawn module is stored. A fixed module counts from the left. A resizable one
- * counts from the nearer edge, because a position has to exist at the narrowest width: counting
- * from the right keeps a terminal at the right edge whatever the width of a placed copy.
+ * How a position on the drawn module is stored. A fixed module counts from the left. A resizable one
+ * counts from the nearer edge, because a position has to exist at the narrowest width: counting from
+ * the right keeps a terminal at the right edge whatever the width of a placed copy. A position that
+ * does not exist at the narrowest width is moved to the nearest unit centre that does.
  */
 export function storedUnit(def: ModuleDef, unit: number, width: number = def.widthUnits): number {
-  if (!def.resizable) return Math.min(width - 1, Math.max(0, unit));
+  if (!def.resizable) return isValidPosition(unit, undefined, width) ? unit : Math.min(width - 1, Math.max(0, Math.round(unit)));
   const narrowest = def.resizable.minUnits;
-  if (unit < width / 2) return Math.min(unit, narrowest - 1);
-  return Math.max(unit - width, -narrowest);
+  const candidate = unit < width / 2 ? unit : unit - width;
+  if (isValidPosition(candidate, narrowest, width)) return candidate;
+  return candidate >= 0 ? Math.min(narrowest - 1, Math.max(0, Math.round(candidate))) : Math.max(-narrowest, Math.min(-1, Math.round(candidate)));
 }
 
 /**
@@ -91,12 +117,11 @@ export function repairPositions(draft: Library, moduleId: string): Library {
   if (!def?.terminals || !def.resizable) return draft;
   const { minUnits } = def.resizable;
   const width = def.widthUnits;
-  const valid = (unit: number) => unit < minUnits && unit >= -minUnits;
+  const valid = (unit: number) => isValidPosition(unit, minUnits, width);
   if (def.terminals.every((t) => t.unit === undefined || valid(t.unit))) return draft;
   const terminals = def.terminals.map((t) => {
     if (t.unit === undefined || valid(t.unit)) return t;
-    const fromLeft = t.unit < 0 ? width + t.unit : t.unit;
-    return { ...t, unit: storedUnit(def, fromLeft, width) };
+    return { ...t, unit: storedUnit(def, leftPosition(t.unit, width, true), width) };
   });
   return replaceTerminals(draft, moduleId, terminals);
 }
@@ -298,34 +323,192 @@ export function netGroups(layout: DesignerLayout): Array<{ net: string; pins: De
 
 export type VariantResult = { ok: true; draft: Library; ids: string[] } | { ok: false; message: string };
 
+/** The listed terminals of a module with every conductor replaced; the poles' terminals are listed first. */
+function withConductor(def: ModuleDef, conductor: Conductor): ModuleDef {
+  if (def.kind === 'comb') return def;
+  return { ...def, terminals: listedTerminals(def).map((t) => ({ ...t, conductor })) };
+}
+
 /**
- * Makes one copy of a module for every rating, and for every curve when curves are given, so that a
- * series is designed once. The copies follow the original and carry the rating in id and name.
+ * Makes a copy of a module for every rating, every curve and every conductor given, and for every
+ * combination when several are given, so that a series is designed once. The copies follow the
+ * original and carry what tells them apart in id and name. A copy for a conductor puts that
+ * conductor on all its terminals, as the blocks of a distribution block come in a colour per conductor.
  */
-export function makeVariants(draft: Library, moduleId: string, ratings: readonly number[], curves: readonly TripCurve[] = []): VariantResult {
+export function makeVariants(
+  draft: Library,
+  moduleId: string,
+  ratings: readonly number[],
+  curves: readonly TripCurve[] = [],
+  conductors: readonly Conductor[] = [],
+): VariantResult {
   const index = draft.modules.findIndex((m) => m.id === moduleId);
   const base = draft.modules[index];
   if (!base) return { ok: false, message: 'That module does not exist.' };
   const distinct = [...new Set(ratings)];
-  if (distinct.length === 0 || distinct.some((r) => !(r > 0))) return { ok: false, message: 'Give at least one rating above 0.' };
-  const made = (curves.length > 0 ? curves : [undefined]).flatMap((curve) =>
-    distinct.map((rating): ModuleDef => {
-      const tag = curve ? `${curve}${rating}` : `${rating}A`;
-      return {
-        ...structuredClone(base),
-        id: `${base.id}-${tag.toLowerCase()}`,
-        name: `${base.name} ${curve ? tag : `${rating} A`}`,
-        ratedCurrentA: rating,
-        ...(curve ? { curve } : {}),
-      };
-    }),
-  );
+  if (distinct.some((r) => !(r > 0))) return { ok: false, message: 'A rating must be above 0.' };
+  if (distinct.length === 0 && curves.length === 0 && conductors.length === 0) {
+    return { ok: false, message: 'Give at least one rating, curve or conductor.' };
+  }
+  const made: ModuleDef[] = [];
+  for (const conductor of conductors.length > 0 ? conductors : [undefined]) {
+    for (const curve of curves.length > 0 ? curves : [undefined]) {
+      for (const rating of distinct.length > 0 ? distinct : [undefined]) {
+        const idParts: string[] = [];
+        const nameParts: string[] = [];
+        if (curve && rating !== undefined) {
+          idParts.push(`${curve}${rating}`.toLowerCase());
+          nameParts.push(`${curve}${rating}`);
+        } else if (curve) {
+          idParts.push(curve.toLowerCase());
+          nameParts.push(curve);
+        } else if (rating !== undefined) {
+          idParts.push(`${rating}a`);
+          nameParts.push(`${rating} A`);
+        }
+        if (conductor) {
+          idParts.push(conductor.toLowerCase());
+          nameParts.push(conductor);
+        }
+        const recoloured = conductor ? withConductor(structuredClone(base), conductor) : structuredClone(base);
+        made.push({
+          ...recoloured,
+          id: `${base.id}-${idParts.join('-')}`,
+          name: `${base.name} ${nameParts.join(' ')}`,
+          ...(rating !== undefined ? { ratedCurrentA: rating } : {}),
+          ...(curve ? { curve } : {}),
+        });
+      }
+    }
+  }
   const taken = new Set(draft.modules.map((m) => m.id));
   const clash = made.find((m) => taken.has(m.id));
   if (clash) return { ok: false, message: `The library already has a module with the id ${clash.id}.` };
   const modules = [...draft.modules];
   modules.splice(index + 1, 0, ...made);
   return { ok: true, draft: { ...draft, modules }, ids: made.map((m) => m.id) };
+}
+
+/** Puts one conductor on every terminal of the module. */
+export function setAllConductors(draft: Library, moduleId: string, conductor: Conductor): Change {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def) return { ok: false, message: 'That module does not exist.' };
+  if (def.kind === 'comb') return { ok: false, message: 'A comb has no terminals.' };
+  return { ok: true, draft: replaceTerminals(draft, moduleId, listedTerminals(def).map((t) => ({ ...t, conductor }))), index: 0 };
+}
+
+const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const MAX_ROW = 48;
+const POSITION_PRECISION = 1000;
+
+/**
+ * Centres of `count` terminals, each in the middle of an equal share of a module `width` units wide.
+ * When that would put the outer ones too close to an edge, they are spread evenly between the
+ * outermost positions the module allows instead.
+ */
+export function evenPositions(count: number, width: number): number[] {
+  const round = (n: number) => Math.round(n * POSITION_PRECISION) / POSITION_PRECISION;
+  const { min, max } = fixedRange(width);
+  const shares = Array.from({ length: count }, (_, i) => round(((i + 0.5) * width) / count - 0.5));
+  if (count === 1 || (shares[0]! >= min && shares[count - 1]! <= max)) return shares;
+  return Array.from({ length: count }, (_, i) => round(min + (i * (max - min)) / (count - 1)));
+}
+
+export interface RowSpec {
+  side: TerminalSide;
+  count: number;
+  conductor: Conductor;
+  /** Terminals are named `<prefix>1`, `<prefix>2`...; a single one is named `<prefix>`. */
+  prefix: string;
+  /** Join them all inside the module, as the terminals of a distribution block are. */
+  joined: boolean;
+}
+
+const rowProblem = (spec: RowSpec): string | null => {
+  if (!Number.isInteger(spec.count) || spec.count < 1 || spec.count > MAX_ROW) return `The count must be a whole number from 1 to ${MAX_ROW}.`;
+  if (!NAME_PATTERN.test(spec.prefix)) return 'The name must start with a letter or digit and use letters, digits, ".", "_" or "-".';
+  return null;
+};
+
+/**
+ * Terminals for one side: evenly spread by position on a module of fixed width, and as one group with
+ * a count on a resizable one, where the group grows with the module and stays spread over its width.
+ */
+function rowEntries(def: ModuleDef, spec: RowSpec, width: number, net: string | undefined): TerminalDef[] {
+  const joined = net ? { net } : {};
+  if (def.resizable) {
+    return [{ name: spec.prefix, conductor: spec.conductor, side: spec.side, ...(spec.count > 1 ? { count: spec.count } : {}), ...joined }];
+  }
+  return evenPositions(spec.count, width).map((unit, i) => ({
+    name: spec.count === 1 ? spec.prefix : `${spec.prefix}${i + 1}`,
+    conductor: spec.conductor,
+    side: spec.side,
+    unit,
+    ...joined,
+  }));
+}
+
+/** Adds several terminals on one side at once, spread evenly, and joined inside the module if asked. */
+export function addRow(draft: Library, moduleId: string, spec: RowSpec, width?: number): Change {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def) return { ok: false, message: 'That module does not exist.' };
+  if (def.kind === 'comb') return { ok: false, message: 'A comb has no terminals.' };
+  const problem = rowProblem(spec);
+  if (problem) return { ok: false, message: problem };
+  const listed = listedTerminals(def);
+  const added = rowEntries(def, spec, width ?? def.widthUnits, spec.joined ? freeNet(listed) : undefined);
+  const taken = new Set(listed.filter((t) => t.side === spec.side).map((t) => t.name));
+  const clash = added.find((t) => taken.has(t.name));
+  if (clash) return { ok: false, message: `The ${spec.side} side already has a terminal named ${clash.name}.` };
+  return { ok: true, draft: replaceTerminals(draft, moduleId, [...listed, ...added]), index: listed.length };
+}
+
+/**
+ * Spaces the single terminals of one side evenly again, in the order they stand in. A resizable
+ * module keeps its terminals at the edges or in groups, so there is nothing to space.
+ */
+export function spreadSide(draft: Library, moduleId: string, side: TerminalSide, width?: number): Change {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def) return { ok: false, message: 'That module does not exist.' };
+  if (def.resizable) return { ok: false, message: 'A module whose width can change keeps its terminals at the edges; use a group with a count to spread them.' };
+  const listed = listedTerminals(def);
+  const positions = (t: TerminalDef, i: number) => (t.unit === undefined ? Math.floor((i * def.widthUnits) / Math.max(1, listed.filter((x) => x.side === side).length)) : t.unit);
+  const singles = listed
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t.side === side && (t.count ?? 1) === 1)
+    .sort((a, b) => positions(a.t, a.i) - positions(b.t, b.i) || a.i - b.i);
+  if (singles.length === 0) return { ok: false, message: `The ${side} side has no single terminals to space.` };
+  const spaced = evenPositions(singles.length, width ?? def.widthUnits);
+  const moved = new Map(singles.map(({ i }, order) => [i, spaced[order]!]));
+  return { ok: true, draft: replaceTerminals(draft, moduleId, listed.map((t, i) => (moved.has(i) ? { ...t, unit: moved.get(i)! } : t))), index: 0 };
+}
+
+export interface BlockSpec {
+  /** Terminals on the top side, usually the inputs. */
+  top: number;
+  /** Terminals on the bottom side, usually the outputs. */
+  bottom: number;
+  conductor: Conductor;
+  /** True for a distribution block, where every terminal is the same point. */
+  joined: boolean;
+}
+
+/** Replaces the terminals of a module with a block: `top` on the top side and `bottom` on the bottom, evenly spread. */
+export function makeBlock(draft: Library, moduleId: string, spec: BlockSpec, width?: number): Change {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def) return { ok: false, message: 'That module does not exist.' };
+  if (def.kind === 'comb') return { ok: false, message: 'A comb has no terminals.' };
+  for (const count of [spec.top, spec.bottom]) {
+    if (!Number.isInteger(count) || count < 0 || count > MAX_ROW) return { ok: false, message: `A side takes from 0 to ${MAX_ROW} terminals.` };
+  }
+  if (spec.top + spec.bottom < 2) return { ok: false, message: 'A block needs at least two terminals.' };
+  const net = spec.joined ? 'NET1' : undefined;
+  const shown = width ?? def.widthUnits;
+  const sides: Array<[TerminalSide, number, string]> = [['top', spec.top, 'IN'], ['bottom', spec.bottom, 'OUT']];
+  const terminals = sides.flatMap(([side, count, prefix]) =>
+    count === 0 ? [] : rowEntries(def, { side, count, conductor: spec.conductor, prefix, joined: spec.joined }, shown, net),
+  );
+  return { ok: true, draft: replaceTerminals(draft, moduleId, terminals), index: 0 };
 }
 
 export const PREVIEW_LIBRARY_ID = 'preview';
@@ -341,4 +524,25 @@ export function railPreviewScene(def: ModuleDef, widthUnits: number): { panel: P
   };
   const panel: Panel = { ...createPanel([widthUnits + 2]), placements: [placed] };
   return { panel, resolve: (ref) => (ref.libraryId === PREVIEW_LIBRARY_ID && ref.moduleId === def.id ? def : undefined) };
+}
+
+/**
+ * What to write beside each pin. When the pins of a side are crowded and all start with the same
+ * letters before their numbers, as OUT1 to OUT8 do (three or more), only the numbers are written; the full names
+ * stay in the fields.
+ */
+export function pinLabels(layout: DesignerLayout): string[] {
+  const prefix = (name: string) => /^([A-Za-z]+)\d+$/.exec(name)?.[1];
+  return layout.pins.map((pin) => {
+    if (!layout.crowded) return pin.terminal.name;
+    const sameSide = layout.pins.filter((p) => p.terminal.side === pin.terminal.side).map((p) => prefix(p.terminal.name));
+    const common = sameSide[0];
+    const shared = common !== undefined && sameSide.length >= MIN_PINS_TO_ABBREVIATE && sameSide.every((p) => p === common);
+    return shared ? pin.terminal.name.slice(common.length) : pin.terminal.name;
+  });
+}
+
+/** The point a net is drawn to from each of its pins: the middle of them. */
+export function netCentre(pins: readonly DesignerPin[]): { x: number; y: number } {
+  return { x: pins.reduce((sum, p) => sum + p.x, 0) / pins.length, y: pins.reduce((sum, p) => sum + p.y, 0) / pins.length };
 }

@@ -1,5 +1,5 @@
 import { stableStringify } from '../library/equality';
-import { TRIP_CURVES, type Library, type ModuleDef, type TripCurve } from '../library/types';
+import { CONDUCTORS, TERMINAL_SIDES, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type TerminalSide, type TripCurve } from '../library/types';
 import { validateLibrary } from '../library/validate';
 import { Camera } from '../view/Camera';
 import { railRect } from '../view/geometry';
@@ -11,17 +11,23 @@ import type { InspectorView } from './inspector';
 import { applyEditorAction, applyEditorEdit, describeEditor, validateDraft, type EditorState } from './libraryEditor';
 import {
   addPreset,
+  addRow,
   addTerminalAt,
   connectTerminals,
   designerLayout,
   detachTerminal,
+  makeBlock,
   makeVariants,
   moveTerminal,
+  netCentre,
   netGroups,
   pinAt,
+  pinLabels,
   railPreviewScene,
   repairPositions,
+  setAllConductors,
   slotAt,
+  spreadSide,
   TERMINAL_PRESETS,
   UNIT_PX,
   type DesignerLayout,
@@ -54,6 +60,7 @@ const STAGE_WIDTH_PX = 560;
 const STAGE_HEIGHT_PX = 400;
 const RAIL_PREVIEW = { width: 520, height: 150 };
 const NET_COLOR = '#7c3aed';
+const LABEL_STAGGER_PX = 10;
 const RAIL_MARGIN_MM = 45;
 const SINGLE_TERMINAL = 'single';
 
@@ -235,7 +242,25 @@ export class ModuleDesignerView {
     this.detachButton.textContent = 'Detach';
     this.detachButton.title = 'Take the selected terminal out of its connection';
     this.detachButton.addEventListener('click', () => this.detach());
-    bar.append(this.placeButton, this.kindSelect, this.connectButton, this.detachButton, button('Variants…', () => this.variants(), 'Make a copy for every rating'));
+    const everything = document.createElement('select');
+    everything.title = 'Put one conductor on every terminal';
+    everything.append(new Option('All terminals: conductor…', ''));
+    for (const conductor of CONDUCTORS) everything.append(new Option(conductor, conductor));
+    everything.addEventListener('change', () => {
+      if (everything.value) this.setEveryConductor(everything.value as Conductor);
+      everything.value = '';
+    });
+    bar.append(
+      this.placeButton,
+      this.kindSelect,
+      this.connectButton,
+      this.detachButton,
+      button('Row…', () => this.rowDialog(), 'Add several terminals on one side at once, spread evenly'),
+      button('Spread', () => this.spread(), 'Space the terminals of the selected side evenly'),
+      button('Block…', () => this.blockDialog(), 'Make a terminal block: so many on top, so many below'),
+      everything,
+      button('Variants…', () => this.variants(), 'Make a copy for every rating, curve or conductor'),
+    );
     return bar;
   }
 
@@ -382,20 +407,26 @@ export class ModuleDesignerView {
     );
     svg.append(svgElement('text', { x: body.x, y: body.y + body.height + 18, 'font-size': 11, fill: '#9aa1b3' }, `${layout.widthUnits} unit${layout.widthUnits === 1 ? '' : 's'}, ${(layout.widthUnits * 17.5).toFixed(1)} mm`));
     for (const { net, pins } of netGroups(layout)) {
-      const line = svgElement('polyline', { points: pins.map((p) => `${p.x},${p.y}`).join(' '), fill: 'none', stroke: NET_COLOR, 'stroke-width': 3, 'stroke-dasharray': '6 4', opacity: 0.85 });
-      line.append(svgElement('title', {}, `Joined inside the module: ${net}`));
-      svg.append(line);
+      const centre = netCentre(pins);
+      const group = svgElement('g', { stroke: NET_COLOR, 'stroke-width': 2, opacity: 0.6, fill: NET_COLOR });
+      group.append(svgElement('title', {}, `Joined inside the module: ${net}`));
+      for (const pin of pins) group.append(svgElement('line', { x1: pin.x, y1: pin.y, x2: centre.x, y2: centre.y }));
+      group.append(svgElement('circle', { cx: centre.x, cy: centre.y, r: 4, stroke: 'none' }));
+      svg.append(group);
     }
     if (this.hover && this.drag?.moved) {
       const x = body.x + (this.hover.unit + 0.5) * UNIT_PX;
       const y = this.hover.side === 'top' ? body.y + 18 : body.y + body.height - 18;
       svg.append(svgElement('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#f5c518', 'stroke-dasharray': '3 3', 'stroke-width': 2 }));
     }
+    const labels = pinLabels(layout);
     for (const pin of layout.pins) {
       const entry = pin.source ?? layout.pins.indexOf(pin);
       const marked = entry === this.selected || entry === this.connectFrom;
-      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: 6, fill: colours[pin.terminal.conductor], stroke: marked ? '#f5c518' : '#14161d', 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
-      svg.append(svgElement('text', { x: pin.x, y: pin.terminal.side === 'top' ? pin.y + 19 : pin.y - 11, 'text-anchor': 'middle', 'font-size': 9, fill: '#14161d' }, pin.terminal.name));
+      svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: layout.pinRadius, fill: colours[pin.terminal.conductor], stroke: marked ? '#f5c518' : '#14161d', 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
+      const stagger = layout.crowded ? (layout.pins.indexOf(pin) % 2) * LABEL_STAGGER_PX : 0;
+      const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
+      svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d' }, labels[layout.pins.indexOf(pin)]!));
     }
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e, svg));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e, svg));
@@ -547,11 +578,13 @@ export class ModuleDesignerView {
     const title = document.createElement('h2');
     title.textContent = 'Variants of this module';
     const help = document.createElement('p');
-    help.textContent = `One copy for every rating, and for every curve if you list any. Ratings in amperes, curves out of ${TRIP_CURVES.join(' ')}, separated by spaces.`;
+    help.textContent = `One copy for every rating, curve and conductor you list, and for every combination of them. Ratings in amperes, curves out of ${TRIP_CURVES.join(' ')}; a copy for a conductor puts it on all terminals. Separate with spaces.`;
     const ratings = document.createElement('input');
     ratings.placeholder = 'Ratings: 6 10 16 25 32';
     const curves = document.createElement('input');
     curves.placeholder = 'Curves (optional): B C';
+    const conductorsInput = document.createElement('input');
+    conductorsInput.placeholder = `Conductors (optional): ${CONDUCTORS.join(' ')}`;
     const problem = document.createElement('div');
     problem.className = 'editor-errors';
     const actions = document.createElement('div');
@@ -560,9 +593,12 @@ export class ModuleDesignerView {
       const rates = ratings.value.split(/[\s,]+/).filter(Boolean).map(Number);
       const named = curves.value.split(/[\s,]+/).filter(Boolean).map((c) => c.toUpperCase());
       const unknown = named.find((c) => !(TRIP_CURVES as readonly string[]).includes(c));
+      const wires = conductorsInput.value.split(/[\s,]+/).filter(Boolean);
+      const badWire = wires.find((c) => !(CONDUCTORS as readonly string[]).includes(c));
       if (rates.some((r) => !Number.isFinite(r))) return void (problem.textContent = 'Ratings must be numbers.');
       if (unknown) return void (problem.textContent = `Unknown curve ${unknown}.`);
-      const result = makeVariants(this.draft, this.moduleId, rates, named as TripCurve[]);
+      if (badWire) return void (problem.textContent = `Unknown conductor ${badWire}.`);
+      const result = makeVariants(this.draft, this.moduleId, rates, named as TripCurve[], wires as Conductor[]);
       if (!result.ok) return void (problem.textContent = result.message);
       dialog.close();
       this.pristine = false;
@@ -571,11 +607,117 @@ export class ModuleDesignerView {
     });
     make.className = 'primary';
     actions.append(button('Cancel', () => dialog.close()), make);
-    dialog.append(title, help, ratings, curves, problem, actions);
+    dialog.append(title, help, ratings, curves, conductorsInput, problem, actions);
     dialog.addEventListener('close', () => dialog.remove());
     this.dialog.append(dialog);
     dialog.showModal();
     ratings.focus();
+  }
+
+  /** A small dialog with labelled fields; `submit` returns a message when something is wrong, or null when it is done. */
+  private form(title: string, fields: Array<[string, HTMLElement]>, submit: () => string | null): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog';
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    const rows = fields.map(([text, control]) => {
+      const row = document.createElement('label');
+      row.className = 'designer-form-row';
+      row.append(text, control);
+      return row;
+    });
+    const problem = document.createElement('div');
+    problem.className = 'editor-errors';
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog-actions';
+    const ok = button('OK', () => {
+      const message = submit();
+      if (message) problem.textContent = message;
+      else dialog.close();
+    });
+    ok.className = 'primary';
+    actions.append(button('Cancel', () => dialog.close()), ok);
+    dialog.append(heading, ...rows, problem, actions);
+    dialog.addEventListener('close', () => dialog.remove());
+    this.dialog.append(dialog);
+    dialog.showModal();
+    (rows[0]?.querySelector('input, select') as HTMLElement | null)?.focus();
+  }
+
+  private choice(options: readonly string[], value: string): HTMLSelectElement {
+    const select = document.createElement('select');
+    for (const option of options) select.append(new Option(option, option));
+    select.value = value;
+    return select;
+  }
+
+  private numberInput(value: number): HTMLInputElement {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.value = String(value);
+    return input;
+  }
+
+  private rowDialog(): void {
+    const side = this.choice(TERMINAL_SIDES, 'bottom');
+    const count = this.numberInput(6);
+    const conductor = this.choice(CONDUCTORS, this.module.terminals?.[0]?.conductor ?? 'L');
+    const prefix = document.createElement('input');
+    prefix.value = 'T';
+    const joined = document.createElement('input');
+    joined.type = 'checkbox';
+    this.form(
+      'Row of terminals',
+      [['Side', side], ['How many', count], ['Conductor', conductor], ['Name (numbered from 1)', prefix], ['Joined inside the module', joined]],
+      () => {
+        const result = addRow(this.draft, this.moduleId, { side: side.value as TerminalSide, count: Number(count.value), conductor: conductor.value as Conductor, prefix: prefix.value.trim(), joined: joined.checked }, this.shownWidth);
+        if (!result.ok) return result.message;
+        this.pristine = false;
+        this.commit(result.draft, result.index);
+        return null;
+      },
+    );
+  }
+
+  private blockDialog(): void {
+    const top = this.numberInput(1);
+    const bottom = this.numberInput(6);
+    const conductor = this.choice(CONDUCTORS, this.module.terminals?.[0]?.conductor ?? 'L');
+    const joined = document.createElement('input');
+    joined.type = 'checkbox';
+    joined.checked = true;
+    this.form(
+      'Terminal block',
+      [['Terminals on top (inputs)', top], ['Terminals below (outputs)', bottom], ['Conductor', conductor], ['All one point (a distribution block)', joined]],
+      () => {
+        const result = makeBlock(this.draft, this.moduleId, { top: Number(top.value), bottom: Number(bottom.value), conductor: conductor.value as Conductor, joined: joined.checked }, this.shownWidth);
+        if (!result.ok) return result.message;
+        this.pristine = false;
+        this.commit(result.draft, null);
+        this.say('The terminals were replaced by the block.');
+        return null;
+      },
+    );
+  }
+
+  private spread(): void {
+    const entry = this.selected === null ? undefined : this.module.terminals?.[this.selected];
+    const sides: TerminalSide[] = entry ? [entry.side] : ['top', 'bottom'];
+    let draft = this.draft;
+    for (const side of sides) {
+      const result = spreadSide({ ...draft }, this.moduleId, side, this.shownWidth);
+      if (result.ok) draft = result.draft;
+      else if (sides.length === 1) return this.say(result.message, true);
+    }
+    this.commit(draft, this.selected);
+  }
+
+  private setEveryConductor(conductor: Conductor): void {
+    const result = setAllConductors(this.draft, this.moduleId, conductor);
+    if (!result.ok) return this.say(result.message, true);
+    this.pristine = false;
+    this.commit(result.draft, this.selected);
   }
 
   private async save(): Promise<void> {

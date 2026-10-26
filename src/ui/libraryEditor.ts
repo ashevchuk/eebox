@@ -165,7 +165,7 @@ function moduleView(module: ModuleDef): InspectorView {
         select(`t.${i}.conductor`, `T${n} conductor`, t.conductor, CONDUCTORS),
         select(`t.${i}.side`, `T${n} side`, t.side, TERMINAL_SIDES),
         text(`t.${i}.net`, `T${n} net`, t.net ?? ''),
-        integer(`t.${i}.unit`, `T${n} position`, optional(t.unit), 'units from the left, negative from the right; empty spreads evenly'),
+        { key: `t.${i}.unit`, label: `T${n} position`, kind: 'number', value: optional(t.unit), hint: 'units from the left, decimals allowed, negative from the right; empty spreads evenly' },
         integer(`t.${i}.count`, `T${n} copies`, optional(t.count), 'repeats with numbered names'),
       );
       actions.push({ key: `removeTerminal:${i}`, label: `Remove T${n}` });
@@ -261,7 +261,7 @@ function editTerminal(module: ModuleDef, index: number, field: string, raw: stri
   else if (field === 'side') next = { ...current, side: raw as TerminalDef['side'] };
   else if (field === 'net') next = withOptional(current, 'net', optionalText(raw));
   else if (field === 'unit' || field === 'count') {
-    const parsed = optionalNumber(raw, true);
+    const parsed = optionalNumber(raw, field === 'count');
     if (!parsed.ok) return fail(parsed.message);
     next = withOptional(current, field, parsed.value);
   } else return fail('That property cannot be edited.');

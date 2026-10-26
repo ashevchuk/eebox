@@ -228,8 +228,8 @@
           "description": "Terminals sharing a net are joined inside the module."
         },
         "unit": {
-          "type": "integer",
-          "description": "Position in module units from the left edge; spread evenly when omitted. Not allowed with count. On a resizable module a negative value counts from the right edge (-1 is the last unit), and either kind must exist at the narrowest width."
+          "type": "number",
+          "description": "Position of the terminal's centre in module units from the left edge, decimals allowed: 0 is the centre of the first unit, 0.5 the border between the first and the second. Spread evenly when omitted. Not allowed with count. It has to lie inside the module, 0.15 of a unit from either edge. On a resizable module a negative value counts from the right edge (-1 is the centre of the last unit), and either kind must exist at the narrowest width."
         },
         "count": {
           "type": "integer",
