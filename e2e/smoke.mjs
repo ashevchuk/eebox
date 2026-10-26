@@ -10,6 +10,7 @@ import { launch } from './browser.mjs';
 
 const page = resolve('dist-file/index.html');
 const example = readFileSync(resolve('examples/house-panel.json'), 'utf8');
+const partsCsv = readFileSync(resolve('examples/parts.csv'), 'utf8');
 const failures = [];
 let browser;
 
@@ -67,6 +68,36 @@ try {
     await browser.waitFor(`document.getElementById('inspector').innerText.includes('MCB 1P C16')`, 'the placed module in the inspector');
   });
 
+  await step('a placed module is duplicated, everything is selected and then deleted from the keyboard', async () => {
+    const press = (code, ctrl) =>
+      browser.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: '${code}', ctrlKey: ${ctrl}, bubbles: true }))`);
+    const inspectorText = () => browser.evaluate(`document.getElementById('inspector').innerText`);
+    await press('KeyD', true);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('p2')`, 'the copy to be selected');
+    await press('KeyA', true);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('2 items selected')`, 'both modules to be selected');
+    await press('Delete', false);
+    await browser.waitFor(`!document.getElementById('inspector').innerText.includes('items selected')`, 'the selection to go');
+    expectTrue(!(await inspectorText()).includes('MCB 1P C16'), 'the modules to be gone');
+  });
+
+  await step('a parts list in CSV is imported as a library with a 22.5 mm relay in it', async () => {
+    await browser.evaluate(`(async () => {
+      const file = new File([${JSON.stringify(partsCsv)}], 'parts.csv');
+      const data = new DataTransfer(); data.items.add(file);
+      const input = document.getElementById('import'); input.files = data.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('Imported "parts"')`, 'the import message');
+    const search = `(async () => {
+      const box = document.getElementById('palette-search');
+      box.value = 'relay 1co'; box.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      return document.getElementById('palette').innerText;
+    })()`;
+    expectTrue((await browser.evaluate(search)).includes('Relay 1CO 22.5 mm'), 'the relay from the table in the palette');
+  });
+
   await step('an example project opens and Check finds nothing wrong', async () => {
     await browser.evaluate(`(async () => {
       const file = new File([${JSON.stringify(example)}], 'house-panel.json');
@@ -98,7 +129,7 @@ try {
   await step('the print sheet holds the drawings and tables, and prints on a white ground', async () => {
     await browser.evaluate(`window.print = () => {}; document.getElementById('print').click()`);
     await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length === 2`, 'two drawings on the print sheet');
-    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#print-sheet h2')].map((h) => h.textContent)`), ['Parts list', 'Circuits', 'Ferrules'], 'sections');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#print-sheet h2')].map((h) => h.textContent)`), ['Parts list', 'Circuits', 'Connections', 'Ferrules'], 'sections');
     await browser.media('print');
     const pdf = await browser.pdf();
     await browser.media('screen');

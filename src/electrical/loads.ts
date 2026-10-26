@@ -40,7 +40,7 @@ export const MIN_POWER_FACTOR = 0.1;
 export const MAX_CABLE_LENGTH_M = 1000;
 
 /** Breakers and RCBOs are the modules whose rating protects the cable behind them. */
-const PROTECTIVE_KINDS = ['breaker', 'rcbo'];
+export const PROTECTIVE_KINDS = ['breaker', 'rcbo'];
 
 export function loadSpecProblem(spec: LoadSpec): string | null {
   if (!Number.isFinite(spec.powerW) || spec.powerW <= 0 || spec.powerW > MAX_POWER_W) {
@@ -143,8 +143,12 @@ export function wireCurrents(project: Project, resolve: Resolve): Map<string, nu
   const phaseWires = schematic.wires.flatMap((wire) => {
     const a = terminalKey(schematic, wire.a);
     const b = terminalKey(schematic, wire.b);
-    const terminal = a === undefined ? undefined : context.netOf.get(a)?.terminals.find((t) => t.key === a)?.terminal;
-    return a !== undefined && b !== undefined && terminal && isPhase(terminal) ? [{ id: wire.id, a, b }] : [];
+    const terminalAt = (key: string | undefined) => (key === undefined ? undefined : context.netOf.get(key)?.terminals.find((t) => t.key === key)?.terminal);
+    const carriesPhase = [a, b].some((key) => {
+      const terminal = terminalAt(key);
+      return terminal !== undefined && isPhase(terminal);
+    });
+    return a !== undefined && b !== undefined && carriesPhase ? [{ id: wire.id, a, b }] : [];
   });
   const endpoints = (wire: { a: string; b: string }): [string, string] => [wire.a, wire.b];
 

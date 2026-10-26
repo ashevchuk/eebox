@@ -1,5 +1,5 @@
-import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts } from '../electrical/schedule';
-import { buildBom, type BomRow } from '../project/bom';
+import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts, wireCells, wireList, WIRE_HEADER } from '../electrical/schedule';
+import { bomTotals, buildBom, lineTotal, type BomRow } from '../project/bom';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
 import type { Session } from './session';
@@ -31,6 +31,27 @@ export function bomCells(row: BomRow): string[] {
 }
 
 /** `idPrefix` keeps the ids inside one drawing from capturing the references of another on the same page. */
+const PRICE_COLUMNS = ['Price', 'Total'] as const;
+
+const money = (amount: number, currency: string) => `${amount.toFixed(2)}${currency ? ` ${currency}` : ''}`;
+
+/** The two price cells of a row: one copy and the line; empty for a module that has no price. */
+export function priceCells(row: BomRow): string[] {
+  const total = lineTotal(row);
+  return row.def?.price === undefined || total === undefined
+    ? ['', '']
+    : [money(row.def.price, row.def.currency ?? ''), money(total, row.def.currency ?? '')];
+}
+
+/** One line per currency, and a note on the rows that no total covers. */
+export function totalsText(rows: BomRow[]): string[] {
+  const { totals, unpriced } = bomTotals(rows);
+  return [
+    ...totals.map(({ currency, amount }) => `Total: ${money(amount, currency)}`),
+    ...(unpriced > 0 && totals.length > 0 ? [`${unpriced} row${unpriced === 1 ? ' has' : 's have'} no price and ${unpriced === 1 ? 'is' : 'are'} not in the total.`] : []),
+  ];
+}
+
 function drawingOf(view: View, session: Session, caption: string, idPrefix: string): HTMLElement {
   const figure = document.createElement('figure');
   const parsed = new DOMParser().parseFromString(renderToSvg(view, session, LIGHT_THEME, idPrefix), 'image/svg+xml');
@@ -70,9 +91,22 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   const parts: HTMLElement[] = [title, drawingOf(views.panel, session, 'Panel layout', 'panel-')];
   if (schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, 'Wiring schematic', 'schematic-'));
   const rows = buildBom(panel, session.resolve);
-  if (rows.length > 0) parts.push(...section('Parts list', table(BOM_COLUMNS, rows.map(bomCells))));
+  if (rows.length > 0) {
+    const priced = rows.some((row) => row.def?.price !== undefined);
+    const header = priced ? [...BOM_COLUMNS, ...PRICE_COLUMNS] : BOM_COLUMNS;
+    const body = rows.map((row) => (priced ? [...bomCells(row), ...priceCells(row)] : bomCells(row)));
+    parts.push(...section('Parts list', table(header, body)));
+    for (const line of priced ? totalsText(rows) : []) {
+      const note = document.createElement('p');
+      note.className = 'bom-total';
+      note.textContent = line;
+      parts.push(note);
+    }
+  }
   const circuits = circuitSchedule(session.project, session.resolve, session.cableSettings);
   if (circuits.length > 0) parts.push(...section('Circuits', table(CIRCUIT_HEADER, circuits.map(circuitCells))));
+  const wires = wireList(session.project, session.resolve);
+  if (wires.length > 0) parts.push(...section('Connections', table(WIRE_HEADER, wires.map(wireCells))));
   const ferrules = ferruleCounts(session.project);
   if (ferrules.length > 0) parts.push(...section('Ferrules', table(['Ferrule (mm2)', 'Quantity'], ferrules.map(ferruleCells))));
   sheet.replaceChildren(...parts);

@@ -1,5 +1,6 @@
 import type { TerminalSide } from '../library/types';
 import { normalizeLabel } from './labels';
+import { LAYOUT_EPSILON_UNITS } from './units';
 import type { CombPlacement, ModuleRef, Panel, ResizeOf, WidthOf } from './placement';
 
 export interface CombLookup {
@@ -34,11 +35,11 @@ function checkComb(panel: Panel, lookup: CombLookup, candidate: CombPlacement, i
   const railLength = panel.railLengthsUnits[candidate.rail];
   if (railLength === undefined) return { kind: 'unknown-rail' };
   const { slot } = candidate;
-  if (!Number.isInteger(slot) || slot < 0 || slot + width > railLength) return { kind: 'out-of-rail' };
+  if (!Number.isFinite(slot) || slot < 0 || slot + width > railLength + LAYOUT_EPSILON_UNITS) return { kind: 'out-of-rail' };
   for (const other of panel.combs) {
     if (other.id === ignoreId || other.rail !== candidate.rail || lookup.sideOf(other.module) !== side) continue;
     const otherWidth = lookup.widthOf(other) ?? 0;
-    if (slot < other.slot + otherWidth && other.slot < slot + width) return { kind: 'overlap', with: other.id };
+    if (slot < other.slot + otherWidth - LAYOUT_EPSILON_UNITS && other.slot < slot + width - LAYOUT_EPSILON_UNITS) return { kind: 'overlap', with: other.id };
   }
   return null;
 }
@@ -70,7 +71,7 @@ export function setCombWidth(
   if (!current) return { ok: false, error: { kind: 'unknown-comb' } };
   const allowed = resizeOf(current.module);
   if (!allowed) return { ok: false, error: { kind: 'not-resizable' } };
-  if (!Number.isInteger(units) || units < allowed.minUnits || units > allowed.maxUnits) {
+  if (!Number.isFinite(units) || units < allowed.minUnits || units > allowed.maxUnits) {
     return { ok: false, error: { kind: 'width-out-of-range' } };
   }
   const { widthUnits: _previous, ...rest } = current;

@@ -63,9 +63,16 @@ describe('addComb', () => {
   it.each([
     ['past the end', comb('c1', 'top6', 0, 7)],
     ['at a negative slot', comb('c1', 'top6', 0, -1)],
-    ['at a fractional slot', comb('c1', 'top6', 0, 0.5)],
+    ['at a slot that is not a number', comb('c1', 'top6', 0, Number.NaN)],
   ])('rejects a comb %s', (_label, candidate) => {
     expect(errorOf(addComb(panelWith(), lookup, candidate))).toEqual({ kind: 'out-of-rail' });
+  });
+
+  it('accepts a comb at a fractional slot, and still finds an overlap and the end of the rail', () => {
+    const first = addComb(panelWith(), lookup, comb('c1', 'top6', 0, 0.5));
+    if (!first.ok) throw new Error('setup');
+    expect(errorOf(addComb(first.panel, lookup, comb('c2', 'top6', 0, 3)))).toEqual({ kind: 'overlap', with: 'c1' });
+    expect(errorOf(addComb(first.panel, lookup, comb('c2', 'top6', 0, 6.5)))).toEqual({ kind: 'out-of-rail' });
   });
 
   it('rejects an unknown rail, a module that is not a comb, and a duplicate id', () => {

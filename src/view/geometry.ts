@@ -1,6 +1,7 @@
 import { MODULE_UNIT_MM } from '../library/types';
 import type { CombPlacement, Panel, Placement, WidthOf } from '../layout/placement';
 import type { TerminalSide } from '../library/types';
+import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
 import type { Point } from './Camera';
 
 /** World units are millimetres. */
@@ -97,11 +98,24 @@ export function frameRect(panel: Panel): Rect {
  * grabbed point (`anchorUnits` from the module's left edge) under the pointer.
  * The slot is clamped into the rail so dragging past an end snaps inward.
  */
+/** How close, in units, the module has to come to a neighbour's edge or the rail's end to be drawn to it: about 5 mm. */
+export const EDGE_SNAP_UNITS = 0.3;
+
+/** Cells of half a millimetre, the grid a module that is not a whole number of units is placed on. */
+const HALF_MM_CELLS_PER_UNIT = MODULE_UNIT_MM * 2;
+
+export interface Neighbour {
+  rail: number;
+  slot: number;
+  widthUnits: number;
+}
+
 export function snapToSlot(
   panel: Panel,
   point: Point,
   widthUnits: number,
   anchorUnits: number,
+  neighbours: readonly Neighbour[] = [],
 ): { rail: number; slot: number } | null {
   let rail = -1;
   let nearest = Infinity;
@@ -114,9 +128,17 @@ export function snapToSlot(
   });
   const railLength = panel.railLengthsUnits[rail];
   if (railLength === undefined || nearest > SNAP_DISTANCE) return null;
-  const raw = Math.round((point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits);
-  const slot = Math.max(0, Math.min(raw, railLength - widthUnits));
-  return { rail, slot: Math.max(0, slot) };
+  const raw = (point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits;
+  const last = Math.max(0, railLength - widthUnits);
+  const edges = [
+    0,
+    last,
+    ...neighbours.filter((n) => n.rail === rail).flatMap((n) => [n.slot + n.widthUnits, n.slot - widthUnits]),
+  ].filter((edge) => edge >= 0 && edge <= last + LAYOUT_EPSILON_UNITS);
+  const closest = edges.reduce<number | undefined>((best, edge) => (best === undefined || Math.abs(edge - raw) < Math.abs(best - raw) ? edge : best), undefined);
+  const grid = isWholeUnits(widthUnits) ? Math.round(raw) : Math.round(raw * HALF_MM_CELLS_PER_UNIT) / HALF_MM_CELLS_PER_UNIT;
+  const slot = closest !== undefined && Math.abs(closest - raw) <= EDGE_SNAP_UNITS ? closest : grid;
+  return { rail, slot: roundUnits(Math.max(0, Math.min(slot, last))) };
 }
 
 /** The row whose rail bar is under the point, if any. */

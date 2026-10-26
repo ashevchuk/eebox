@@ -1,6 +1,7 @@
 import { terminalSources, terminalsOf, type Terminal } from '../electrical/terminals';
 import { createPanel } from '../layout/panel';
 import { fixedRange, isValidPosition, leftPosition } from '../library/positions';
+import { blockTerminals, evenPositions, rowEntries, type BlockSpec, type RowSpec } from '../library/terminalLayouts';
 import type { ModuleRef, Panel, Placement } from '../layout/placement';
 import type { Conductor, Library, ModuleDef, TerminalDef, TerminalSide, TripCurve } from '../library/types';
 
@@ -401,52 +402,13 @@ const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const MAX_ROW = 48;
 const POSITION_PRECISION = 1000;
 
-/**
- * Centres of `count` terminals, each in the middle of an equal share of a module `width` units wide.
- * When that would put the outer ones too close to an edge, they are spread evenly between the
- * outermost positions the module allows instead.
- */
-export function evenPositions(count: number, width: number): number[] {
-  const round = (n: number) => Math.round(n * POSITION_PRECISION) / POSITION_PRECISION;
-  const { min, max } = fixedRange(width);
-  const shares = Array.from({ length: count }, (_, i) => round(((i + 0.5) * width) / count - 0.5));
-  if (count === 1 || (shares[0]! >= min && shares[count - 1]! <= max)) return shares;
-  return Array.from({ length: count }, (_, i) => round(min + (i * (max - min)) / (count - 1)));
-}
-
-export interface RowSpec {
-  side: TerminalSide;
-  count: number;
-  conductor: Conductor;
-  /** Terminals are named `<prefix>1`, `<prefix>2`...; a single one is named `<prefix>`. */
-  prefix: string;
-  /** Join them all inside the module, as the terminals of a distribution block are. */
-  joined: boolean;
-}
+export { evenPositions, type BlockSpec, type RowSpec } from '../library/terminalLayouts';
 
 const rowProblem = (spec: RowSpec): string | null => {
   if (!Number.isInteger(spec.count) || spec.count < 1 || spec.count > MAX_ROW) return `The count must be a whole number from 1 to ${MAX_ROW}.`;
   if (!NAME_PATTERN.test(spec.prefix)) return 'The name must start with a letter or digit and use letters, digits, ".", "_" or "-".';
   return null;
 };
-
-/**
- * Terminals for one side: evenly spread by position on a module of fixed width, and as one group with
- * a count on a resizable one, where the group grows with the module and stays spread over its width.
- */
-function rowEntries(def: ModuleDef, spec: RowSpec, width: number, net: string | undefined): TerminalDef[] {
-  const joined = net ? { net } : {};
-  if (def.resizable) {
-    return [{ name: spec.prefix, conductor: spec.conductor, side: spec.side, ...(spec.count > 1 ? { count: spec.count } : {}), ...joined }];
-  }
-  return evenPositions(spec.count, width).map((unit, i) => ({
-    name: spec.count === 1 ? spec.prefix : `${spec.prefix}${i + 1}`,
-    conductor: spec.conductor,
-    side: spec.side,
-    unit,
-    ...joined,
-  }));
-}
 
 /** Adds several terminals on one side at once, spread evenly, and joined inside the module if asked. */
 export function addRow(draft: Library, moduleId: string, spec: RowSpec, width?: number): Change {
@@ -456,7 +418,7 @@ export function addRow(draft: Library, moduleId: string, spec: RowSpec, width?: 
   const problem = rowProblem(spec);
   if (problem) return { ok: false, message: problem };
   const listed = listedTerminals(def);
-  const added = rowEntries(def, spec, width ?? def.widthUnits, spec.joined ? freeNet(listed) : undefined);
+  const added = rowEntries(def.resizable !== undefined, spec, width ?? def.widthUnits, spec.joined ? freeNet(listed) : undefined);
   const taken = new Set(listed.filter((t) => t.side === spec.side).map((t) => t.name));
   const clash = added.find((t) => taken.has(t.name));
   if (clash) return { ok: false, message: `The ${spec.side} side already has a terminal named ${clash.name}.` };
@@ -483,16 +445,6 @@ export function spreadSide(draft: Library, moduleId: string, side: TerminalSide,
   return { ok: true, draft: replaceTerminals(draft, moduleId, listed.map((t, i) => (moved.has(i) ? { ...t, unit: moved.get(i)! } : t))), index: 0 };
 }
 
-export interface BlockSpec {
-  /** Terminals on the top side, usually the inputs. */
-  top: number;
-  /** Terminals on the bottom side, usually the outputs. */
-  bottom: number;
-  conductor: Conductor;
-  /** True for a distribution block, where every terminal is the same point. */
-  joined: boolean;
-}
-
 /** Replaces the terminals of a module with a block: `top` on the top side and `bottom` on the bottom, evenly spread. */
 export function makeBlock(draft: Library, moduleId: string, spec: BlockSpec, width?: number): Change {
   const def = draft.modules.find((m) => m.id === moduleId);
@@ -502,12 +454,7 @@ export function makeBlock(draft: Library, moduleId: string, spec: BlockSpec, wid
     if (!Number.isInteger(count) || count < 0 || count > MAX_ROW) return { ok: false, message: `A side takes from 0 to ${MAX_ROW} terminals.` };
   }
   if (spec.top + spec.bottom < 2) return { ok: false, message: 'A block needs at least two terminals.' };
-  const net = spec.joined ? 'NET1' : undefined;
-  const shown = width ?? def.widthUnits;
-  const sides: Array<[TerminalSide, number, string]> = [['top', spec.top, 'IN'], ['bottom', spec.bottom, 'OUT']];
-  const terminals = sides.flatMap(([side, count, prefix]) =>
-    count === 0 ? [] : rowEntries(def, { side, count, conductor: spec.conductor, prefix, joined: spec.joined }, shown, net),
-  );
+  const terminals = blockTerminals(spec, width ?? def.widthUnits, def.resizable !== undefined);
   return { ok: true, draft: replaceTerminals(draft, moduleId, terminals), index: 0 };
 }
 

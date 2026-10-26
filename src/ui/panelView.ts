@@ -1,3 +1,4 @@
+import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import {
   insertPlacement,
@@ -12,8 +13,9 @@ import { deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
-import { FRAME_PADDING, combAtPoint, frameRect, placementAt, railAtPoint, snapToSlot } from '../view/geometry';
+import { FRAME_PADDING, combAtPoint, frameRect, placementAt, railAtPoint, snapToSlot, type Neighbour } from '../view/geometry';
 import { render, type Ghost } from '../view/render';
+import { groupSelection, selectedIds, toggleItem } from './selection';
 import type { Session } from './session';
 import type { View } from './view';
 
@@ -35,6 +37,7 @@ interface Drag {
 export class PanelView implements View {
   readonly camera = new Camera();
   private drag: Drag | null = null;
+  private clip: Clip | null = null;
 
   constructor(private readonly session: Session) {}
 
@@ -54,6 +57,7 @@ export class PanelView implements View {
         selectedPlacementId: this.session.selection.placementId ?? null,
         selectedCombId: this.session.selection.combId ?? null,
         selectedRail: this.session.selection.rail ?? null,
+        selectedIds: new Set([...selectedIds(this.session.selection).placements, ...selectedIds(this.session.selection).combs]),
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
       },
@@ -81,7 +85,7 @@ export class PanelView implements View {
     this.pointerMove(e, world, false);
   }
 
-  pointerDown(_e: PointerEvent, world: Point): boolean {
+  pointerDown(e: PointerEvent, world: Point): boolean {
     const panel = this.session.project.panel;
     const comb = combAtPoint(
       panel,
@@ -91,6 +95,10 @@ export class PanelView implements View {
       },
       world,
     );
+    if (comb && e.shiftKey) {
+      this.session.select(toggleItem(this.session.selection, 'comb', comb.id));
+      return true;
+    }
     if (comb) {
       this.session.select({ combId: comb.id });
       const def = this.session.resolve(comb.module);
@@ -105,6 +113,10 @@ export class PanelView implements View {
       const rail = railAtPoint(panel, world);
       this.session.select(rail === undefined ? {} : { rail });
       return false;
+    }
+    if (e.shiftKey) {
+      this.session.select(toggleItem(this.session.selection, 'placement', hit.id));
+      return true;
     }
     this.session.select({ placementId: hit.id });
     const def = this.session.resolve(hit.module);
@@ -121,13 +133,21 @@ export class PanelView implements View {
     const panel = this.session.project.panel;
     drag.ghost = null;
     drag.next = null;
-    const snap = overCanvas ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits) : null;
+    const snap = overCanvas ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits, this.neighboursOf(drag, panel)) : null;
     if (snap) {
       const result = this.tryDrop(drag, panel, snap);
       drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, ...snap, valid: result.ok };
       drag.next = result.ok ? result.panel : null;
     }
     this.session.changed();
+  }
+
+  /** What the dragged item may be drawn up against: the other items of its own kind, not itself. */
+  private neighboursOf(drag: Drag, panel: Panel): Neighbour[] {
+    const others = drag.kind === 'comb' ? panel.combs : panel.placements;
+    return others
+      .filter((item) => item.id !== drag.movingId)
+      .map((item) => ({ rail: item.rail, slot: item.slot, widthUnits: this.session.widthOf(item) ?? 1 }));
   }
 
   pointerUp(): void {
@@ -148,18 +168,54 @@ export class PanelView implements View {
   }
 
   deleteSelection(): void {
-    const { placementId, combId } = this.session.selection;
-    const panel = this.session.project.panel;
-    const project = this.session.project;
-    let next: Project | null = null;
-    if (combId) {
-      const result = removeComb(panel, combId);
-      if (result.ok) next = { ...project, panel: result.panel };
-    } else if (placementId) {
-      next = deletePlacement(project, placementId);
+    const chosen = selectedIds(this.session.selection);
+    let project = this.session.project;
+    let changed = false;
+    for (const id of chosen.combs) {
+      const result = removeComb(project.panel, id);
+      if (result.ok) {
+        project = { ...project, panel: result.panel };
+        changed = true;
+      }
     }
-    if (next) this.session.commit(next);
+    for (const id of chosen.placements) {
+      const next = deletePlacement(project, id);
+      if (next) {
+        project = next;
+        changed = true;
+      }
+    }
+    if (changed) this.session.commit(project);
     this.session.select({});
+  }
+
+  selectAll(): void {
+    const { panel } = this.session.project;
+    this.session.select(groupSelection(panel.placements.map((p) => p.id), panel.combs.map((c) => c.id)));
+  }
+
+  copySelection(): void {
+    const chosen = selectedIds(this.session.selection);
+    const clip = copyItems(this.session.project.panel, chosen.placements, chosen.combs);
+    if (clip.placements.length + clip.combs.length === 0) return;
+    this.clip = clip;
+    this.session.notify(`Copied ${clip.placements.length + clip.combs.length} item(s).`);
+  }
+
+  paste(): void {
+    if (!this.clip) return;
+    const result = pasteItems(this.session.project.panel, this.session.widthOf, this.session.combLookup, this.clip);
+    if (!result.ok) {
+      this.session.notify(result.error === 'no-room' ? 'There is no room on the rails for the copies.' : 'Nothing is copied.', true);
+      return;
+    }
+    this.session.commit({ ...this.session.project, panel: result.panel });
+    this.session.select(groupSelection(result.placementIds, result.combIds));
+  }
+
+  duplicateSelection(): void {
+    this.copySelection();
+    this.paste();
   }
 
   private grabbedUnits(world: Point, slot: number, widthUnits: number): number {

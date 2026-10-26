@@ -130,6 +130,10 @@ function contactors(): ModuleDef[] {
     poles: 3,
     ratedCurrentA: rating,
     terminals,
+    logic: {
+      inputs: { coil: { terminals: ['top:A1', 'top:A2'], when: 'all' } },
+      contacts: [1, 2, 3].map((pole) => ({ between: [`top:L${pole}`, `bottom:T${pole}`], closedWhen: 'coil' })),
+    },
   }));
 }
 
@@ -178,6 +182,15 @@ const changeOverContact = (): TerminalDef[] => [bottom('11', 'C'), bottom('12', 
 
 const SWITCHED_LOAD_RATING_A = 16;
 
+/** The relay senses voltage across its top terminals and picks the change-over contact accordingly. */
+const monitoringLogic = (sensed: string[]): NonNullable<ModuleDef['logic']> => ({
+  inputs: { V: { terminals: sensed.map((name) => `top:${name}`), when: 'all' } },
+  contacts: [
+    { between: ['bottom:11', 'bottom:14'], closedWhen: 'V' },
+    { between: ['bottom:11', 'bottom:12'], closedWhen: '!V' },
+  ],
+});
+
 /** Monitoring relays measure the supply on their top terminals and switch a contact at the bottom. */
 function monitoringRelays(): ModuleDef[] {
   return [
@@ -188,6 +201,7 @@ function monitoringRelays(): ModuleDef[] {
       widthUnits: 1,
       poles: 2,
       terminals: [top('L', 'L'), top('N', 'N'), ...changeOverContact()],
+      logic: monitoringLogic(['L', 'N']),
     },
     {
       id: 'vrelay-3pn',
@@ -196,6 +210,7 @@ function monitoringRelays(): ModuleDef[] {
       widthUnits: 2,
       poles: 4,
       terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), top('N', 'N'), ...changeOverContact()],
+      logic: monitoringLogic(['L1', 'L2', 'L3', 'N']),
     },
     {
       id: 'phase-relay-3p',
@@ -204,6 +219,7 @@ function monitoringRelays(): ModuleDef[] {
       widthUnits: 1,
       poles: 3,
       terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), ...changeOverContact()],
+      logic: monitoringLogic(['L1', 'L2', 'L3']),
     },
     {
       id: 'phase-relay-3pn',
@@ -212,6 +228,7 @@ function monitoringRelays(): ModuleDef[] {
       widthUnits: 1,
       poles: 4,
       terminals: [top('L1', 'L1'), top('L2', 'L2'), top('L3', 'L3'), top('N', 'N'), ...changeOverContact()],
+      logic: monitoringLogic(['L1', 'L2', 'L3', 'N']),
     },
   ];
 }
@@ -339,6 +356,17 @@ function transferController(): ModuleDef[] {
       widthUnits: 4,
       poles: 4,
       terminals: [...sense('a'), ...sense('b'), ...contact('CA'), ...contact('CB'), ...contact('GS')],
+      logic: {
+        inputs: {
+          A: { terminals: ['L1', 'L2', 'L3', 'N'].map((c) => `top:${c}a`), when: 'all' },
+          B: { terminals: ['L1', 'L2', 'L3', 'N'].map((c) => `top:${c}b`), when: 'all' },
+        },
+        contacts: [
+          { between: ['bottom:CA1', 'bottom:CA2'], closedWhen: 'A' },
+          { between: ['bottom:CB1', 'bottom:CB2'], closedWhen: 'B & !A' },
+          { between: ['bottom:GS1', 'bottom:GS2'], closedWhen: '!A' },
+        ],
+      },
     },
   ];
 }
@@ -398,7 +426,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '4';
+export const GENERIC_LIBRARY_VERSION = '5';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

@@ -6,6 +6,7 @@ import type { Library, ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
 import { emptySchematic } from '../schematic/model';
+import { groupSelection, selectedIds } from './selection';
 import { History } from '../view/history';
 
 export type Mode = 'panel' | 'schematic';
@@ -15,6 +16,9 @@ export interface Selection {
   nodeId?: string;
   wireId?: string;
   combId?: string;
+  /** Set instead of `placementId` and `combId` when several items are selected together. */
+  placementIds?: string[];
+  combIds?: string[];
   /** Index of the selected row (rail). */
   rail?: number;
 }
@@ -122,10 +126,13 @@ export class Session {
 
   private afterHistoryMove(): void {
     const { panel, schematic } = this.project;
-    const { placementId, nodeId, wireId, combId, rail } = this.selection;
+    const { nodeId, wireId, rail } = this.selection;
+    const kept = selectedIds(this.selection);
     this.selection = {
-      ...(placementId && panel.placements.some((p) => p.id === placementId) ? { placementId } : {}),
-      ...(combId && panel.combs.some((c) => c.id === combId) ? { combId } : {}),
+      ...groupSelection(
+        kept.placements.filter((id) => panel.placements.some((p) => p.id === id)),
+        kept.combs.filter((id) => panel.combs.some((c) => c.id === id)),
+      ),
       ...(rail !== undefined && rail < panel.railLengthsUnits.length ? { rail } : {}),
       ...(nodeId && schematic.nodes.some((n) => n.id === nodeId) ? { nodeId } : {}),
       ...(wireId && schematic.wires.some((w) => w.id === wireId) ? { wireId } : {}),

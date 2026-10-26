@@ -268,7 +268,7 @@ export class ModuleDesignerView {
     const row = document.createElement('label');
     row.className = 'designer-width';
     this.widthSlider.type = 'range';
-    this.widthSlider.step = '1';
+    this.widthSlider.step = 'any';
     this.widthSlider.addEventListener('input', () => {
       this.previewWidth = Number(this.widthSlider.value);
       this.renderAll();

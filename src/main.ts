@@ -12,6 +12,7 @@ import type { Library, ModuleDef } from './library/types';
 import type { ValidationError } from './library/validate';
 import { GENERIC_LIBRARY_ID } from './library/genericSeries';
 import { describeDiff } from './library/compare';
+import { libraryFromCsv } from './library/csvImport';
 import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
@@ -24,7 +25,7 @@ import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
-import { circuitSchedule, ferruleCounts, scheduleToCsv } from './electrical/schedule';
+import { circuitSchedule, ferruleCounts, scheduleToCsv, wireList, wireListToCsv } from './electrical/schedule';
 import { LIGHT_THEME } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
@@ -198,6 +199,12 @@ window.addEventListener('keydown', (e) => {
   } else if (mod && e.code === 'KeyY') {
     e.preventDefault();
     session.redo();
+  } else if (mod && session.mode === 'panel' && ['KeyC', 'KeyV', 'KeyD', 'KeyA'].includes(e.code)) {
+    e.preventDefault();
+    if (e.code === 'KeyC') panelView.copySelection();
+    else if (e.code === 'KeyV') panelView.paste();
+    else if (e.code === 'KeyD') panelView.duplicateSelection();
+    else panelView.selectAll();
   } else if (e.code === 'Delete' || e.code === 'Backspace') {
     activeView().deleteSelection();
   }
@@ -350,6 +357,16 @@ function exportCircuits(): void {
   downloadBlob(new Blob(['\uFEFF', scheduleToCsv(circuits, ferrules)], { type: 'text/csv;charset=utf-8' }), `${stem}-circuits.csv`);
 }
 
+function exportWires(): void {
+  const rows = wireList(session.project, session.resolve);
+  if (rows.length === 0) {
+    showStatus('There are no wires yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', wireListToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-wires.csv`);
+}
+
 function exportBom(): void {
   const rows = buildBom(session.project.panel, session.resolve);
   if (rows.length === 0) {
@@ -422,7 +439,19 @@ async function importFiles(files: FileList | File[]): Promise<void> {
   const lines: string[] = [];
   let failed = false;
   for (const file of files) {
-    const outcome = await importLibraryText(storage, await file.text(), bundledLibraryId, (incoming, before, diff) => {
+    const source = await file.text();
+    let libraryText = source;
+    if (/\.csv$/i.test(file.name)) {
+      const stem = file.name.replace(/\.csv$/i, '');
+      const converted = libraryFromCsv(source, { id: stem.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '') || 'parts', name: stem });
+      if (!converted.ok) {
+        failed = true;
+        lines.push(...describeErrors(file.name, converted.errors));
+        continue;
+      }
+      libraryText = JSON.stringify(converted.library);
+    }
+    const outcome = await importLibraryText(storage, libraryText, bundledLibraryId, (incoming, before, diff) => {
       const versions = `${before.version ?? 'no version'} to ${incoming.version ?? 'no version'}`;
       return confirmDialog(
         `Replace "${incoming.name}" (${versions})? ${describeDiff(diff)}. Projects keep their own copy of each module until you update them.`,
@@ -549,6 +578,7 @@ byId('export-png').addEventListener('click', () => void exportPng());
 byId('export-svg').addEventListener('click', exportSvg);
 byId('export-bom').addEventListener('click', exportBom);
 byId('export-circuits').addEventListener('click', exportCircuits);
+byId('export-wires').addEventListener('click', exportWires);
 for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));
 }

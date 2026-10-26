@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
-import { circuitSchedule, ferruleCounts, scheduleToCsv } from '../src/electrical/schedule';
+import { circuitSchedule, ferruleCounts, scheduleToCsv, wireList, wireListToCsv } from '../src/electrical/schedule';
 import { buildProjectFile, parseProjectJson } from '../src/project/file';
 import type { Project } from '../src/project';
-import { addNode, connect, emptySchematic, setNodeLoad, setWireSection, syncModuleNodes, type Schematic } from '../src/schematic/model';
+import { addNode, connect, emptySchematic, setNodeLoad, setWireLabel, setWireSection, syncModuleNodes, type Schematic } from '../src/schematic/model';
 import { panelOf, place, resolve } from './fixtures';
 
 /** Mains n2 -> breaker n1 -> load n3, with the wire ids returned. */
@@ -112,5 +112,56 @@ describe('scheduleToCsv', () => {
     const project = circuit('=HYPERLINK("x")').withLoad({ powerW: 1000 });
     const csv = scheduleToCsv(circuitSchedule(project, resolve), []);
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+  });
+});
+
+describe('wireList', () => {
+  const sample = () => circuit('Oven').withLoad({ powerW: 2300, crossSectionMm2: 2.5, lengthM: 20 });
+
+  it('names both ends of every wire by module or node and terminal, and gives the conductor', () => {
+    const rows = wireList(sample(), resolve);
+    expect(rows.map((r) => [r.wireId, r.from, r.to, r.conductor])).toEqual([
+      ['w1', 'Mains L (bottom)', 'breaker16 L (top)', 'L'],
+      ['w2', 'breaker16 L (bottom)', 'Oven L (top)', 'L'],
+    ]);
+  });
+
+  it('takes the cross-section and length from the cable of the load a wire leads to, and the current from the schematic', () => {
+    const [feed, branch] = wireList(sample(), resolve);
+    expect(feed).toMatchObject({ currentA: expect.closeTo(10, 3) });
+    expect(feed).not.toHaveProperty('sectionMm2');
+    expect(branch).toMatchObject({ sectionMm2: 2.5, lengthM: 20 });
+    expect(branch!.currentA).toBeCloseTo(10, 3);
+  });
+
+  it('prefers the label of a placement and of a terminal to the names of the module and the terminal', () => {
+    const scene = circuit('Oven');
+    const placements = scene.panel.placements.map((p) => ({ ...p, label: 'Kitchen', terminalLabels: { 'bottom:L': 'out' } }));
+    const rows = wireList({ panel: { ...scene.panel, placements }, schematic: scene.schematic }, resolve);
+    expect(rows[1]!.from).toBe('Kitchen out (bottom)');
+  });
+
+  it('shows the label of a wire and the cross-section the wire has of its own', () => {
+    const scene = circuit();
+    const labelled = setWireLabel(scene.schematic, scene.feed, 'Supply');
+    if (!labelled.ok) throw new Error('setup');
+    const sized = setWireSection(labelled.schematic, scene.feed, 6);
+    if (!sized.ok) throw new Error('setup');
+    expect(wireList({ panel: scene.panel, schematic: sized.schematic }, resolve)[0]).toMatchObject({ label: 'Supply', sectionMm2: 6 });
+  });
+
+  it('writes a header and a row per wire, and keeps a label that starts like a formula from running', () => {
+    const scene = circuit();
+    const labelled = setWireLabel(scene.schematic, scene.feed, '=1+1');
+    if (!labelled.ok) throw new Error('setup');
+    const csv = wireListToCsv(wireList({ panel: scene.panel, schematic: labelled.schematic }, resolve)).split('\r\n');
+    expect(csv[0]).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Current (A)');
+    expect(csv).toHaveLength(4);
+    expect(csv[1]).toContain("'=1+1");
+  });
+
+  it('has nothing to list for a schematic without wires', () => {
+    expect(wireList({ panel: panelOf([]), schematic: emptySchematic() }, resolve)).toEqual([]);
+    expect(wireListToCsv([])).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Current (A)\r\n');
   });
 });

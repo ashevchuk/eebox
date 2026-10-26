@@ -1,5 +1,6 @@
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { ModuleDef } from '../library/types';
+import { mmFromUnits } from '../layout/units';
 import { moduleKey } from './file';
 
 export interface BomRow {
@@ -11,6 +12,31 @@ export interface BomRow {
   quantity: number;
   /** Custom labels of the placed items, in panel order. */
   labels: string[];
+}
+
+/** What a row costs, when its module has a price: one copy times the quantity. */
+export const lineTotal = (row: BomRow): number | undefined =>
+  row.def?.price === undefined ? undefined : Math.round(row.def.price * row.quantity * 100) / 100;
+
+export interface BomTotals {
+  /** One total per currency; a price without a currency is counted under an empty one. */
+  totals: Array<{ currency: string; amount: number }>;
+  /** Rows whose module has no price, so a total does not cover them. */
+  unpriced: number;
+}
+
+export function bomTotals(rows: BomRow[]): BomTotals {
+  const byCurrency = new Map<string, number>();
+  let unpriced = 0;
+  for (const row of rows) {
+    const total = lineTotal(row);
+    if (total === undefined) unpriced++;
+    else byCurrency.set(row.def?.currency ?? '', (byCurrency.get(row.def?.currency ?? '') ?? 0) + total);
+  }
+  return {
+    totals: [...byCurrency].map(([currency, amount]) => ({ currency, amount: Math.round(amount * 100) / 100 })),
+    unpriced,
+  };
 }
 
 const HEADER = [
@@ -27,6 +53,10 @@ const HEADER = [
   'Width (units)',
   'Quantity',
   'Labels',
+  'Width (mm)',
+  'Unit price',
+  'Currency',
+  'Line total',
 ];
 
 export function buildBom(panel: Panel, resolve: (ref: ModuleRef) => ModuleDef | undefined): BomRow[] {
@@ -74,6 +104,10 @@ export function bomToCsv(rows: BomRow[]): string {
       widthUnits,
       quantity,
       labels.join('; ') || undefined,
+      widthUnits === undefined ? undefined : mmFromUnits(widthUnits),
+      def?.price,
+      def?.currency,
+      lineTotal({ libraryId, moduleId, def, widthUnits, quantity, labels }),
     ]
       .map(cell)
       .join(','),

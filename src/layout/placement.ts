@@ -1,4 +1,5 @@
 import { normalizeLabel } from './labels';
+import { LAYOUT_EPSILON_UNITS } from './units';
 
 export interface ModuleRef {
   libraryId: string;
@@ -93,14 +94,14 @@ function checkFit(
   const railLength = panel.railLengthsUnits[candidate.rail];
   if (railLength === undefined) return { kind: 'unknown-rail' };
   const { slot } = candidate;
-  if (!Number.isInteger(slot) || slot < 0 || slot + width > railLength) {
+  if (!Number.isFinite(slot) || slot < 0 || slot + width > railLength + LAYOUT_EPSILON_UNITS) {
     return { kind: 'out-of-rail' };
   }
   for (const other of panel.placements) {
     if (other.id === ignoreId || other.rail !== candidate.rail) continue;
     const otherWidth = widthOf(other);
     if (otherWidth === undefined) continue;
-    if (slot < other.slot + otherWidth && other.slot < slot + width) {
+    if (slot < other.slot + otherWidth - LAYOUT_EPSILON_UNITS && other.slot < slot + width - LAYOUT_EPSILON_UNITS) {
       return { kind: 'overlap', with: other.id };
     }
   }
@@ -138,9 +139,9 @@ function pushRight(others: { p: Placement; w: number }[], slot: number, width: n
   const shifted = new Map<string, number>();
   let frontier = slot + width;
   for (const { p, w } of others) {
-    if (p.slot + w <= slot) continue;
+    if (p.slot + w <= slot + LAYOUT_EPSILON_UNITS) continue;
     const newSlot = Math.max(p.slot, frontier);
-    if (newSlot + w > railLength) return null;
+    if (newSlot + w > railLength + LAYOUT_EPSILON_UNITS) return null;
     shifted.set(p.id, newSlot);
     frontier = newSlot + w;
   }
@@ -151,9 +152,9 @@ function pushLeft(others: { p: Placement; w: number }[], slot: number, width: nu
   const shifted = new Map<string, number>();
   let frontier = slot;
   for (const { p, w } of [...others].reverse()) {
-    if (p.slot >= slot + width) continue;
+    if (p.slot >= slot + width - LAYOUT_EPSILON_UNITS) continue;
     const newSlot = Math.min(p.slot + w, frontier) - w;
-    if (newSlot < 0) return null;
+    if (newSlot < -LAYOUT_EPSILON_UNITS) return null;
     shifted.set(p.id, newSlot);
     frontier = newSlot;
   }
@@ -204,7 +205,7 @@ export function setPlacementWidth(
   if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
   const allowed = resizeOf(current.module);
   if (!allowed) return { ok: false, error: { kind: 'not-resizable' } };
-  if (!Number.isInteger(units) || units < allowed.minUnits || units > allowed.maxUnits) {
+  if (!Number.isFinite(units) || units < allowed.minUnits || units > allowed.maxUnits) {
     return { ok: false, error: { kind: 'width-out-of-range' } };
   }
   const { widthUnits: _previous, ...rest } = current;

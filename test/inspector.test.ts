@@ -78,7 +78,7 @@ describe('inspect: what is shown', () => {
     expect(view.title).toBe('Module');
     expect(field(ctx({ placementId: 'p1' }), 'label')).toMatchObject({ kind: 'text', value: '', placeholder: 'MCB 1P C16' });
     expect(field(ctx({ placementId: 'p1' }), 'row')).toMatchObject({ kind: 'integer', value: 1, min: 1, max: 2 });
-    expect(field(ctx({ placementId: 'p1' }), 'slot')).toMatchObject({ kind: 'integer', value: 0, min: 0, max: 23 });
+    expect(field(ctx({ placementId: 'p1' }), 'slot')).toMatchObject({ kind: 'number', value: 0, min: 0, max: 23, hint: 'units from the start of the rail, 0 mm' });
     expect(keysOf(ctx({ placementId: 'p1' }))).toEqual(
       expect.arrayContaining(['module', 'kind', 'poles', 'rated', 'curve', 'capacity', 'residual', 'sku', 'terminals', 'id']),
     );
@@ -92,8 +92,8 @@ describe('inspect: what is shown', () => {
   });
 
   it('lets only resizable modules have an editable width, with the allowed range', () => {
-    expect(field(ctx({ placementId: 'p1' }), 'width')).toMatchObject({ kind: 'readonly', value: '1 units' });
-    expect(field(ctx({ placementId: 'p3' }), 'width')).toMatchObject({ kind: 'integer', value: 3, min: 2, max: 12, hint: '2-12 units' });
+    expect(field(ctx({ placementId: 'p1' }), 'width')).toMatchObject({ kind: 'readonly', value: '1 units (17.5 mm)' });
+    expect(field(ctx({ placementId: 'p3' }), 'width')).toMatchObject({ kind: 'number', value: 3, min: 2, max: 12, hint: '2-12 units, 52.5 mm' });
   });
 
   it('keeps the position range tied to the width of this copy', () => {
@@ -116,7 +116,7 @@ describe('inspect: what is shown', () => {
     expect(view.title).toBe('Comb');
     expect(field(ctx({ combId: 'c1' }), 'pattern')?.value).toBe('L');
     expect(field(ctx({ combId: 'c1' }), 'side')?.value).toBe('top');
-    expect(field(ctx({ combId: 'c1' }), 'width')).toMatchObject({ kind: 'integer', value: 6, min: 2, max: 12 });
+    expect(field(ctx({ combId: 'c1' }), 'width')).toMatchObject({ kind: 'number', value: 6, min: 2, max: 12 });
   });
 
   it('describes a row, with spacing only when there is a row below', () => {
@@ -211,10 +211,18 @@ describe('applyEdit: position and width', () => {
     expect(message(applyEdit(ctx({ placementId: 'p1' }), 'row', '3'))).toBe('There is no such row.');
   });
 
-  it('asks for a whole number', () => {
-    for (const bad of ['', 'abc', '1.5']) {
-      expect(message(applyEdit(ctx({ placementId: 'p1' }), 'slot', bad))).toBe('Enter a whole number.');
+  it('asks for a number, and for a whole one where only a whole one makes sense, such as the row', () => {
+    for (const bad of ['', 'abc']) {
+      expect(message(applyEdit(ctx({ placementId: 'p1' }), 'slot', bad))).toBe('Enter a number.');
     }
+    for (const bad of ['', 'abc', '1.5']) {
+      expect(message(applyEdit(ctx({ placementId: 'p1' }), 'row', bad))).toBe('Enter a whole number.');
+    }
+  });
+
+  it('moves a module to a position that is not a whole number of units, as a relay of 22.5 mm needs', () => {
+    const moved = ok(applyEdit(ctx({ placementId: 'p1' }), 'slot', '1.2857'));
+    expect(moved.panel.placements.find((p) => p.id === 'p1')?.slot).toBe(1.2857);
   });
 
   it('moves a comb the same way', () => {
@@ -526,7 +534,7 @@ describe('inspector: width of a relay', () => {
   const relayCtx = (project: Project = withRelay()) => ctx({ placementId: 'p9' }, 'panel', project);
 
   it('offers the width of a resizable relay as a number within the range of its library entry', () => {
-    expect(field(relayCtx(), 'width')).toMatchObject({ kind: 'integer', value: 1, min: 1, max: 4, hint: '1-4 units' });
+    expect(field(relayCtx(), 'width')).toMatchObject({ kind: 'number', value: 1, min: 1, max: 4, hint: '1-4 units, 17.5 mm' });
   });
 
   it('sets the width to two units and keeps the single terminals single', () => {

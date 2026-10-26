@@ -4,7 +4,7 @@ import type { ModuleRef } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 import type { Project } from '../src/project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from '../src/project/autosave';
-import { bomToCsv, buildBom } from '../src/project/bom';
+import { bomToCsv, bomTotals, buildBom } from '../src/project/bom';
 import { buildProjectFile, parseProjectFile, parseProjectJson } from '../src/project/file';
 import { decodeShare, encodeShare } from '../src/project/share';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
@@ -185,9 +185,9 @@ describe('bill of materials', () => {
   it('writes a header and one CRLF line per row', () => {
     const lines = bomToCsv(buildBom(sampleProject().panel, resolve)).split('\r\n');
     expect(lines[0]).toBe(
-      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity,Labels',
+      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity,Labels,Width (mm),Unit price,Currency,Line total',
     );
-    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2,');
+    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2,,17.5,,,');
     expect(lines[3]).toBe('');
   });
 
@@ -409,14 +409,64 @@ describe('labels in the bill of materials', () => {
       ],
     };
     const csv = bomToCsv(buildBom(panel, resolve)).split('\r\n');
-    expect(csv[0]!.endsWith(',Quantity,Labels')).toBe(true);
-    expect(csv[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,3,Kitchen; Hall');
+    expect(csv[0]!.includes(',Quantity,Labels,')).toBe(true);
+    expect(csv[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,3,Kitchen; Hall,17.5,,,');
   });
 
   it('leaves the column empty without labels and neutralises formulas in labels', () => {
     const bare = { ...createPanel([12]), placements: [{ id: 'p1', module: ref('c16'), rail: 0, slot: 0 }] };
-    expect(bomToCsv(buildBom(bare, resolve)).split('\r\n')[1]!.endsWith(',1,1,')).toBe(true);
+    expect(bomToCsv(buildBom(bare, resolve)).split('\r\n')[1]!.endsWith(',1,1,,17.5,,,')).toBe(true);
     const evil = { ...bare, placements: [{ ...bare.placements[0]!, label: '=HYPERLINK("x")' }] };
     expect(bomToCsv(buildBom(evil, resolve))).toContain(`"'=HYPERLINK(""x"")"`);
+  });
+});
+
+
+describe('prices in the bill of materials', () => {
+  const priced = (id: string, price: number | undefined, currency?: string): ModuleDef => ({
+    ...C16, id, name: id, ...(price !== undefined ? { price } : {}), ...(currency ? { currency } : {}),
+  });
+  const panelOf = (ids: string[]) => ({
+    ...createPanel([12]),
+    placements: ids.map((id, i) => ({ id: `p${i}`, module: ref(id), rail: 0, slot: i })),
+  });
+  const defs: Record<string, ModuleDef> = {
+    a: priced('a', 1.25, 'EUR'),
+    b: priced('b', 10, 'EUR'),
+    c: priced('c', 5, 'USD'),
+    d: priced('d', undefined),
+  };
+  const rowsOf = (ids: string[]) => buildBom(panelOf(ids), (r) => defs[r.moduleId]);
+
+  it('writes the unit price, the currency and the line total after the other columns', () => {
+    const lines = bomToCsv(rowsOf(['a', 'a', 'a'])).split('\r\n');
+    expect(lines[0]!.endsWith(',Width (mm),Unit price,Currency,Line total')).toBe(true);
+    expect(lines[1]!.endsWith(',3,,17.5,1.25,EUR,3.75')).toBe(true);
+  });
+
+  it('leaves the price columns empty for a module that has no price', () => {
+    expect(bomToCsv(rowsOf(['d'])).split('\r\n')[1]!.endsWith(',1,,17.5,,,')).toBe(true);
+  });
+
+  it('adds the lines of a currency and keeps the currencies apart', () => {
+    const { totals, unpriced } = bomTotals(rowsOf(['a', 'a', 'b', 'c', 'c']));
+    expect(totals).toEqual([{ currency: 'EUR', amount: 12.5 }, { currency: 'USD', amount: 10 }]);
+    expect(unpriced).toBe(0);
+  });
+
+  it('says how many rows no total covers, and rounds to cents', () => {
+    expect(bomTotals(rowsOf(['a', 'd', 'd']))).toEqual({ totals: [{ currency: 'EUR', amount: 1.25 }], unpriced: 1 });
+    const thirds: ModuleDef = priced('t', 0.1, 'EUR');
+    const total = bomTotals(buildBom(panelOf(['t', 't', 't']), () => thirds)).totals[0]!.amount;
+    expect(total).toBe(0.3);
+  });
+
+  it('has no totals for an empty panel', () => {
+    expect(bomTotals([])).toEqual({ totals: [], unpriced: 0 });
+  });
+
+  it('counts a price with no currency under an empty currency', () => {
+    const bare = priced('x', 4);
+    expect(bomTotals(buildBom(panelOf(['x']), () => bare)).totals).toEqual([{ currency: '', amount: 4 }]);
   });
 });

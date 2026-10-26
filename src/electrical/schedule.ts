@@ -1,7 +1,9 @@
 import type { Project } from '../project';
 import { cell } from '../project/bom';
 import { DEFAULT_CABLE_SETTINGS, type CableSettings, type InstallMethod } from './cables';
-import { formatAmps, loadReports } from './loads';
+import type { Conductor } from '../library/types';
+import { formatAmps, loadReports, wireCurrents } from './loads';
+import { nodeTerminalsLookup } from './nodeTerminals';
 import { ownerName } from './rules';
 import type { Resolve } from './context';
 
@@ -105,4 +107,74 @@ export function scheduleToCsv(circuits: CircuitRow[], ferrules: FerruleRow[]): s
     line(['Ferrule (mm2)', 'Quantity']),
     ...ferrules.map((row) => line(ferruleCells(row))),
   ].join('\r\n')}\r\n`;
+}
+
+/** One wire, as a fitter wants it listed: where it starts, where it ends and what it is. */
+export interface WireRow {
+  wireId: string;
+  label?: string;
+  from: string;
+  to: string;
+  conductor: Conductor;
+  sectionMm2?: number;
+  lengthM?: number;
+  currentA?: number;
+}
+
+/**
+ * Every wire with its ends named by the label of the module or node and the label or name of the
+ * terminal. The cross-section is the wire's own or that of the cable of the load it leads to, and the
+ * length that of the load's cable.
+ */
+export function wireList(project: Project, resolve: Resolve): WireRow[] {
+  const { schematic, panel } = project;
+  const terminalsOf = nodeTerminalsLookup(panel, resolve);
+  const currents = wireCurrents(project, resolve);
+  const loadOf = (nodeId: string) => schematic.nodes.find((n) => n.id === nodeId && n.kind === 'load')?.load;
+
+  const end = (ref: { node: string; terminal: string }): { text: string; conductor?: Conductor } => {
+    const node = schematic.nodes.find((n) => n.id === ref.node);
+    if (!node) return { text: `${ref.node} ${ref.terminal}` };
+    const terminal = terminalsOf(node)?.find((t) => t.id === ref.terminal);
+    const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
+    const name = placement?.terminalLabels?.[ref.terminal] ?? terminal?.name ?? ref.terminal;
+    const side = ref.terminal.split(':')[0];
+    return { text: `${placement?.label ?? node.label} ${name} (${side})`, ...(terminal ? { conductor: terminal.conductor } : {}) };
+  };
+
+  return schematic.wires.map((wire): WireRow => {
+    const from = end(wire.a);
+    const to = end(wire.b);
+    const load = loadOf(wire.a.node) ?? loadOf(wire.b.node);
+    const sectionMm2 = wire.crossSectionMm2 ?? load?.crossSectionMm2;
+    const currentA = currents.get(wire.id);
+    return {
+      wireId: wire.id,
+      ...(wire.label ? { label: wire.label } : {}),
+      from: from.text,
+      to: to.text,
+      conductor: from.conductor ?? to.conductor ?? 'L',
+      ...(sectionMm2 !== undefined ? { sectionMm2 } : {}),
+      ...(load?.lengthM !== undefined ? { lengthM: load.lengthM } : {}),
+      ...(currentA !== undefined ? { currentA } : {}),
+    };
+  });
+}
+
+export const WIRE_HEADER = ['Wire', 'Label', 'From', 'To', 'Conductor', 'Cross-section (mm2)', 'Length (m)', 'Current (A)'] as const;
+
+export const wireCells = (row: WireRow): string[] => [
+  row.wireId,
+  row.label ?? '',
+  row.from,
+  row.to,
+  row.conductor,
+  row.sectionMm2 === undefined ? '' : String(row.sectionMm2),
+  row.lengthM === undefined ? '' : String(row.lengthM),
+  row.currentA === undefined ? '' : formatAmps(row.currentA),
+];
+
+export function wireListToCsv(rows: WireRow[]): string {
+  const line = (cells: readonly string[]) => cells.map(cell).join(',');
+  return `${[line(WIRE_HEADER), ...rows.map((row) => line(wireCells(row)))].join('\r\n')}\r\n`;
 }

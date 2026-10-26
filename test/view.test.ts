@@ -214,3 +214,37 @@ describe('railAtPoint', () => {
     expect(railAtPoint(panel(), { x: 5000, y: 5000 })).toBeUndefined();
   });
 });
+
+describe('snapToSlot against neighbours and with fractional widths', () => {
+  const relay = 22.5 / 17.5;
+
+  it('draws a module up against the end of its neighbour when it comes within about 5 mm', () => {
+    const neighbour = [{ rail: 0, slot: 2, widthUnits: relay }];
+    const edge = 2 + relay;
+    expect(snapToSlot(panel(), at(edge + 0.2, 0), 1, 0, neighbour)).toEqual({ rail: 0, slot: Math.round(edge * 1e4) / 1e4 });
+    expect(snapToSlot(panel(), at(edge - 0.25, 0), 1, 0, neighbour)?.slot).toBeCloseTo(edge, 3);
+  });
+
+  it('draws a module up against the front of its neighbour, which puts its own end on that edge', () => {
+    const neighbour = [{ rail: 0, slot: 5, widthUnits: 2 }];
+    expect(snapToSlot(panel(), at(3.9, 0), relay, 0, neighbour)?.slot).toBeCloseTo(5 - relay, 3);
+  });
+
+  it('keeps to whole units when everything on the rail is whole, as before', () => {
+    const neighbour = [{ rail: 0, slot: 2, widthUnits: 2 }];
+    expect(snapToSlot(panel(), at(4.4, 0), 1, 0, neighbour)).toEqual({ rail: 0, slot: 4 });
+    expect(snapToSlot(panel(), at(7.35, 0), 1, 0, neighbour)).toEqual({ rail: 0, slot: 7 });
+  });
+
+  it('puts a module that is not a whole number of units on a half-millimetre grid when no edge is near', () => {
+    const slot = snapToSlot(panel(), at(7.34, 0), relay, 0)!.slot;
+    expect(slot * 17.5 * 2).toBeCloseTo(Math.round(slot * 17.5 * 2), 1);
+    expect(Math.abs(slot - 7.34)).toBeLessThan(0.02);
+  });
+
+  it('ignores neighbours on another rail and keeps the module inside its own rail', () => {
+    const elsewhere = [{ rail: 1, slot: 2, widthUnits: 2 }];
+    expect(snapToSlot(panel(), at(4.2, 0), 1, 0, elsewhere)).toEqual({ rail: 0, slot: 4 });
+    expect(snapToSlot(panel(), at(100, 0), relay, 0)?.slot).toBeCloseTo(10 - relay, 3);
+  });
+});

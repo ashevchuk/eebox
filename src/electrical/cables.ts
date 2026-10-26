@@ -1,3 +1,4 @@
+import { TRIP_CURVES, type TripCurve } from '../library/types';
 import type { ValidationError } from '../library/validate';
 
 export const INSTALL_METHODS = ['B1', 'B2', 'C', 'E'] as const;
@@ -20,6 +21,10 @@ export interface CableSettings {
   resistivityOhmMm2PerM: number;
   /** Reactance of the cable per metre, in ohms. */
   reactanceOhmPerM: number;
+  /** Phase-to-neutral voltage that drives the fault current in the loop check, in volts. */
+  faultVoltageV: number;
+  /** The multiple of its rating at which a breaker of each curve trips at once, for the loop check. */
+  tripMultiples: Record<TripCurve, number>;
 }
 
 /**
@@ -38,6 +43,8 @@ export const DEFAULT_CABLE_SETTINGS: CableSettings = {
   voltageDropLimitPercent: { lighting: 3, other: 5 },
   resistivityOhmMm2PerM: 0.0225,
   reactanceOhmPerM: 0.00008,
+  faultVoltageV: 230,
+  tripMultiples: { B: 5, C: 10, D: 20, K: 14, Z: 3 },
 };
 
 export const CABLE_TABLE_NOTE =
@@ -123,7 +130,7 @@ export function parseCableSettings(text: string): { ok: true; settings: CableSet
   }
   if (!isRecord(raw)) return { ok: false, errors: [{ path: '', message: 'must be an object' }] };
   const errors: ValidationError[] = [];
-  unknownKeys(raw, ['ampacity', 'voltageDropLimitPercent', 'resistivityOhmMm2PerM', 'reactanceOhmPerM'], '', errors);
+  unknownKeys(raw, ['ampacity', 'voltageDropLimitPercent', 'resistivityOhmMm2PerM', 'reactanceOhmPerM', 'faultVoltageV', 'tripMultiples'], '', errors);
   const ampacity = parseAmpacity(raw.ampacity, errors);
 
   const limits = raw.voltageDropLimitPercent;
@@ -142,7 +149,21 @@ export function parseCableSettings(text: string): { ok: true; settings: CableSet
   if (typeof raw.reactanceOhmPerM !== 'number' || !Number.isFinite(raw.reactanceOhmPerM) || raw.reactanceOhmPerM < 0) {
     errors.push({ path: 'reactanceOhmPerM', message: 'must be 0 or more' });
   }
-  if (errors.length > 0 || !ampacity || !limit) return { ok: false, errors };
+  if (!positive(raw.faultVoltageV) || raw.faultVoltageV > 1000) {
+    errors.push({ path: 'faultVoltageV', message: 'must be above 0 and at most 1000' });
+  }
+  const multiples = raw.tripMultiples;
+  let tripMultiples: CableSettings['tripMultiples'] | undefined;
+  if (!isRecord(multiples)) {
+    errors.push({ path: 'tripMultiples', message: `must be an object with ${TRIP_CURVES.join(', ')}` });
+  } else {
+    unknownKeys(multiples, TRIP_CURVES, 'tripMultiples', errors);
+    for (const curve of TRIP_CURVES) {
+      if (!positive(multiples[curve]) || multiples[curve] > 100) errors.push({ path: `tripMultiples.${curve}`, message: 'must be above 0 and at most 100' });
+    }
+    if (TRIP_CURVES.every((curve) => positive(multiples[curve]) && multiples[curve] <= 100)) tripMultiples = multiples as CableSettings['tripMultiples'];
+  }
+  if (errors.length > 0 || !ampacity || !limit || !tripMultiples) return { ok: false, errors };
   return {
     ok: true,
     settings: {
@@ -150,6 +171,8 @@ export function parseCableSettings(text: string): { ok: true; settings: CableSet
       voltageDropLimitPercent: limit,
       resistivityOhmMm2PerM: raw.resistivityOhmMm2PerM as number,
       reactanceOhmPerM: raw.reactanceOhmPerM as number,
+      faultVoltageV: raw.faultVoltageV as number,
+      tripMultiples,
     },
   };
 }

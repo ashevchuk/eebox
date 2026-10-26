@@ -58,13 +58,19 @@ describe('the control family', () => {
     expect(CONDUCTORS.filter((c) => familyOf(c) === 'phase')).toEqual(['L', 'L1', 'L2', 'L3']);
   });
 
-  it('cannot be wired to phase, neutral or earth, but wires to other control conductors', () => {
+  it('keeps DC conductors apart from phase, neutral and earth, but wires them to other control conductors', () => {
     const s = sceneOf(['relay', 'psu']);
-    expect(connect(s.schematic, s.terminalsOf, { node: 'n1', terminal: 'bottom:11' }, { node: 'n2', terminal: 'top:L' })).toEqual({
+    expect(connect(s.schematic, s.terminalsOf, { node: 'n2', terminal: 'bottom:24V' }, { node: 'n1', terminal: 'top:L' })).toEqual({
       ok: false,
       error: { kind: 'incompatible-conductors' },
     });
     expect(connect(s.schematic, s.terminalsOf, { node: 'n1', terminal: 'bottom:11' }, { node: 'n2', terminal: 'bottom:24V' }).ok).toBe(true);
+  });
+
+  it('lets the terminal of a contact, conductor C, be wired to any conductor, as a contact switches whatever it is given', () => {
+    const s = sceneOf(['relay', 'psu']);
+    expect(connect(s.schematic, s.terminalsOf, { node: 'n1', terminal: 'bottom:11' }, { node: 'n2', terminal: 'top:L' }).ok).toBe(true);
+    expect(connect(s.schematic, s.terminalsOf, { node: 'n1', terminal: 'bottom:14' }, { node: 'n1', terminal: 'top:N' }).ok).toBe(true);
   });
 
   it('wires all poles of two nodes by matching conductor, so contacts meet contacts', () => {

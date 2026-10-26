@@ -227,10 +227,39 @@ describe('editing a module', () => {
     expect(refused(applyEditorEdit(s, 'ratedCurrentA', 'abc'))).toBe('Enter a number.');
   });
 
-  it('wants a whole number for the width, and does not let it be cleared', () => {
-    expect(refused(applyEditorEdit(on('mcb'), 'widthUnits', '1.5'))).toBe('Enter a whole number.');
-    expect(refused(applyEditorEdit(on('mcb'), 'widthUnits', ''))).toBe('Enter a whole number.');
+  it('wants a number for the width, accepts a fraction, and does not let it be cleared', () => {
+    expect(refused(applyEditorEdit(on('mcb'), 'widthUnits', ''))).toBe('Enter a number.');
     expect(refused(applyEditorEdit(on('mcb'), 'widthUnits', 'x'))).toBe('Enter a number.');
+    expect(moduleOf(edit(on('mcb'), 'widthUnits', '1.5').draft, 'mcb').widthUnits).toBe(1.5);
+  });
+
+  it('sets the width from millimetres, so that a relay of 22.5 mm is 22.5 mm wide', () => {
+    expect(moduleOf(edit(on('mcb'), 'widthMm', '22.5').draft, 'mcb').widthUnits).toBe(1.2857);
+    expect(moduleOf(edit(on('mcb'), 'widthMm', '35').draft, 'mcb').widthUnits).toBe(2);
+    expect(moduleOf(edit(on('mcb'), 'widthMm', '29').draft, 'mcb').widthUnits).toBe(1.6571);
+    expect(refused(applyEditorEdit(on('mcb'), 'widthMm', 'wide'))).toBe('Enter a number.');
+  });
+
+  it('shows the width in millimetres next to the width in units', () => {
+    const fields = describeEditor(on('mcb')).fields;
+    expect(fields.find((f) => f.key === 'widthUnits')?.value).toBe(1);
+    expect(fields.find((f) => f.key === 'widthMm')?.value).toBe(17.5);
+  });
+
+  it('sets a price and upper-cases a currency, and clears both with an empty field', () => {
+    let s = on('mcb');
+    s = state(edit(s, 'price', '12.5').draft, s.target);
+    s = state(edit(s, 'currency', 'eur').draft, s.target);
+    expect(moduleOf(s.draft, 'mcb')).toMatchObject({ price: 12.5, currency: 'EUR' });
+    s = state(edit(s, 'price', '').draft, s.target);
+    s = state(edit(s, 'currency', '').draft, s.target);
+    expect('price' in moduleOf(s.draft, 'mcb')).toBe(false);
+    expect('currency' in moduleOf(s.draft, 'mcb')).toBe(false);
+  });
+
+  it('refuses a price that is not a number, and shows the price and the currency', () => {
+    expect(refused(applyEditorEdit(on('mcb'), 'price', 'cheap'))).toBe('Enter a number.');
+    expect(fieldKeys(on('mcb'))).toEqual(expect.arrayContaining(['price', 'currency']));
   });
 
   it('makes a module resizable by giving a range, and fixed again by clearing it', () => {
@@ -241,7 +270,7 @@ describe('editing a module', () => {
     expect(moduleOf(s.draft, 'mcb').resizable).toEqual({ minUnits: 1, maxUnits: 8 });
     s = state(edit(s, 'resizeMin', '').draft, s.target);
     expect('resizable' in moduleOf(s.draft, 'mcb')).toBe(false);
-    expect(refused(applyEditorEdit(s, 'resizeMin', '1.5'))).toBe('Enter a whole number.');
+    expect(refused(applyEditorEdit(s, 'resizeMin', 'one'))).toBe('Enter a number.');
   });
 
   it('turns a module into a comb with a default pin spec and no terminals, and back', () => {
@@ -352,11 +381,12 @@ describe('editing an enclosure', () => {
     expect(edit(on(), 'rails', '18, 18  24').draft.enclosures[0]!.railLengthsUnits).toEqual([18, 18, 24]);
   });
 
-  it('refuses a list that is empty, too long, not whole or out of range', () => {
+  it('refuses a list that is empty, too long, not a number or out of range', () => {
     expect(refused(applyEditorEdit(on(), 'rails', ' '))).toMatch(/List 1 to 20/);
     expect(refused(applyEditorEdit(on(), 'rails', Array(21).fill('12').join(' ')))).toMatch(/List 1 to 20/);
-    expect(refused(applyEditorEdit(on(), 'rails', '12 1.5'))).toMatch(/whole number from 1 to 144/);
-    expect(refused(applyEditorEdit(on(), 'rails', '12 500'))).toMatch(/whole number from 1 to 144/);
+    expect(refused(applyEditorEdit(on(), 'rails', '12 x'))).toMatch(/number from 1 to 144/);
+    expect(refused(applyEditorEdit(on(), 'rails', '12 500'))).toMatch(/number from 1 to 144/);
+    expect(edit(on(), 'rails', '12 14.5').draft.enclosures[0]!.railLengthsUnits).toEqual([12, 14.5]);
   });
 
   it('removes the enclosure and falls back to the library', () => {
@@ -400,3 +430,4 @@ describe('what the validator says about a draft', () => {
     expect(validateDraft(draft)).toEqual([]);
   });
 });
+

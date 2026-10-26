@@ -1,4 +1,5 @@
 import type { ModuleRef } from '../layout/placement';
+import { LAYOUT_EPSILON_UNITS } from '../layout/units';
 import { familyOf, type Conductor, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { freeNodeTerminals } from './nodeTerminals';
@@ -60,17 +61,16 @@ export function combContacts(panel: Project['panel'], resolve: Resolve): CombCon
     const def = resolve(comb.module);
     if (!def?.comb) continue;
     const { pattern, side } = def.comb;
-    for (let offset = 0; offset < (comb.widthUnits ?? def.widthUnits); offset++) {
-      const unit = comb.slot + offset;
+    const pins = Math.max(1, Math.floor((comb.widthUnits ?? def.widthUnits) + LAYOUT_EPSILON_UNITS));
+    for (let offset = 0; offset < pins; offset++) {
       const pin = pattern[offset % pattern.length]!;
       for (const placement of panel.placements) {
         const placed = placement.rail === comb.rail ? resolve(placement.module) : undefined;
         if (!placed) continue;
+        // A pin is one unit of the comb; a terminal belongs to the pin whose unit holds its centre.
+        const pinOf = (unit: number) => Math.floor(placement.slot + unit + 0.5 - comb.slot + LAYOUT_EPSILON_UNITS);
         const terminal = terminalsOf(placed, placement.widthUnits ?? placed.widthUnits).find(
-          (t) =>
-            t.side === side &&
-            placement.slot + Math.floor(t.unit + 0.5) === unit &&
-            familyOf(t.conductor) === familyOf(pin),
+          (t) => t.side === side && pinOf(t.unit) === offset && familyOf(t.conductor) === familyOf(pin),
         );
         if (terminal) contacts.push({ combId: comb.id, pin, placementId: placement.id, terminalId: terminal.id });
       }
@@ -138,7 +138,7 @@ export function findNetProblems(nets: Net[]): NetProblem[] {
   const problems: NetProblem[] = [];
   for (const net of nets) {
     const conductors = net.terminals.map((t) => t.terminal.conductor);
-    if (new Set(conductors.map(familyOf)).size > 1) {
+    if (new Set(conductors.filter((c) => c !== 'C').map(familyOf)).size > 1) {
       problems.push({ kind: 'mixed-families', net });
     } else if (new Set(conductors.filter((c) => c === 'L1' || c === 'L2' || c === 'L3')).size > 1) {
       problems.push({ kind: 'mixed-phases', net });

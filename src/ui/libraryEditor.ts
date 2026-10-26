@@ -13,6 +13,7 @@ import {
   type TerminalDef,
 } from '../library/types';
 import { SCHEMA_VERSION } from '../library/types';
+import { mmFromUnits, roundUnits, unitsFromMm } from '../layout/units';
 import { validateLibrary, type ValidationError } from '../library/validate';
 import type { InspectorAction, InspectorField, InspectorView } from './inspector';
 
@@ -137,15 +138,18 @@ function moduleView(module: ModuleDef): InspectorView {
     text('id', 'Id', module.id),
     text('name', 'Name', module.name),
     select('kind', 'Kind', module.kind, MODULE_KINDS),
-    integer('widthUnits', 'Width', module.widthUnits, 'units of 17.5 mm'),
+    number('widthUnits', 'Width', module.widthUnits, 'units of 17.5 mm; a fraction is fine'),
+    number('widthMm', 'Width, mm', mmFromUnits(module.widthUnits), 'the real width of the device; this and the line above are one setting'),
     select('poles', 'Poles', String(module.poles), ['1', '2', '3', '4']),
     text('sku', 'Part number', module.sku ?? ''),
     number('ratedCurrentA', 'Rated current', optional(module.ratedCurrentA), 'A'),
     select('curve', 'Trip curve', module.curve ?? '', ['', ...TRIP_CURVES]),
     number('breakingCapacityKA', 'Breaking capacity', optional(module.breakingCapacityKA), 'kA'),
     number('residualCurrentMa', 'Residual current', optional(module.residualCurrentMa), 'mA'),
-    integer('resizeMin', 'Narrowest copy', optional(module.resizable?.minUnits), 'units; empty both for a fixed width'),
-    integer('resizeMax', 'Widest copy', optional(module.resizable?.maxUnits), 'units; a placed copy can have any width in the range'),
+    number('price', 'Price', optional(module.price), 'what one costs; empty for none'),
+    text('currency', 'Currency', module.currency ?? '', 'EUR'),
+    number('resizeMin', 'Narrowest copy', optional(module.resizable?.minUnits), 'units; empty both for a fixed width'),
+    number('resizeMax', 'Widest copy', optional(module.resizable?.maxUnits), 'units; a placed copy can have any width in the range'),
   ];
   const actions: InspectorAction[] = [
     { key: 'duplicate', label: 'Duplicate' },
@@ -234,8 +238,8 @@ function parseRails(raw: string): number[] | string {
   const tokens = raw.split(/[\s,]+/).filter(Boolean);
   const numbers = tokens.map(Number);
   if (numbers.length === 0 || numbers.length > MAX_RAILS) return `List 1 to ${MAX_RAILS} rail lengths.`;
-  if (numbers.some((n) => !Number.isInteger(n) || n < 1 || n > MAX_RAIL_LENGTH_UNITS)) {
-    return `Each rail length is a whole number from 1 to ${MAX_RAIL_LENGTH_UNITS}.`;
+  if (numbers.some((n) => !Number.isFinite(n) || n < 1 || n > MAX_RAIL_LENGTH_UNITS)) {
+    return `Each rail length is a number from 1 to ${MAX_RAIL_LENGTH_UNITS}.`;
   }
   return numbers;
 }
@@ -275,7 +279,7 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
     draft: replaceModule(draft, id, change),
     ...(target ? { target } : {}),
   });
-  const numeric = (field: 'ratedCurrentA' | 'breakingCapacityKA' | 'residualCurrentMa'): EditorResult => {
+  const numeric = (field: 'ratedCurrentA' | 'breakingCapacityKA' | 'residualCurrentMa' | 'price'): EditorResult => {
     const parsed = optionalNumber(raw, false);
     return parsed.ok ? apply((m) => withOptional(m, field, parsed.value)) : fail(parsed.message);
   };
@@ -287,10 +291,12 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       return apply((m) => ({ ...m, name: raw.trim() }));
     case 'kind':
       return apply((m) => withKind(m, raw as ModuleKind));
-    case 'widthUnits': {
-      const parsed = optionalNumber(raw, true);
-      if (!parsed.ok || parsed.value === undefined) return fail(parsed.ok ? NOT_AN_INTEGER : parsed.message);
-      return apply((m) => ({ ...m, widthUnits: parsed.value! }));
+    case 'widthUnits':
+    case 'widthMm': {
+      const parsed = optionalNumber(raw, false);
+      if (!parsed.ok || parsed.value === undefined) return fail(parsed.ok ? NOT_A_NUMBER : parsed.message);
+      const units = key === 'widthMm' ? unitsFromMm(parsed.value) : roundUnits(parsed.value);
+      return apply((m) => ({ ...m, widthUnits: units }));
     }
     case 'poles':
       return apply((m) => ({ ...m, poles: Number(raw) as ModuleDef['poles'] }));
@@ -301,10 +307,13 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
     case 'ratedCurrentA':
     case 'breakingCapacityKA':
     case 'residualCurrentMa':
+    case 'price':
       return numeric(key);
+    case 'currency':
+      return apply((m) => withOptional(m, 'currency', optionalText(raw)?.toUpperCase()));
     case 'resizeMin':
     case 'resizeMax': {
-      const parsed = optionalNumber(raw, true);
+      const parsed = optionalNumber(raw, false);
       if (!parsed.ok) return fail(parsed.message);
       return apply((m) => {
         const { minUnits, maxUnits } = m.resizable ?? {};

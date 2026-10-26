@@ -120,9 +120,10 @@
           "minLength": 1
         },
         "widthUnits": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Width in 17.5 mm units."
+          "type": "number",
+          "minimum": 0.1,
+          "description": "Width in 17.5 mm units; a fraction is fine, as a relay of 22.5 mm is 1.2857 units wide.",
+          "maximum": 144
         },
         "poles": {
           "enum": [
@@ -171,6 +172,20 @@
         },
         "resizable": {
           "$ref": "#/definitions/resizable"
+        },
+        "price": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000000,
+          "description": "What one costs, in `currency`; for pricing a bill of materials."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{1,8}$",
+          "description": "Short code of the currency of `price`, for example EUR."
+        },
+        "logic": {
+          "$ref": "#/definitions/logic"
         }
       },
       "allOf": [
@@ -260,6 +275,83 @@
         }
       }
     },
+    "logic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputs",
+        "contacts"
+      ],
+      "description": "What a relay or contactor does with the voltages it senses. Needs explicit terminals, which it refers to by id such as top:A1.",
+      "properties": {
+        "inputs": {
+          "type": "object",
+          "maxProperties": 8,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/logicInput"
+          }
+        },
+        "contacts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/definitions/logicContact"
+          }
+        }
+      }
+    },
+    "logicInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terminals",
+        "when"
+      ],
+      "properties": {
+        "terminals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "string"
+          }
+        },
+        "when": {
+          "enum": [
+            "all",
+            "any"
+          ],
+          "description": "all: every terminal carries voltage, on separate nets, as a coil's two terminals do. any: at least one does."
+        }
+      }
+    },
+    "logicContact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "between",
+        "closedWhen"
+      ],
+      "properties": {
+        "between": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "closedWhen": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "An expression over the input names with ! (not), & (and), | (or) and parentheses."
+        }
+      }
+    },
     "resizable": {
       "type": "object",
       "additionalProperties": false,
@@ -269,13 +361,13 @@
       ],
       "properties": {
         "minUnits": {
-          "type": "integer",
-          "minimum": 1,
+          "type": "number",
+          "minimum": 0.1,
           "maximum": 144
         },
         "maxUnits": {
-          "type": "integer",
-          "minimum": 1,
+          "type": "number",
+          "minimum": 0.1,
           "maximum": 144
         }
       }
@@ -301,11 +393,11 @@
           "minItems": 1,
           "maxItems": 20,
           "items": {
-            "type": "integer",
+            "type": "number",
             "minimum": 1,
             "maximum": 144
           },
-          "description": "Usable length of each DIN rail, top to bottom, in 17.5 mm units."
+          "description": "Usable length of each DIN rail, top to bottom, in 17.5 mm units; a fraction is fine, as a rail cut to a measure is."
         }
       }
     }

@@ -19,6 +19,8 @@ export interface Scene {
   resolve: (ref: ModuleRef) => ModuleDef | undefined;
   selectedPlacementId: string | null;
   selectedCombId: string | null;
+  /** Items selected together as a group, instead of the two above. */
+  selectedIds?: ReadonlySet<string>;
   selectedRail: number | null;
   /** The placement or comb being dragged; drawn dimmed at its old position. */
   moving: { kind: 'placement' | 'comb'; id: string } | null;
@@ -250,7 +252,7 @@ export function render(
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
     drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement));
-    if (placement.id === scene.selectedPlacementId) {
+    if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
       const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
@@ -262,7 +264,7 @@ export function render(
     if (!def?.comb) continue;
     ctx.globalAlpha = comb.id === movingId('comb') ? 0.35 : 1;
     drawComb(ctx, panel, def, comb.rail, comb.slot, itemWidth(scene, comb), LEVER_COLORS.comb);
-    if (comb.id === scene.selectedCombId) {
+    if (comb.id === scene.selectedCombId || scene.selectedIds?.has(comb.id)) {
       const r = combRect(panel, comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;

@@ -1,5 +1,7 @@
 import { isStoredLabel } from '../layout/labels';
 import { MAX_LABEL_LENGTH, MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../layout/limits';
+import { MIN_WIDTH_UNITS } from '../layout/units';
+import { parseExpression } from './logicExpression';
 import { positionProblem } from './positions';
 import {
   CONDUCTORS,
@@ -45,6 +47,12 @@ export const labelCheck: FieldCheck = (v) =>
 export const positiveInteger: FieldCheck = (v) =>
   Number.isInteger(v) && (v as number) > 0 ? null : 'must be a positive integer';
 
+/** A width in units of 17.5 mm; it may be a fraction, since a relay is 22.5 mm and a block 29 mm. */
+export const widthCheck: FieldCheck = (v) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= MIN_WIDTH_UNITS && v <= MAX_RAIL_LENGTH_UNITS
+    ? null
+    : `must be a number of units from ${MIN_WIDTH_UNITS} to ${MAX_RAIL_LENGTH_UNITS} (1 unit is 17.5 mm)`;
+
 export const positiveNumber: FieldCheck = (v) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : 'must be a positive number';
 
@@ -57,24 +65,51 @@ export const railLengthsCheck: FieldCheck = (v) =>
   Array.isArray(v) &&
   v.length >= 1 &&
   v.length <= MAX_RAILS &&
-  v.every((n) => Number.isInteger(n) && n >= 1 && n <= MAX_RAIL_LENGTH_UNITS)
+  v.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= MAX_RAIL_LENGTH_UNITS)
     ? null
-    : `must be 1 to ${MAX_RAILS} rail lengths, each a whole number of units from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
+    : `must be 1 to ${MAX_RAILS} rail lengths, each a number of units from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
+
+export const MAX_PRICE = 10_000_000;
+export const CURRENCY_PATTERN = /^[A-Za-z]{1,8}$/;
+const priceCheck: FieldCheck = (v) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_PRICE ? null : `must be a number from 0 to ${MAX_PRICE}`;
+const currencyCheck: FieldCheck = (v) =>
+  typeof v === 'string' && CURRENCY_PATTERN.test(v) ? null : 'must be 1 to 8 letters, such as EUR';
 
 export const MODULE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   kind: { required: true, check: oneOf(MODULE_KINDS) },
   name: { required: true, check: nonEmptyString },
-  widthUnits: { required: true, check: positiveInteger },
+  widthUnits: { required: true, check: widthCheck },
   poles: { required: true, check: oneOf([1, 2, 3, 4]) },
   sku: { required: false, check: nonEmptyString },
   ratedCurrentA: { required: false, check: positiveNumber },
   curve: { required: false, check: oneOf(TRIP_CURVES) },
   breakingCapacityKA: { required: false, check: positiveNumber },
   residualCurrentMa: { required: false, check: positiveNumber },
+  price: { required: false, check: priceCheck },
+  currency: { required: false, check: currencyCheck },
   terminals: { required: false, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
   comb: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   resizable: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
+  logic: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
+};
+
+export const MAX_LOGIC_INPUTS = 8;
+export const MAX_LOGIC_CONTACTS = 32;
+export const MAX_INPUT_TERMINALS = 8;
+
+export const LOGIC_SPEC: FieldSpec = {
+  inputs: { required: true, check: (v) => (isRecord(v) ? null : 'must be an object') },
+  contacts: { required: true, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
+};
+export const LOGIC_INPUT_SPEC: FieldSpec = {
+  terminals: { required: true, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
+  when: { required: true, check: oneOf(['all', 'any']) },
+};
+export const LOGIC_CONTACT_SPEC: FieldSpec = {
+  between: { required: true, check: (v) => (Array.isArray(v) && v.length === 2 ? null : 'must list two terminals') },
+  closedWhen: { required: true, check: nonEmptyString },
 };
 
 export const MAX_TERMINALS_PER_MODULE = 64;
@@ -98,10 +133,7 @@ export const TERMINAL_SPEC: FieldSpec = {
   },
 };
 
-const boundedUnits: FieldCheck = (v) =>
-  Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_RAIL_LENGTH_UNITS
-    ? null
-    : `must be a whole number from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
+const boundedUnits: FieldCheck = widthCheck;
 
 export const RESIZE_SPEC: FieldSpec = {
   minUnits: { required: true, check: boundedUnits },
@@ -157,6 +189,9 @@ export function validateModuleDeep(
   if (isComb && def.terminals !== undefined) errors.push({ path: `${path}.terminals`, message: 'a comb has no terminals' });
   if (def.comb !== undefined) validateObject(def.comb, COMB_SPEC, `${path}.comb`, errors);
   const narrowest = checkResizable(def, path, errors);
+  if (def.logic !== undefined && !Array.isArray(def.terminals)) {
+    errors.push({ path: `${path}.logic`, message: 'needs explicit terminals to refer to' });
+  }
   if (!Array.isArray(def.terminals)) return;
 
   const width = def.widthUnits as number;
@@ -180,6 +215,45 @@ export function validateModuleDeep(
   if (total > MAX_TERMINALS_PER_MODULE) {
     errors.push({ path: `${path}.terminals`, message: `at most ${MAX_TERMINALS_PER_MODULE} terminals per module` });
   }
+  if (def.logic !== undefined) validateLogic(def.logic, ids, `${path}.logic`, errors);
+}
+
+function validateLogic(raw: unknown, terminalIds: Set<string>, path: string, errors: ValidationError[]): void {
+  const logic = validateObject(raw, LOGIC_SPEC, path, errors);
+  if (!logic) return;
+  const inputs = logic.inputs as Record<string, unknown>;
+  const names = Object.keys(inputs);
+  if (names.length > MAX_LOGIC_INPUTS) errors.push({ path: `${path}.inputs`, message: `at most ${MAX_LOGIC_INPUTS} inputs` });
+  const knownTerminal = (id: unknown, at: string) => {
+    if (typeof id !== 'string' || !terminalIds.has(id)) errors.push({ path: at, message: `"${String(id)}" is not a terminal of this module` });
+  };
+  for (const name of names) {
+    const inputPath = `${path}.inputs.${name}`;
+    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) errors.push({ path: inputPath, message: 'the name must be letters, digits and _, starting with a letter' });
+    const input = validateObject(inputs[name], LOGIC_INPUT_SPEC, inputPath, errors);
+    if (!input) continue;
+    const terminals = input.terminals as unknown[];
+    if (terminals.length < 1 || terminals.length > MAX_INPUT_TERMINALS) {
+      errors.push({ path: `${inputPath}.terminals`, message: `must list 1 to ${MAX_INPUT_TERMINALS} terminals` });
+    }
+    terminals.forEach((id, i) => knownTerminal(id, `${inputPath}.terminals[${i}]`));
+  }
+  const contacts = logic.contacts as unknown[];
+  if (contacts.length > MAX_LOGIC_CONTACTS) errors.push({ path: `${path}.contacts`, message: `at most ${MAX_LOGIC_CONTACTS} contacts` });
+  contacts.forEach((entry, index) => {
+    const contactPath = `${path}.contacts[${index}]`;
+    const contact = validateObject(entry, LOGIC_CONTACT_SPEC, contactPath, errors);
+    if (!contact) return;
+    (contact.between as unknown[]).forEach((id, i) => knownTerminal(id, `${contactPath}.between[${i}]`));
+    const parsed = parseExpression(contact.closedWhen as string);
+    if (!parsed.ok) {
+      errors.push({ path: `${contactPath}.closedWhen`, message: parsed.message });
+      return;
+    }
+    for (const name of parsed.names) {
+      if (!names.includes(name)) errors.push({ path: `${contactPath}.closedWhen`, message: `"${name}" is not an input` });
+    }
+  });
 }
 
 export const ENCLOSURE_SPEC: FieldSpec = {

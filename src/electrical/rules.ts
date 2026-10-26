@@ -5,6 +5,7 @@ import { formatAmps, loadReports, type LoadReport } from './loads';
 import { netContextOf, PASSIVE_KINDS, type NetContext, type Resolve } from './context';
 import type { Net, NetTerminal } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
+import { protectionWarnings } from './protection';
 import type { Terminal } from './terminals';
 
 type Owner = NetTerminal['owner'];
@@ -32,12 +33,14 @@ function contextOf(project: Project, resolve: Resolve): Context {
  */
 export function findRuleWarnings(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): string[] {
   const context = contextOf(project, resolve);
+  const reports = loadReports(project, resolve, settings);
   return [
     ...openEarth(context),
     ...unfedModules(context),
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
-    ...cablesAgainstBreakers(loadReports(project, resolve, settings), context.name),
+    ...cablesAgainstBreakers(reports, context.name),
+    ...protectionWarnings(project, resolve, settings, reports, (id) => context.name({ kind: 'node', id })),
   ];
 }
 

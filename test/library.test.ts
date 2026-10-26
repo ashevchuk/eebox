@@ -34,8 +34,14 @@ describe('library validation', () => {
 
   it('reports the path of a bad nested field', () => {
     const lib = minimalLibrary();
-    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 1.5, poles: 1 });
+    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 0.05, poles: 1 });
     expect(errorPaths(lib)).toEqual(['modules[1].widthUnits']);
+  });
+
+  it('accepts a width that is a fraction of a unit, as a relay of 22.5 mm is', () => {
+    const lib = minimalLibrary();
+    lib.modules.push({ id: 'm2', kind: 'relay', name: 'M2', widthUnits: 1.2857, poles: 1 });
+    expect(validateLibrary(lib).ok).toBe(true);
   });
 
   it('reports every problem, not only the first', () => {
@@ -267,5 +273,27 @@ describe('library metadata', () => {
     if (result.ok) throw new Error('expected a failure');
     expect(result.errors.map((e) => e.path)).toEqual([field]);
     expect(result.errors[0]?.message).toContain(message);
+  });
+});
+
+
+describe('price and currency of a module', () => {
+  const withModule = (extra: Record<string, unknown>) => {
+    const lib = minimalLibrary();
+    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 1, poles: 1, ...extra } as never);
+    return lib;
+  };
+
+  it('are accepted: a price from zero up, and a currency of letters', () => {
+    expect(validateLibrary(withModule({ price: 12.5, currency: 'EUR' })).ok).toBe(true);
+    expect(validateLibrary(withModule({ price: 0 })).ok).toBe(true);
+  });
+
+  it('are refused when the price is negative, not a number or absurd, and when the currency is not letters', () => {
+    expect(errorPaths(withModule({ price: -1 }))).toEqual(['modules[1].price']);
+    expect(errorPaths(withModule({ price: '5' }))).toEqual(['modules[1].price']);
+    expect(errorPaths(withModule({ price: 1e9 }))).toEqual(['modules[1].price']);
+    expect(errorPaths(withModule({ currency: '€' }))).toEqual(['modules[1].currency']);
+    expect(errorPaths(withModule({ currency: 'EUROPEAN-X' }))).toEqual(['modules[1].currency']);
   });
 });

@@ -8,6 +8,7 @@ import {
 } from './limits';
 import { normalizeLabel } from './labels';
 import type { Panel, WidthOf } from './placement';
+import { LAYOUT_EPSILON_UNITS } from './units';
 
 export type PanelEditError = 'invalid-value' | 'unknown-rail' | 'rail-not-empty' | 'modules-do-not-fit';
 
@@ -47,9 +48,9 @@ export function setRailCount(panel: Panel, count: number): PanelEditResult {
 
 export function setRailLength(panel: Panel, widthOf: WidthOf, rail: number, units: number): PanelEditResult {
   if (!inRange(rail, 0, panel.railLengthsUnits.length - 1)) return failure('unknown-rail');
-  if (!inRange(units, 1, MAX_RAIL_LENGTH_UNITS)) return failure('invalid-value');
+  if (!Number.isFinite(units) || units < 1 || units > MAX_RAIL_LENGTH_UNITS) return failure('invalid-value');
   const overflows = [...panel.placements, ...panel.combs].some(
-    (p) => p.rail === rail && p.slot + (widthOf(p) ?? 1) > units,
+    (p) => p.rail === rail && p.slot + (widthOf(p) ?? 1) > units + LAYOUT_EPSILON_UNITS,
   );
   if (overflows) return failure('modules-do-not-fit');
   const railLengthsUnits = panel.railLengthsUnits.map((length, i) => (i === rail ? units : length));

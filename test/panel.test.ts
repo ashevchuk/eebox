@@ -109,8 +109,12 @@ describe('setRailLength', () => {
     expect(setRailLength(panel, widthOf, 1, 1).ok).toBe(true);
   });
 
-  it.each([0, -3, MAX_RAIL_LENGTH_UNITS + 1, 2.5, Number.NaN])('rejects the length %s', (units) => {
+  it.each([0, -3, MAX_RAIL_LENGTH_UNITS + 1, 0.5, Number.NaN])('rejects the length %s', (units) => {
     expect(errorOf(setRailLength(createPanel([12]), widthOf, 0, units))).toBe('invalid-value');
+  });
+
+  it('accepts a length that is not a whole number of units, a rail cut to a measure', () => {
+    expect(setRailLength(createPanel([12]), widthOf, 0, 14.2857).ok).toBe(true);
   });
 
   it('rejects an unknown rail', () => {

@@ -42,7 +42,7 @@ describe('setPlacementWidth', () => {
     expect(setPlacementWidth(panel, widthOf, resizeOf, 'p1', 12).ok).toBe(true);
     expect(failure(setPlacementWidth(panel, widthOf, resizeOf, 'p1', 1))).toBe('width-out-of-range');
     expect(failure(setPlacementWidth(panel, widthOf, resizeOf, 'p1', 13))).toBe('width-out-of-range');
-    expect(failure(setPlacementWidth(panel, widthOf, resizeOf, 'p1', 4.5))).toBe('width-out-of-range');
+    expect(setPlacementWidth(panel, widthOf, resizeOf, 'p1', 4.5).ok).toBe(true);
     expect(failure(setPlacementWidth(panel, widthOf, resizeOf, 'p1', Number.NaN))).toBe('width-out-of-range');
   });
 
@@ -190,9 +190,9 @@ describe('bill of materials and project file', () => {
     );
   });
 
-  it('rejects an own width that is not a whole number of units', () => {
+  it('rejects an own width that is not a number of units, or is smaller than a tenth of one', () => {
     const file = JSON.parse(JSON.stringify(buildProjectFile(widened(), resolve)));
-    file.project.panel.placements[1].widthUnits = 4.5;
+    file.project.panel.placements[1].widthUnits = 'wide';
     file.project.panel.placements[2].widthUnits = 0;
     const result = parseProjectFile(file);
     expect(result.ok ? [] : result.errors.map((e) => e.path)).toEqual([

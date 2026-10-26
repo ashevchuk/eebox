@@ -1,0 +1,4 @@
+name;sku;kind;poles;width_mm;rated_current_a;curve;breaking_capacity_ka;price;currency;top_terminals;bottom_terminals;conductor;joined
+Relay 1CO 22.5 mm;REL-22;relay;1;22,5;;;;4,90;EUR;;;;
+Breaker 1P C16;MCB-1C16;breaker;1;17,5;16;C;6;3,20;EUR;;;;
+Distribution block 1 in 6 out;DB-1-6;terminal;1;52,5;;;;7,10;EUR;1;6;L;yes

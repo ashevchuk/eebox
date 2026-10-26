@@ -4,7 +4,7 @@ import { freeNodeTerminals } from '../electrical/nodeTerminals';
 import type { Terminal } from '../electrical/terminals';
 import { normalizeLabel } from '../layout/labels';
 import type { ModuleRef, Panel } from '../layout/placement';
-import { CONDUCTORS, familyOf, type Conductor } from '../library/types';
+import { CONDUCTORS, canJoin, familyOf, type Conductor } from '../library/types';
 
 export type NodeKind = 'source' | 'load' | 'module';
 
@@ -22,6 +22,10 @@ export interface SchematicNode {
   load?: LoadSpec;
   /** A `source` node that is switched off, to see what loses power; only on source nodes. */
   off?: boolean;
+  /** Prospective short-circuit current at the source, in kA; only on source nodes. */
+  shortCircuitKA?: number;
+  /** Phase-to-neutral loop impedance at the source, in milliohms; only on source nodes. */
+  loopImpedanceMOhm?: number;
 }
 
 export interface TerminalRef {
@@ -170,7 +174,7 @@ export function connect(
   if (typeof first === 'string') return failure(first);
   if (typeof second === 'string') return failure(second);
   if (sameRef(a, b)) return failure('same-terminal');
-  if (familyOf(first.conductor) !== familyOf(second.conductor)) return failure('incompatible-conductors');
+  if (!canJoin(first.conductor, second.conductor)) return failure('incompatible-conductors');
   if (isWired(schematic, a, b)) return failure('duplicate-wire');
   const wire: Wire = { id: nextId('w', schematic.wires), a, b };
   return { ok: true, schematic: { ...schematic, wires: [...schematic.wires, wire] } };
@@ -278,6 +282,22 @@ export function setSourceOff(schematic: Schematic, id: string, off: boolean): Sc
   if (node.kind !== 'source') return failure('not-a-source');
   const { off: _previous, ...rest } = node;
   const updated: SchematicNode = off ? { ...rest, off: true } : rest;
+  return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
+}
+
+export type SourceProtectionKey = 'shortCircuitKA' | 'loopImpedanceMOhm';
+export const MAX_SHORT_CIRCUIT_KA = 200;
+export const MAX_LOOP_IMPEDANCE_MOHM = 100_000;
+
+/** Sets what is known of the supply for the protection checks, or clears it with `undefined`. */
+export function setSourceProtection(schematic: Schematic, id: string, key: SourceProtectionKey, value: number | undefined): SchematicResult {
+  const node = schematic.nodes.find((n) => n.id === id);
+  if (!node) return failure('unknown-node');
+  if (node.kind !== 'source') return failure('not-a-source');
+  const limit = key === 'shortCircuitKA' ? MAX_SHORT_CIRCUIT_KA : MAX_LOOP_IMPEDANCE_MOHM;
+  if (value !== undefined && !(Number.isFinite(value) && value > 0 && value <= limit)) return failure('invalid-load');
+  const { [key]: _previous, ...rest } = node;
+  const updated: SchematicNode = value === undefined ? rest : { ...rest, [key]: value };
   return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
 }
 

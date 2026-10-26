@@ -25,6 +25,7 @@ import {
   nonEmptyString,
   labelCheck,
   oneOf,
+  widthCheck,
   railLengthsCheck,
   validateList,
   validateObject,
@@ -33,7 +34,7 @@ import {
 } from '../library/validate';
 import { CONDUCTORS, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
-import { findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
+import { MAX_LOOP_IMPEDANCE_MOHM, MAX_SHORT_CIRCUIT_KA, findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
 
 export const PROJECT_FORMAT = 'eebox-project';
 export const PROJECT_VERSION = 1;
@@ -69,10 +70,9 @@ const objectCheck = (v: unknown) => (isRecord(v) ? null : 'must be an object');
 const arrayCheck = (v: unknown) => (Array.isArray(v) ? null : 'must be an array');
 const nonNegativeInteger = (v: unknown) =>
   Number.isInteger(v) && (v as number) >= 0 ? null : 'must be a non-negative integer';
-const unitsCheck = (v: unknown) =>
-  Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_RAIL_LENGTH_UNITS
-    ? null
-    : `must be a whole number from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
+const slotCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_LENGTH_UNITS ? null : `must be a number of units from 0 to ${MAX_RAIL_LENGTH_UNITS}`;
+const unitsCheck = widthCheck;
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
 const pitchListCheck = (v: unknown) =>
   Array.isArray(v) &&
@@ -138,7 +138,7 @@ const COMB_PLACEMENT_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
   rail: { required: true, check: nonNegativeInteger },
-  slot: { required: true, check: nonNegativeInteger },
+  slot: { required: true, check: slotCheck },
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
 };
@@ -170,6 +170,8 @@ const NODE_SPEC: FieldSpec = {
   conductors: { required: false, check: conductorsCheck },
   load: { required: false, check: objectCheck },
   off: { required: false, check: (v) => (v === true ? null : 'must be true when present') },
+  shortCircuitKA: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_SHORT_CIRCUIT_KA ? null : `must be above 0 and at most ${MAX_SHORT_CIRCUIT_KA}`) },
+  loopImpedanceMOhm: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_LOOP_IMPEDANCE_MOHM ? null : `must be above 0 and at most ${MAX_LOOP_IMPEDANCE_MOHM}`) },
 };
 const LOAD_SPEC: FieldSpec = {
   powerW: { required: true, check: (v) => (typeof v === 'number' && loadSpecProblem({ powerW: v }) === null ? null : `must be above 0 and at most ${MAX_POWER_W}`) },
@@ -197,6 +199,9 @@ function checkNodeShape(node: Record<string, unknown>, path: string, errors: Val
     errors.push({ path: `${path}.conductors`, message: 'is required for source and load nodes' });
   }
   if (node.off !== undefined && node.kind !== 'source') errors.push({ path: `${path}.off`, message: 'is only allowed on a source node' });
+  for (const key of ['shortCircuitKA', 'loopImpedanceMOhm']) {
+    if (node[key] !== undefined && node.kind !== 'source') errors.push({ path: `${path}.${key}`, message: 'is only allowed on a source node' });
+  }
   if (node.load !== undefined) {
     if (node.kind !== 'load') errors.push({ path: `${path}.load`, message: 'is only allowed on a load node' });
     else child(node, 'load', LOAD_SPEC, `${path}.load`, errors);

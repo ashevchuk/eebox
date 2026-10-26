@@ -36,7 +36,8 @@ import {
   MIN_POWER_FACTOR,
   type LoadSpec,
 } from '../electrical/loads';
-import { energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
+import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
+import { mmFromUnits } from '../layout/units';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
 import { CONDUCTORS, type Conductor, type ModuleDef } from '../library/types';
@@ -47,12 +48,14 @@ import {
   setNodeConductors,
   setNodeLoad,
   setSourceOff,
+  setSourceProtection,
   setWireSection,
   setWireLabel,
   type SchematicNode,
   type Wire,
 } from '../schematic/model';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
+import { selectedIds } from './selection';
 import type { Mode, Selection } from './session';
 
 export type FieldKind = 'text' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
@@ -114,11 +117,13 @@ type Target =
   | { kind: 'comb'; comb: CombPlacement }
   | { kind: 'placement'; placement: Placement; node?: SchematicNode }
   | { kind: 'rail'; rail: number }
+  | { kind: 'group'; count: number }
   | { kind: 'wire'; wire: Wire }
   | { kind: 'node'; node: SchematicNode };
 
 const LABEL_MESSAGE = 'Labels are 1 to 60 characters, without line breaks.';
 const NOT_A_NUMBER = 'Enter a whole number.';
+const NOT_A_DECIMAL = 'Enter a number.';
 
 /** What the selection points at, given which view is showing: a module node stands for its placement. */
 function targetOf({ project, selection, mode }: InspectContext): Target {
@@ -130,6 +135,10 @@ function targetOf({ project, selection, mode }: InspectContext): Target {
     if (!node) return { kind: 'panel' };
     const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
     return placement ? { kind: 'placement', placement, node } : { kind: 'node', node };
+  }
+  if (selection.placementIds || selection.combIds) {
+    const chosen = selectedIds(selection);
+    return { kind: 'group', count: chosen.placements.length + chosen.combs.length };
   }
   const comb = panel.combs.find((c) => c.id === selection.combId);
   if (comb) return { kind: 'comb', comb };
@@ -147,13 +156,21 @@ const text = (key: string, label: string, value: string, placeholder?: string): 
 const integer = (key: string, label: string, value: number, min: number, max: number, hint?: string): InspectorField => ({
   key, label, kind: 'integer', value, min, max, ...(hint ? { hint } : {}),
 });
+/** A number that need not be whole: positions and widths are fractions of a unit. */
+const decimal = (key: string, label: string, value: number, min: number, max: number, hint?: string): InspectorField => ({
+  key, label, kind: 'number', value, min, max, ...(hint ? { hint } : {}),
+});
 const readonly = (key: string, label: string, value: string | number): InspectorField => ({
   key, label, kind: 'readonly', value,
 });
 
 function loadFields(project: Project, resolve: Resolve, node: SchematicNode, settings?: CableSettings): InspectorField[] {
   if (node.kind === 'source') {
-    return [{ key: 'supply', label: 'Supply', kind: 'select', value: node.off ? 'off' : 'on', options: ['on', 'off'], hint: 'off to see what loses power' }];
+    return [
+      { key: 'supply', label: 'Supply', kind: 'select', value: node.off ? 'off' : 'on', options: ['on', 'off'], hint: 'off to see what loses power' },
+      { key: 'shortCircuitKA', label: 'Short-circuit', kind: 'number', value: node.shortCircuitKA ?? '', hint: 'kA at the panel; empty for unknown' },
+      { key: 'loopImpedanceMOhm', label: 'Loop impedance', kind: 'number', value: node.loopImpedanceMOhm ?? '', hint: 'mOhm phase to neutral; empty for unknown' },
+    ];
   }
   if (node.kind !== 'load') return [];
   const spec = node.load;
@@ -190,8 +207,17 @@ function powerFields(placement: Placement, def: ModuleDef | undefined, power: En
   if (positions.length > 0) {
     fields.push({
       key: 'state', label: 'Position', kind: 'select', value: positionOf(placement, def) ?? positions[0]!, options: positions,
-      hint: positions.includes('1') ? '1 or 2 picks the input, open breaks the circuit' : 'open breaks the circuit',
+      hint: positions.includes(AUTO)
+        ? 'auto follows the coil, closed and open override it'
+        : positions.includes('1') ? '1 or 2 picks the input, open breaks the circuit' : 'open breaks the circuit',
     });
+  }
+  if (power.hasSource) {
+    for (const [name, sensed] of Object.entries(power.inputsOf(placement.id) ?? {})) {
+      fields.push(readonly(`input-${name}`, `Input ${name}`, sensed ? 'voltage' : 'no voltage'));
+    }
+    const contacts = power.contactsOf(placement.id);
+    if (contacts) fields.push(readonly('contacts', 'Contacts', `${contacts.closed} of ${contacts.total} closed`));
   }
   if (power.hasSource) fields.push(readonly('supplied', 'Supplied', power.placementLive(placement.id) ? 'yes' : 'no'));
   return fields;
@@ -225,10 +251,10 @@ function positionFields(
   const resizable = def?.resizable;
   return [
     integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
-    integer('slot', 'Position', item.slot, 0, Math.max(0, railLength - width), 'units from the start of the rail'),
+    decimal('slot', 'Position', item.slot, 0, Math.max(0, railLength - width), `units from the start of the rail, ${mmFromUnits(item.slot)} mm`),
     resizable
-      ? integer('width', 'Width', width, resizable.minUnits, resizable.maxUnits, `${resizable.minUnits}-${resizable.maxUnits} units`)
-      : readonly('width', 'Width', `${width} units`),
+      ? decimal('width', 'Width', width, resizable.minUnits, resizable.maxUnits, `${resizable.minUnits}-${resizable.maxUnits} units, ${mmFromUnits(width)} mm`)
+      : readonly('width', 'Width', `${width} units (${mmFromUnits(width)} mm)`),
   ];
 }
 
@@ -313,6 +339,12 @@ export function inspect(ctx: InspectContext): InspectorView {
         ],
       };
     }
+    case 'group':
+      return {
+        title: `${target.count} items selected`,
+        fields: [readonly('count', 'Selected', target.count)],
+        actions: [],
+      };
     case 'rail': {
       const { panel } = project;
       const { rail } = target;
@@ -324,7 +356,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         fields: [
           text('label', 'Label', panel.railLabels[rail] ?? '', `Row ${rail + 1}`),
           integer('position', 'Position', rail + 1, 1, panel.railLengthsUnits.length),
-          integer('length', 'Length', panel.railLengthsUnits[rail] ?? 0, 1, MAX_RAIL_LENGTH_UNITS, 'units'),
+          decimal('length', 'Length', panel.railLengthsUnits[rail] ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.railLengthsUnits[rail] ?? 0)} mm`),
           ...(rail < panel.railPitchesMm.length
             ? [integer('spacing', 'Spacing below', panel.railPitchesMm[rail] ?? 0, MIN_RAIL_PITCH_MM, MAX_RAIL_PITCH_MM, 'mm to the next row')]
             : []),
@@ -430,6 +462,12 @@ function withValidation(spec: LoadSpec): LoadSpec | string {
   return problem === null ? spec : `${problem.charAt(0).toUpperCase()}${problem.slice(1)}.`;
 }
 
+function numberOf(raw: string | string[]): number | null {
+  if (Array.isArray(raw) || raw.trim() === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 function integerOf(raw: string | string[]): number | null {
   if (Array.isArray(raw) || raw.trim() === '') return null;
   const value = Number(raw);
@@ -500,9 +538,9 @@ export function applyEdit(
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if ((key === 'nodeX' || key === 'nodeY') && node) return moveNodeTo(node);
-      const value = integerOf(raw);
+      const value = key === 'slot' || key === 'width' ? numberOf(raw) : integerOf(raw);
       if (key === 'row' || key === 'slot') {
-        if (value === null) return fail(NOT_A_NUMBER);
+        if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
         const result = movePlacement(
           panel,
           widthOf,
@@ -531,9 +569,9 @@ export function applyEdit(
         const result = setCombLabel(panel, comb.id, text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
-      const value = integerOf(raw);
+      const value = key === 'slot' || key === 'width' ? numberOf(raw) : integerOf(raw);
       if (key === 'row' || key === 'slot') {
-        if (value === null) return fail(NOT_A_NUMBER);
+        if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
         const result = moveComb(
           panel,
           combLookup,
@@ -550,13 +588,15 @@ export function applyEdit(
       }
       return fail('That property cannot be edited.');
     }
+    case 'group':
+      return fail('That property cannot be edited.');
     case 'rail': {
       const { rail } = target;
       if (key === 'label') {
         const result = setRailLabel(panel, rail, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
       }
-      const value = integerOf(raw);
+      const value = key === 'length' ? numberOf(raw) : integerOf(raw);
       if (value === null) return fail(NOT_A_NUMBER);
       if (key === 'position') {
         const result = moveRail(panel, rail, value - 1);
@@ -589,6 +629,12 @@ export function applyEdit(
         return result.ok ? withSchematic(result.schematic) : fail(text.trim() === '' ? 'This item needs a label.' : LABEL_MESSAGE);
       }
       if (key === 'nodeX' || key === 'nodeY') return moveNodeTo(node);
+      if ((key === 'shortCircuitKA' || key === 'loopImpedanceMOhm') && node.kind === 'source') {
+        const value = text.trim() === '' ? undefined : Number(text);
+        if (value !== undefined && !Number.isFinite(value)) return fail(NOT_A_DECIMAL);
+        const result = setSourceProtection(schematic, node.id, key, value);
+        return result.ok ? withSchematic(result.schematic) : fail('Enter a value above 0 within the allowed range.');
+      }
       if (key === 'supply' && node.kind === 'source') {
         const result = setSourceOff(schematic, node.id, text === 'off');
         return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));

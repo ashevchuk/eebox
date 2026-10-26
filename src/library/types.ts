@@ -31,6 +31,12 @@ const CONTROL_CONDUCTORS: readonly Conductor[] = ['C', 'DCP', 'DCN'];
 export const familyOf = (conductor: Conductor): ConductorFamily =>
   conductor === 'N' || conductor === 'PE' ? conductor : CONTROL_CONDUCTORS.includes(conductor) ? 'control' : 'phase';
 
+/**
+ * Whether a wire may join two conductors: those of one family, or any pair when one is `C`, the
+ * terminal of a contact, which switches whatever is wired to it.
+ */
+export const canJoin = (a: Conductor, b: Conductor): boolean => a === 'C' || b === 'C' || familyOf(a) === familyOf(b);
+
 export const TERMINAL_SIDES = ['top', 'bottom'] as const;
 export type TerminalSide = (typeof TERMINAL_SIDES)[number];
 
@@ -63,6 +69,26 @@ export interface ResizeSpec {
   maxUnits: number;
 }
 
+/** A group of terminals whose voltage a device senses; a coil is one with two terminals. */
+export interface LogicInput {
+  /** Terminal ids of the module, such as `top:A1`. */
+  terminals: string[];
+  /** `all`: every terminal carries voltage, on separate nets (a coil); `any`: at least one does. */
+  when: 'all' | 'any';
+}
+
+/** Two terminals that are joined while an expression over the input names is true. */
+export interface LogicContact {
+  between: [string, string];
+  closedWhen: string;
+}
+
+/** What a relay or contactor does with the voltages it senses, so the power view can follow its contacts. */
+export interface ModuleLogic {
+  inputs: Record<string, LogicInput>;
+  contacts: LogicContact[];
+}
+
 export interface ModuleDef {
   id: string;
   kind: ModuleKind;
@@ -75,6 +101,10 @@ export interface ModuleDef {
   curve?: TripCurve;
   breakingCapacityKA?: number;
   residualCurrentMa?: number;
+  /** What one costs, in `currency`; entered by the person who owns the library, so a bill of materials can be priced. */
+  price?: number;
+  /** Short code of the currency of `price`, for example EUR; totals are kept apart per currency. */
+  currency?: string;
   /** Replaces the terminals derived from `poles`. */
   terminals?: TerminalDef[];
   /** Required for, and only allowed on, kind "comb". */
@@ -85,6 +115,8 @@ export interface ModuleDef {
    * units; single terminals stay single.
    */
   resizable?: ResizeSpec;
+  /** Needs explicit `terminals`, which it refers to. */
+  logic?: ModuleLogic;
 }
 
 export interface EnclosureDef {

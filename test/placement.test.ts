@@ -69,10 +69,48 @@ describe('addPlacement', () => {
   it.each([
     ['past the rail end', place('a', 'two', 0, 5)],
     ['at a negative slot', place('a', 'one', 0, -1)],
-    ['at a fractional slot', place('a', 'one', 0, 0.5)],
+    ['at a slot that is not a number', place('a', 'one', 0, Number.NaN)],
+    ['that ends past the rail by a fraction', place('a', 'two', 0, 4.5)],
   ])('rejects a module %s', (_label, placement) => {
     expect(errorOf(addPlacement(emptyPanel(), widthOf, placement))).toEqual({
       kind: 'out-of-rail',
+    });
+  });
+
+  describe('with fractional slots and widths', () => {
+    const relayWidth = 22.5 / 17.5;
+    const wideOf: WidthOf = (item) => (item.module.moduleId === 'relay' ? relayWidth : widthOf(item));
+
+    it('accepts a module at a fractional slot, as a rail is measured in millimetres', () => {
+      expect(addPlacement(emptyPanel(), widthOf, place('a', 'one', 0, 0.5)).ok).toBe(true);
+    });
+
+    it('lets modules of 22.5 mm stand end to end without calling it an overlap', () => {
+      let panel = emptyPanel();
+      for (let i = 0; i < 4; i++) {
+        const result = addPlacement(panel, wideOf, place(`r${i}`, 'relay', 0, i * relayWidth));
+        if (!result.ok) throw new Error(`relay ${i}: ${JSON.stringify(result.error)}`);
+        panel = result.panel;
+      }
+      expect(panel.placements).toHaveLength(4);
+    });
+
+    it('tolerates the rounding of a width kept to four decimals, but not a real overlap', () => {
+      const rounded: WidthOf = (item) => (item.module.moduleId === 'relay' ? 1.2857 : widthOf(item));
+      const first = addPlacement(emptyPanel(), rounded, place('a', 'relay', 0, 0));
+      if (!first.ok) throw new Error('setup');
+      expect(addPlacement(first.panel, rounded, place('b', 'relay', 0, 22.5 / 17.5)).ok).toBe(true);
+      expect(errorOf(addPlacement(first.panel, rounded, place('c', 'relay', 0, 1)))).toEqual({ kind: 'overlap', with: 'a' });
+    });
+
+    it('fits nine modules of 22.5 mm on a rail of 210 mm, where whole units would have fitted six', () => {
+      let panel = { ...emptyPanel(), railLengthsUnits: [12, 12] };
+      for (let i = 0; i < 9; i++) {
+        const result = addPlacement(panel, wideOf, place(`r${i}`, 'relay', 0, i * relayWidth));
+        if (!result.ok) throw new Error(`relay ${i}: ${JSON.stringify(result.error)}`);
+        panel = result.panel;
+      }
+      expect(errorOf(addPlacement(panel, wideOf, place('tenth', 'relay', 0, 9 * relayWidth)))).toEqual({ kind: 'out-of-rail' });
     });
   });
 
