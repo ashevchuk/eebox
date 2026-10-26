@@ -48,7 +48,7 @@ export const DEFAULT_CABLE_SETTINGS: CableSettings = {
 };
 
 export const CABLE_TABLE_NOTE =
-  'Reference values (copper, PVC, 30 °C), not verified against IEC 60364-5-52. Replace them in File > Cable settings.';
+  'Ampacities (copper, PVC, 30 °C, 1.5 to 35 mm²) match IEC 60364-5-52:2009 tables B.52.2, B.52.4 and B.52.10; resistivity, reactance, voltage drop limits and trip multiples are not verified. Replace them in File > Cable settings.';
 
 export function ampacityA(
   method: InstallMethod,

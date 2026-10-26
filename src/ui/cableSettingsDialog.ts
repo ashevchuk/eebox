@@ -201,7 +201,7 @@ export function editCableSettings(current: CableSettings): Promise<CableSettings
     const help = element(
       'p',
       'settings-hint',
-      'Used to size cables, to check the voltage drop and the fault loop. Values that differ from the built-in ones are outlined. The built-in values are not verified against the standards.',
+      'Used to size cables, to check the voltage drop and the fault loop. Values that differ from the built-in ones are outlined. The built-in ampacities match IEC 60364-5-52:2009; the other built-in values are not verified.',
     );
     const actions = element('div', 'app-dialog-actions settings-actions');
     const files = element('div', 'settings-files');

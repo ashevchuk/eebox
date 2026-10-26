@@ -69,7 +69,7 @@ Pushes to `main` run the tests and deploy `dist-file/` to GitHub Pages.
 
 ## Limits
 
-- The cable table (copper, PVC, 30 °C, methods B1, B2, C and E, 1.5 to 35 mm²) was entered without the standard at hand and is **not verified** against IEC 60364-5-52. Check it before relying on a cable size. There is no grouping or temperature correction and no selectivity calculation. The voltage drop is that of the final circuit only, from the panel to the load, with the simplified formula of the standard.
+- The cable table (copper, PVC, 30 °C, methods B1, B2, C and E, 1.5 to 35 mm²) was compared with tables B.52.2, B.52.4 and B.52.10 of IEC 60364-5-52:2009 and matches them. The resistivity, reactance and voltage drop limits are **not verified**. Check them before relying on a cable size. There is no grouping or temperature correction and no selectivity calculation. The voltage drop is that of the final circuit only, from the panel to the load, with the simplified formula of the standard.
 - Currents assume 230 V single-phase and balanced 400 V three-phase loads. Wires behind a phase bar, and wires in a loop, show no current.
 - The checks are advice, not a design verification.
 - A project keeps its own copy of the modules it uses, so a changed library reaches it only through *Update modules from libraries*.
