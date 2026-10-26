@@ -275,6 +275,33 @@ try {
     expectEqual(await browser.evaluate(`document.getElementById('status').textContent`), 'Check passed: no problems found.', 'Check on the example');
   });
 
+  await step('no text is cut off or sticks out of the window in the toolbar, the sidebars and the dialogs', async () => {
+    const scan = `(() => {
+      const out = [];
+      const W = window.innerWidth, H = window.innerHeight;
+      for (const el of document.querySelectorAll('body *')) {
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || el.closest('#print-sheet') || el.closest('svg') || el.tagName === 'CANVAS') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) continue;
+        const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        if (!own) continue;
+        const scrolls = (() => { for (let a = el.parentElement; a; a = a.parentElement) { const o = getComputedStyle(a).overflowY; if (o === 'auto' || o === 'scroll') return true; } return false; })();
+        const clipped = st.overflowX !== 'visible' && st.overflowX !== 'auto' && st.overflowX !== 'scroll' && el.scrollWidth > el.clientWidth + 1;
+        const outside = !scrolls && (r.right > W + 1 || r.bottom > H + 1 || r.left < -1);
+        if (clipped || outside) out.push(el.tagName + ' "' + el.textContent.trim().slice(0, 40) + '"');
+      }
+      return out;
+    })()`;
+    await clickButton('Check');
+    expectEqual(await browser.evaluate(scan), [], 'cut off or overflowing text in the main window');
+    await clickButton('File');
+    await browser.evaluate(`document.getElementById('cable-settings').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open]')`, 'the cable settings dialog');
+    expectEqual(await browser.evaluate(scan), [], 'cut off or overflowing text in the cable settings');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Cancel').click()`);
+  });
+
   await step('a source that is off leaves what it feeds dashed and dim in an exported drawing', async () => {
     const project = JSON.parse(example);
     project.project.schematic.nodes.find((n) => n.kind === 'source').off = true;

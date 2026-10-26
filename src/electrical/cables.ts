@@ -48,7 +48,7 @@ export const DEFAULT_CABLE_SETTINGS: CableSettings = {
 };
 
 export const CABLE_TABLE_NOTE =
-  'Built-in reference values for copper with PVC insulation at 30 °C (after IEC 60364-5-52), entered without the standard at hand and not verified against it. Replace them in File > Cable settings if your norm differs.';
+  'Reference values (copper, PVC, 30 °C), not verified against IEC 60364-5-52. Replace them in File > Cable settings.';
 
 export function ampacityA(
   method: InstallMethod,

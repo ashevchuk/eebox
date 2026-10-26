@@ -13,7 +13,8 @@ export function editCableSettings(current: CableSettings): Promise<CableSettings
     const help = document.createElement('p');
     help.textContent =
       'Current-carrying capacity per laying method, loaded conductors (2 or 3) and cross-section 1.5, 2.5, 4, 6, 10, 16, 25, 35 mm2; ' +
-      'voltage drop limits in percent; resistivity in ohm mm2/m; reactance in ohm/m.';
+      'voltage drop limits in percent; resistivity in ohm mm2/m; reactance in ohm/m; the voltage that drives a fault current and the multiple of its rating at which each breaker curve trips at once. ' +
+      'The built-in values are not verified against the standards.';
     const text = document.createElement('textarea');
     text.className = 'settings-text';
     text.spellcheck = false;

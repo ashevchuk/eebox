@@ -7,6 +7,8 @@ import type { Conductor, Library, ModuleDef, TerminalDef, TerminalSide, TripCurv
 
 export const UNIT_PX = 44;
 const MARGIN = 28;
+/** The drawing is never narrower than this, so the caption under a very narrow module fits. */
+const MIN_STAGE_WIDTH_PX = 150;
 const BODY_HEIGHT = 190;
 const PIN_INSET = 18;
 const PIN_SPACING_PX = 13;
@@ -59,7 +61,7 @@ export function designerLayout(def: ModuleDef, widthUnits: number = def.widthUni
   });
   const tightest = Math.min(Infinity, ...gaps);
   const pinRadius = Math.max(MIN_PIN_RADIUS, Math.min(MAX_PIN_RADIUS, tightest * PIN_GAP_SHARE));
-  return { width: body.width + 2 * MARGIN, height: body.height + 2 * MARGIN, widthUnits, pinRadius, crowded: tightest < CROWDED_GAP_PX, body, pins };
+  return { width: Math.max(body.width + 2 * MARGIN, MIN_STAGE_WIDTH_PX), height: body.height + 2 * MARGIN, widthUnits, pinRadius, crowded: tightest < CROWDED_GAP_PX, body, pins };
 }
 
 /** The pin under a point, the nearest one when several are within reach. */

@@ -27,6 +27,7 @@
       }
       body { display: flex; flex-direction: column; }
       header {
+        position: relative;
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
@@ -128,8 +129,26 @@
       button:hover:not(:disabled), .file-button:hover { border-color: var(--accent); }
       button:disabled { opacity: 0.4; cursor: default; }
       .hint { flex-basis: 100%; color: var(--text-dim); font-size: 12px; }
-      #status { color: var(--text-dim); margin-left: auto; white-space: pre-line; text-align: right; }
-      #status.error { color: var(--error); }
+      /* An overlay under the toolbar, so a long message does not stretch the toolbar and shift the drawing. */
+      #status {
+        position: absolute;
+        top: 100%;
+        right: 290px;
+        z-index: 30;
+        max-width: min(560px, 60vw);
+        margin-top: 4px;
+        padding: 4px 10px;
+        color: var(--text-dim);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        white-space: pre-line;
+        text-align: left;
+        pointer-events: none;
+      }
+      #status:empty { display: none; }
+      #status.error { color: var(--error); border-color: var(--error); }
       main { flex: 1; display: flex; min-height: 0; }
       #sidebar {
         width: 240px;

@@ -219,10 +219,16 @@ export function routeWires(schematic: Schematic, layout: Layout): Map<string, Po
     }
   }
   const s: Search = { xs: sortedUnique(xValues), ys: sortedUnique(yValues), obstacles, used: new Map(), blocked: new Map() };
+  /**
+   * A terminal whose stub ends inside the clearance of a nearby node is shut in by the clearance
+   * alone, so such a wire is searched against the bodies of the nodes instead of their clearance.
+   */
+  const bodies: Search = { ...s, obstacles: [...layout.values()].map((n) => n.rect), blocked: new Map() };
+  const inClearance = (p: Point) => obstacles.some((o) => p.x > o.x && p.x < o.x + o.width && p.y > o.y && p.y < o.y + o.height);
 
   const routes = new Map<string, Point[]>();
   for (const { wire, from, to, sides } of endpoints) {
-    const found = search(s, from, to);
+    const found = search(s, from, to) ?? (inClearance(from.stub) || inClearance(to.stub) ? search(bodies, from, to) : undefined);
     if (!found) {
       routes.set(wire.id, wirePath({ point: from.port, side: sides[0] }, { point: to.port, side: sides[1] }, 0));
       continue;

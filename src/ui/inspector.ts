@@ -213,7 +213,7 @@ function powerFields(placement: Placement, def: ModuleDef | undefined, power: En
   const fields: InspectorField[] = [];
   if (positions.length > 0) {
     fields.push({
-      key: 'state', label: 'Position', kind: 'select', value: positionOf(placement, def) ?? positions[0]!, options: positions,
+      key: 'state', label: 'Switch position', kind: 'select', value: positionOf(placement, def) ?? positions[0]!, options: positions,
       hint: positions.includes(AUTO)
         ? 'auto follows the coil, closed and open override it'
         : positions.includes('1') ? '1 or 2 picks the input, open breaks the circuit' : 'open breaks the circuit',

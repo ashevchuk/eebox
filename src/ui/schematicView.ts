@@ -124,12 +124,6 @@ export class SchematicView implements View {
       const colour = wire.id === wireId ? COLORS.selection : dead ? COLORS.dead : theme().conductors[conductor];
       this.strokePath(ctx, path, colour, 2.5, dead ? DEAD_WIRE_DASH : undefined);
     }
-    for (const wire of frame.schematic.wires) {
-      const path = routes.get(wire.id);
-      const amps = currents.get(wire.id);
-      const text = [wire.label, amps === undefined ? undefined : `${formatAmps(amps)} A`].filter(Boolean).join(' \u00b7 ');
-      if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
-    }
     for (const { node } of frame.layout.values()) {
       const selected = node.id === nodeId || (node.placementId !== undefined && node.placementId === placementId);
       const dead = power.deadNodes.has(node.id);
@@ -139,6 +133,13 @@ export class SchematicView implements View {
       }
       this.drawNode(ctx, frame, node, selected);
       if (dead) ctx.restore();
+    }
+    // Drawn after the nodes so that a label whose midpoint falls on a node is not half hidden by it.
+    for (const wire of frame.schematic.wires) {
+      const path = routes.get(wire.id);
+      const amps = currents.get(wire.id);
+      const text = [wire.label, amps === undefined ? undefined : `${formatAmps(amps)} A`].filter(Boolean).join(' \u00b7 ');
+      if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
     }
     this.drawPreview(ctx, frame);
   }

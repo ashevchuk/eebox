@@ -59,6 +59,8 @@ const MAX_ZOOM = 2.5;
 const STAGE_WIDTH_PX = 560;
 const STAGE_HEIGHT_PX = 400;
 const RAIL_PREVIEW = { width: 520, height: 150 };
+/** A light outline, so dark text stays readable where it runs past a narrow module onto the dark ground. */
+const HALO = { stroke: '#e5e7eb', 'stroke-width': 3, 'paint-order': 'stroke' };
 const NET_COLOR = '#7c3aed';
 const LABEL_STAGGER_PX = 10;
 const RAIL_MARGIN_MM = 45;
@@ -401,7 +403,7 @@ export class ModuleDesignerView {
     svg.append(
       svgElement(
         'text',
-        { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, fill: '#14161d', transform: `rotate(-90 ${cx} ${cy})` },
+        { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 13, fill: '#14161d', ...HALO, transform: `rotate(-90 ${cx} ${cy})` },
         label.length > MAX_LABEL_CHARS ? `${label.slice(0, MAX_LABEL_CHARS - 1)}…` : label,
       ),
     );
@@ -426,7 +428,7 @@ export class ModuleDesignerView {
       svg.append(svgElement('circle', { cx: pin.x, cy: pin.y, r: layout.pinRadius, fill: colours[pin.terminal.conductor], stroke: marked ? '#f5c518' : '#14161d', 'stroke-width': marked ? 3 : 1, class: 'designer-pin' }));
       const stagger = layout.crowded ? (layout.pins.indexOf(pin) % 2) * LABEL_STAGGER_PX : 0;
       const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
-      svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d' }, labels[layout.pins.indexOf(pin)]!));
+      svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, labels[layout.pins.indexOf(pin)]!));
     }
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e, svg));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e, svg));

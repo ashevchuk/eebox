@@ -1,3 +1,4 @@
+import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
 import { MODULE_UNIT_MM, type ModuleDef, type ModuleKind } from '../library/types';
 import type { ModuleRef, Panel } from '../layout/placement';
@@ -63,6 +64,15 @@ function fillRect(ctx: CanvasRenderingContext2D, r: Rect, color: string): void {
   ctx.fillRect(r.x, r.y, r.width, r.height);
 }
 
+/** Narrower than this a module has no room for its rating or its name, and the clipped pieces of letters only make a mess. */
+const MIN_RATING_WIDTH_MM = 12;
+const MIN_NAME_WIDTH_MM = 8;
+/** The name runs between the rating at the top and the terminals at the bottom. */
+const NAME_TOP_MM = 28;
+const NAME_BOTTOM_MM = 20;
+const NAME_MAX_LINES = 3;
+const NAME_LINE_SPACING_MM = 7.5;
+
 function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void {
   ctx.save();
   ctx.beginPath();
@@ -72,14 +82,18 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const rating = def.ratedCurrentA === undefined ? '' : `${def.curve ?? ''}${def.ratedCurrentA}`;
-  if (rating) {
+  if (rating && r.width >= MIN_RATING_WIDTH_MM) {
     ctx.font = 'bold 8px sans-serif';
     ctx.fillText(rating, r.x + r.width / 2, r.y + 22);
   }
-  ctx.translate(r.x + r.width / 2, r.y + r.height / 2 + 12);
-  ctx.rotate(-Math.PI / 2);
-  ctx.font = '6px sans-serif';
-  ctx.fillText(def.name, 0, 0);
+  if (r.width >= MIN_NAME_WIDTH_MM) {
+    const room = r.height - NAME_TOP_MM - NAME_BOTTOM_MM;
+    ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = '6px sans-serif';
+    const lines = wrapText((text) => ctx.measureText(text).width, def.name, room, Math.min(NAME_MAX_LINES, Math.max(1, Math.floor(r.width / NAME_LINE_SPACING_MM / 1.6))));
+    lines.forEach((line, i) => ctx.fillText(line, 0, (i - (lines.length - 1) / 2) * NAME_LINE_SPACING_MM));
+  }
   ctx.restore();
 }
 
