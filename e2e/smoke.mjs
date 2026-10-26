@@ -120,6 +120,15 @@ try {
     expectTrue(Math.abs(after[1] - after[0] - (before[1] - before[0])) < 1e-6, 'the distance between them to stay');
   });
 
+  await step('copies of the selected modules are added edge to edge from the inspector', async () => {
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label').textContent === 'Add copies');
+      const input = row.querySelector('input'); input.value = '4'; input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('Added 4 copies')`, 'the message about the copies');
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('8 items selected')`, 'all the copies to be selected');
+  });
+
   await step('a parts list in CSV is imported as a library with a 22.5 mm relay in it', async () => {
     await browser.evaluate(`(async () => {
       const file = new File([${JSON.stringify(partsCsv)}], 'parts.csv');

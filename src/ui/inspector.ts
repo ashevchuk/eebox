@@ -56,7 +56,8 @@ import {
   type Wire,
 } from '../schematic/model';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
-import { selectedIds } from './selection';
+import { copyItems, MAX_REPEAT_COPIES, repeatItems } from '../layout/clipboard';
+import { groupSelection, selectedIds } from './selection';
 import type { Mode, Selection } from './session';
 
 export type FieldKind = 'text' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
@@ -121,6 +122,11 @@ type Target =
   | { kind: 'group'; count: number }
   | { kind: 'wire'; wire: Wire }
   | { kind: 'node'; node: SchematicNode };
+
+/** Adds copies of what is selected, edge to edge after it; the number is typed in and nothing is kept in the field. */
+const REPEAT_FIELD: InspectorField = {
+  key: 'repeat', label: 'Add copies', kind: 'integer', value: '', min: 1, max: MAX_REPEAT_COPIES, hint: 'placed edge to edge after the selection',
+};
 
 const LABEL_MESSAGE = 'Labels are 1 to 60 characters, without line breaks.';
 const NOT_A_NUMBER = 'Enter a whole number.';
@@ -319,6 +325,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...positionFields(placement, def, project, width),
           ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
+          ...(node ? [] : [REPEAT_FIELD]),
           ...moduleDetails(def, width),
           ...terminalLabelFields(placement, def, width),
           readonly('id', 'Id', placement.id),
@@ -339,6 +346,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...(def?.comb
             ? [readonly('pattern', 'Pins', def.comb.pattern.join(' ')), readonly('side', 'Side', def.comb.side)]
             : []),
+          REPEAT_FIELD,
           readonly('id', 'Id', comb.id),
         ],
       };
@@ -346,7 +354,7 @@ export function inspect(ctx: InspectContext): InspectorView {
     case 'group':
       return {
         title: `${target.count} items selected`,
-        fields: [readonly('count', 'Selected', target.count)],
+        fields: [readonly('count', 'Selected', target.count), REPEAT_FIELD],
         actions: [],
       };
     case 'rail': {
@@ -511,6 +519,21 @@ export function applyEdit(
     const result = moveNode(schematic, node.id, key === 'nodeX' ? value : node.x, key === 'nodeY' ? value : node.y);
     return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
   };
+
+  if (key === 'repeat' && (target.kind === 'group' || target.kind === 'comb' || (target.kind === 'placement' && !target.node))) {
+    const copies = integerOf(raw);
+    if (copies === null || copies < 1 || copies > MAX_REPEAT_COPIES) return fail(`Enter a number from 1 to ${MAX_REPEAT_COPIES}.`);
+    const chosen = selectedIds(ctx.selection);
+    const clip = copyItems(panel, chosen.placements, chosen.combs);
+    const repeated = repeatItems(panel, widthOf, combLookup, clip, copies);
+    if (!repeated.ok) return fail('There is no room on the rails for a copy.');
+    return {
+      ok: true,
+      project: { ...project, panel: repeated.panel },
+      selection: groupSelection(repeated.placementIds, repeated.combIds),
+      message: repeated.added < copies ? `Only ${repeated.added} of ${copies} copies fit.` : `Added ${repeated.added} ${repeated.added === 1 ? 'copy' : 'copies'}.`,
+    };
+  }
 
   switch (target.kind) {
     case 'panel': {
