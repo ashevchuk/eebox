@@ -1,4 +1,5 @@
 import genericIecText from '../libraries/generic-iec.json?raw';
+import { createPanel } from './layout/panel';
 import type { ModuleRef } from './layout/placement';
 import {
   IndexedDbLibraryStorage,
@@ -17,6 +18,7 @@ import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, renameNode } from './schematic/model';
 import { downloadBlob } from './ui/download';
 import { renderToPng } from './ui/exportImage';
+import { PanelEditor } from './ui/panelEditor';
 import { PanelView } from './ui/panelView';
 import { SchematicView } from './ui/schematicView';
 import { Session, type Mode } from './ui/session';
@@ -41,6 +43,7 @@ const panelView = new PanelView(session);
 const schematicView = new SchematicView(session);
 const views: Record<Mode, View> = { panel: panelView, schematic: schematicView };
 const fittedModes = new Set<Mode>();
+new PanelEditor(byId('panel-settings'), session);
 
 let panFrom: Point | null = null;
 let spaceHeld = false;
@@ -48,9 +51,14 @@ let renderQueued = false;
 
 const activeView = (): View => views[session.mode];
 
+const STATUS_TTL_MS = 8000;
+let statusTimer: number | undefined;
+
 function showStatus(message: string, isError = false): void {
   statusEl.textContent = message;
   statusEl.classList.toggle('error', isError);
+  window.clearTimeout(statusTimer);
+  if (message) statusTimer = window.setTimeout(() => showStatus(''), STATUS_TTL_MS);
 }
 session.notify = showStatus;
 
@@ -93,6 +101,7 @@ function fitView(mode: Mode = session.mode): void {
 }
 
 function setMode(mode: Mode): void {
+  showStatus('');
   session.mode = mode;
   if (!fittedModes.has(mode)) fitView(mode);
   session.changed();
@@ -252,7 +261,7 @@ function newPanel(): void {
   }
   if (!confirmDiscard()) return;
   session.reset({
-    panel: { railLengthsUnits: [...enclosure.railLengthsUnits], placements: [] },
+    panel: createPanel(enclosure.railLengthsUnits),
     schematic: emptySchematic(),
   });
   fitView('panel');
@@ -292,6 +301,14 @@ async function shareLink(): Promise<void> {
   } catch {
     showStatus('Share link is in the address bar; the clipboard is unavailable here.');
   }
+}
+
+async function openSharedHash(): Promise<void> {
+  if (!location.hash.startsWith(SHARE_PREFIX)) return;
+  const result = await decodeShare(location.hash.slice(SHARE_PREFIX.length));
+  history.replaceState(null, '', location.href.split('#')[0]);
+  if (!result.ok) showStatus(describeErrors('Share link', result.errors).join('\n'), true);
+  else if (confirmDiscard()) applyLoaded(result.file, result.warnings, 'Shared project');
 }
 
 async function exportPng(): Promise<void> {
@@ -387,6 +404,7 @@ byId('sync-modules').addEventListener('click', () => schematicView.syncModules()
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
 new ResizeObserver(resizeCanvas).observe(stageWrap);
+window.addEventListener('hashchange', () => void openSharedHash());
 
 const autosaveStore: KeyValueStore | null = (() => {
   try {

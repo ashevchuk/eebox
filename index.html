@@ -48,7 +48,7 @@
       button.active { border-color: var(--accent); color: var(--accent); }
       body[data-mode='panel'] .schematic-only,
       body[data-mode='schematic'] .panel-only,
-      body[data-mode='schematic'] #palette { display: none; }
+      body[data-mode='schematic'] #sidebar { display: none; }
       #node-label {
         font: inherit;
         color: var(--text);
@@ -63,7 +63,7 @@
       #status { color: var(--text-dim); margin-left: auto; white-space: pre-line; text-align: right; }
       #status.error { color: var(--error); }
       main { flex: 1; display: flex; min-height: 0; }
-      #palette {
+      #sidebar {
         width: 240px;
         flex: 0 0 auto;
         overflow-y: auto;
@@ -92,6 +92,13 @@
       .module:hover { border-color: var(--accent); }
       .module small { color: var(--text-dim); }
       #palette .hint { color: var(--text-dim); }
+      #panel-settings { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+      #panel-settings h3 { margin: 0 0 6px; font-size: 13px; }
+      .settings-line { display: flex; align-items: center; gap: 4px; margin: 3px 0; }
+      .settings-line input { width: 64px; font: inherit; color: var(--text); background: var(--bg);
+        border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; }
+      .settings-line button { padding: 0 6px; }
+      .settings-gap { color: var(--text-dim); padding-left: 12px; }
       #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
       #stage-wrap { flex: 1; min-width: 0; position: relative; }
       #stage-wrap.drop::after {
@@ -137,7 +144,10 @@
       <div id="status"></div>
     </header>
     <main>
-      <aside id="palette"></aside>
+      <aside id="sidebar">
+        <section id="panel-settings"></section>
+        <div id="palette"></div>
+      </aside>
       <div id="stage-wrap"><canvas id="stage"></canvas></div>
     </main>
     <script type="module" src="/src/main.ts"></script>

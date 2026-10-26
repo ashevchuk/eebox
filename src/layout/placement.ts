@@ -14,6 +14,8 @@ export interface Placement {
 export interface Panel {
   /** Snapshot of the enclosure rails, so later library edits cannot move placed modules. */
   railLengthsUnits: number[];
+  /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */
+  railPitchesMm: number[];
   placements: Placement[];
 }
 
@@ -86,6 +88,64 @@ export function movePlacement(
     ok: true,
     panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? moved : p)) },
   };
+}
+
+function pushRight(others: { p: Placement; w: number }[], slot: number, width: number, railLength: number) {
+  const shifted = new Map<string, number>();
+  let frontier = slot + width;
+  for (const { p, w } of others) {
+    if (p.slot + w <= slot) continue;
+    const newSlot = Math.max(p.slot, frontier);
+    if (newSlot + w > railLength) return null;
+    shifted.set(p.id, newSlot);
+    frontier = newSlot + w;
+  }
+  return shifted;
+}
+
+function pushLeft(others: { p: Placement; w: number }[], slot: number, width: number) {
+  const shifted = new Map<string, number>();
+  let frontier = slot;
+  for (const { p, w } of [...others].reverse()) {
+    if (p.slot >= slot + width) continue;
+    const newSlot = Math.min(p.slot + w, frontier) - w;
+    if (newSlot < 0) return null;
+    shifted.set(p.id, newSlot);
+    frontier = newSlot;
+  }
+  return shifted;
+}
+
+/**
+ * Like addPlacement/movePlacement (when `replaceId` is set), but a drop onto occupied slots
+ * inserts the module there and pushes the modules in the way aside: to the right if they fit,
+ * otherwise to the left. Gaps between untouched modules are kept. Fails when neither side has room.
+ */
+export function insertPlacement(
+  panel: Panel,
+  widthOf: WidthOf,
+  placement: Placement,
+  replaceId?: string,
+): PlacementResult {
+  const strict = replaceId
+    ? movePlacement(panel, widthOf, replaceId, placement.rail, placement.slot)
+    : addPlacement(panel, widthOf, placement);
+  if (strict.ok || strict.error.kind !== 'overlap') return strict;
+
+  const width = widthOf(placement.module) ?? 1;
+  const railLength = panel.railLengthsUnits[placement.rail] ?? 0;
+  const others = panel.placements
+    .filter((p) => p.rail === placement.rail && p.id !== replaceId)
+    .map((p) => ({ p, w: widthOf(p.module) ?? 1 }))
+    .sort((a, b) => a.p.slot - b.p.slot);
+  const shifted =
+    pushRight(others, placement.slot, width, railLength) ?? pushLeft(others, placement.slot, width);
+  if (!shifted) return strict;
+
+  const moved = panel.placements.map((p) =>
+    p.id === replaceId ? placement : shifted.has(p.id) ? { ...p, slot: shifted.get(p.id)! } : p,
+  );
+  return { ok: true, panel: { ...panel, placements: replaceId ? moved : [...moved, placement] } };
 }
 
 export function removePlacement(panel: Panel, id: string): PlacementResult {

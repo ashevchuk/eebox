@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createPanel } from '../src/layout/panel';
 import type { ModuleRef } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 import type { Project } from '../src/project';
@@ -16,7 +17,7 @@ const ref = (moduleId: string): ModuleRef => ({ libraryId: 'lib', moduleId });
 
 function sampleProject(): Project {
   const panel = {
-    railLengthsUnits: [12],
+    ...createPanel([12]),
     placements: [
       { id: 'p1', module: ref('c16'), rail: 0, slot: 0 },
       { id: 'p2', module: ref('c16'), rail: 0, slot: 1 },
@@ -175,7 +176,7 @@ describe('bill of materials', () => {
   });
 
   it('keeps modules missing from the library as flagged rows', () => {
-    const panel = { railLengthsUnits: [4], placements: [{ id: 'p1', module: ref('ghost'), rail: 0, slot: 0 }] };
+    const panel = { ...createPanel([4]), placements: [{ id: 'p1', module: ref('ghost'), rail: 0, slot: 0 }] };
     const csv = bomToCsv(buildBom(panel, resolve));
     expect(csv).toContain('lib,ghost,,(missing module)');
   });
@@ -191,15 +192,49 @@ describe('bill of materials', () => {
 
   it('quotes commas, quotes and newlines', () => {
     const tricky: ModuleDef = { ...C16, id: 'x', name: 'A, "B"\nC' };
-    const panel = { railLengthsUnits: [4], placements: [{ id: 'p1', module: ref('x'), rail: 0, slot: 0 }] };
+    const panel = { ...createPanel([4]), placements: [{ id: 'p1', module: ref('x'), rail: 0, slot: 0 }] };
     const csv = bomToCsv(buildBom(panel, () => tricky));
     expect(csv).toContain('"A, ""B""\nC"');
   });
 
   it.each(['=1+1', '+SUM(A1)', '-2', '@cmd', '\tx'])('neutralises the formula %j', (name) => {
     const evil: ModuleDef = { ...C16, id: 'x', name };
-    const panel = { railLengthsUnits: [4], placements: [{ id: 'p1', module: ref('x'), rail: 0, slot: 0 }] };
+    const panel = { ...createPanel([4]), placements: [{ id: 'p1', module: ref('x'), rail: 0, slot: 0 }] };
     const csv = bomToCsv(buildBom(panel, () => evil));
     expect(csv).toContain(`,'${name},`);
+  });
+});
+
+describe('panel spacing in the project file', () => {
+  it('round-trips custom row spacing', () => {
+    const project = sampleProject();
+    const panel = { ...createPanel([12, 18]), railPitchesMm: [210], placements: project.panel.placements };
+    const file = buildProjectFile({ ...project, panel }, resolve);
+    expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
+  });
+
+  it('fills the default spacing when an older file has none', () => {
+    const file = JSON.parse(JSON.stringify(validFile()));
+    file.project.panel.railLengthsUnits = [12, 12, 12];
+    delete file.project.panel.railPitchesMm;
+    const result = parseProjectFile(file);
+    if (!result.ok) throw new Error('should load');
+    expect(result.file.project.panel.railPitchesMm).toEqual([150, 150]);
+  });
+
+  it('rejects a spacing list that does not match the rows', () => {
+    const file = validFile();
+    file.project.panel.railPitchesMm = [150];
+    expect(errorPaths(file)).toEqual(['project.panel.railPitchesMm']);
+  });
+
+  it('rejects out-of-range spacing and absurd rail lengths', () => {
+    const file = validFile();
+    file.project.panel.railLengthsUnits = [12, 12];
+    file.project.panel.railPitchesMm = [50];
+    expect(errorPaths(file)).toEqual(['project.panel.railPitchesMm']);
+    file.project.panel.railPitchesMm = [150];
+    file.project.panel.railLengthsUnits = [1_000_000_000, 12];
+    expect(errorPaths(file)).toEqual(['project.panel.railLengthsUnits']);
   });
 });

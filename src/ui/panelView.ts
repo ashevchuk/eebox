@@ -1,6 +1,5 @@
 import {
-  addPlacement,
-  movePlacement,
+  insertPlacement,
   nextPlacementId,
   removePlacement,
   type ModuleRef,
@@ -40,7 +39,7 @@ export class PanelView implements View {
       ctx,
       this.camera,
       {
-        panel: this.session.project.panel,
+        panel: this.drag?.next ?? this.session.project.panel,
         resolve: this.session.resolve,
         selection: this.session.selection.placementId ?? null,
         movingId: this.drag?.movingId ?? null,
@@ -80,10 +79,8 @@ export class PanelView implements View {
     drag.next = null;
     const snap = overCanvas ? snapToSlot(panel, world, drag.def.widthUnits, drag.anchorUnits) : null;
     if (snap) {
-      const { widthOf } = this.session;
-      const result = drag.movingId
-        ? movePlacement(panel, widthOf, drag.movingId, snap.rail, snap.slot)
-        : addPlacement(panel, widthOf, { id: drag.newId, module: drag.module, ...snap });
+      const placement = { id: drag.movingId ?? drag.newId, module: drag.module, ...snap };
+      const result = insertPlacement(panel, this.session.widthOf, placement, drag.movingId ?? undefined);
       drag.ghost = { module: drag.def, ...snap, valid: result.ok };
       drag.next = result.ok ? result.panel : null;
     }

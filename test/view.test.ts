@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_RAIL_PITCH_MM } from '../src/layout/limits';
+import { createPanel } from '../src/layout/panel';
 import { nextPlacementId, type Panel, type Placement } from '../src/layout/placement';
 import { Camera } from '../src/view/Camera';
 import {
   FRAME_PADDING,
-  RAIL_PITCH,
+  ROW_MARGIN,
+  frameRect,
   moduleRect,
   placementAt,
+  railCenterY,
+  railRect,
   snapToSlot,
 } from '../src/view/geometry';
 import { History } from '../src/view/history';
@@ -17,11 +22,11 @@ const placement = (id: string, rail: number, slot: number): Placement => ({
   slot,
 });
 
-const panel = (...placements: Placement[]): Panel => ({ railLengthsUnits: [10, 6], placements });
+const panel = (...placements: Placement[]): Panel => ({ ...createPanel([10, 6]), placements });
 
 const at = (unit: number, rail: number) => ({
   x: FRAME_PADDING + unit * 17.5,
-  y: FRAME_PADDING + rail * RAIL_PITCH + RAIL_PITCH / 2,
+  y: FRAME_PADDING + ROW_MARGIN + rail * DEFAULT_RAIL_PITCH_MM,
 });
 
 describe('snapToSlot', () => {
@@ -53,7 +58,7 @@ describe('placementAt', () => {
   const target = panel(placement('a', 0, 3), placement('b', 1, 0));
 
   it('finds the module under the point', () => {
-    const rect = moduleRect(0, 3, 2);
+    const rect = moduleRect(target, 0, 3, 2);
     expect(placementAt(target, widthOf, { x: rect.x + 5, y: rect.y + 5 })?.id).toBe('a');
   });
 
@@ -126,5 +131,40 @@ describe('Camera', () => {
     camera.scale = 1.5;
     const screen = camera.worldToScreen({ x: 10, y: 20 }, 800, 600);
     expect(camera.screenToWorld(screen, 800, 600)).toEqual({ x: 10, y: 20 });
+  });
+});
+
+describe('panel geometry with custom pitches', () => {
+  const uneven = (): Panel => ({ ...createPanel([10, 10, 10]), railPitchesMm: [200, 120] });
+
+  it('places each rail centre after the pitches above it', () => {
+    const p = uneven();
+    const first = FRAME_PADDING + ROW_MARGIN;
+    expect([0, 1, 2].map((rail) => railCenterY(p, rail))).toEqual([first, first + 200, first + 320]);
+  });
+
+  it('centres modules and rails on the same line', () => {
+    const p = uneven();
+    const module = moduleRect(p, 1, 0, 1);
+    const rail = railRect(p, 1);
+    expect(module.y + module.height / 2).toBe(rail.y + rail.height / 2);
+  });
+
+  it('grows the frame by exactly the added spacing', () => {
+    const base = frameRect(createPanel([10, 10, 10])).height;
+    expect(frameRect(uneven()).height).toBe(base + (200 - DEFAULT_RAIL_PITCH_MM) + (120 - DEFAULT_RAIL_PITCH_MM));
+  });
+
+  it('snaps to the nearest rail and ignores the empty gap between rows', () => {
+    const p = uneven();
+    const x = FRAME_PADDING + 50;
+    expect(snapToSlot(p, { x, y: railCenterY(p, 1) + 30 }, 1, 0)?.rail).toBe(1);
+    expect(snapToSlot(p, { x, y: railCenterY(p, 2) - 30 }, 1, 0)?.rail).toBe(2);
+    expect(snapToSlot(p, { x, y: railCenterY(p, 0) + 100 }, 1, 0)).toBeNull();
+  });
+
+  it('keeps the default frame height of the single-pitch layout', () => {
+    expect(frameRect(createPanel([10, 10])).height).toBe(2 * 150 + 80);
+    expect(frameRect(createPanel([])).height).toBe(FRAME_PADDING);
   });
 });

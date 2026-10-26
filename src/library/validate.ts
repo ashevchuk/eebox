@@ -1,3 +1,4 @@
+import { MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../layout/limits';
 import {
   MODULE_KINDS,
   SCHEMA_VERSION,
@@ -43,10 +44,13 @@ export const oneOf =
   (v) =>
     allowed.includes(v) ? null : `must be one of: ${allowed.join(', ')}`;
 
-export const positiveIntegerList: FieldCheck = (v) =>
-  Array.isArray(v) && v.length > 0 && v.every((n) => Number.isInteger(n) && n > 0)
+export const railLengthsCheck: FieldCheck = (v) =>
+  Array.isArray(v) &&
+  v.length >= 1 &&
+  v.length <= MAX_RAILS &&
+  v.every((n) => Number.isInteger(n) && n >= 1 && n <= MAX_RAIL_LENGTH_UNITS)
     ? null
-    : 'must be a non-empty array of positive integers';
+    : `must be 1 to ${MAX_RAILS} rail lengths, each a whole number of units from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
 
 export const MODULE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
@@ -64,7 +68,7 @@ export const MODULE_SPEC: FieldSpec = {
 const ENCLOSURE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   name: { required: true, check: nonEmptyString },
-  railLengthsUnits: { required: true, check: positiveIntegerList },
+  railLengthsUnits: { required: true, check: railLengthsCheck },
 };
 
 const LIBRARY_SPEC: FieldSpec = {

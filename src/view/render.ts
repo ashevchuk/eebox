@@ -73,11 +73,12 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
 
 function drawModule(
   ctx: CanvasRenderingContext2D,
+  panel: Panel,
   def: ModuleDef | undefined,
   rail: number,
   slot: number,
 ): void {
-  const r = moduleRect(rail, slot, def?.widthUnits ?? 1);
+  const r = moduleRect(panel, rail, slot, def?.widthUnits ?? 1);
   if (!def) {
     fillRect(ctx, r, COLORS.missing);
     return;
@@ -123,9 +124,9 @@ export function render(
 
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === scene.movingId ? 0.35 : 1;
-    drawModule(ctx, scene.resolve(placement.module), placement.rail, placement.slot);
+    drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot);
     if (placement.id === scene.selection) {
-      const r = moduleRect(placement.rail, placement.slot, scene.resolve(placement.module)?.widthUnits ?? 1);
+      const r = moduleRect(panel, placement.rail, placement.slot, scene.resolve(placement.module)?.widthUnits ?? 1);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
       ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
@@ -135,6 +136,6 @@ export function render(
 
   if (scene.ghost) {
     const { module, rail, slot, valid } = scene.ghost;
-    fillRect(ctx, moduleRect(rail, slot, module.widthUnits), valid ? COLORS.ghostOk : COLORS.ghostBad);
+    fillRect(ctx, moduleRect(panel, rail, slot, module.widthUnits), valid ? COLORS.ghostOk : COLORS.ghostBad);
   }
 }

@@ -1,3 +1,4 @@
+import { createPanel } from '../layout/panel';
 import type { ModuleRef, WidthOf } from '../layout/placement';
 import type { Library, ModuleDef } from '../library/types';
 import type { Project } from '../project';
@@ -14,7 +15,7 @@ export interface Selection {
 }
 
 export const emptyProject = (): Project => ({
-  panel: { railLengthsUnits: [], placements: [] },
+  panel: createPanel([]),
   schematic: emptySchematic(),
 });
 

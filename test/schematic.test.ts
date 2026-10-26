@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createPanel } from '../src/layout/panel';
 import type { Panel, Placement } from '../src/layout/placement';
 import {
   addNode,
@@ -16,6 +17,7 @@ import {
 } from '../src/schematic/model';
 import {
   distanceToPath,
+  freeSpot,
   hitNode,
   hitOutPort,
   hitWire,
@@ -51,7 +53,7 @@ const placement = (id: string, rail: number, slot: number): Placement => ({
   slot,
 });
 
-const panel = (...placements: Placement[]): Panel => ({ railLengthsUnits: [10, 10], placements });
+const panel = (...placements: Placement[]): Panel => ({ ...createPanel([10, 10]), placements });
 
 describe('nodes', () => {
   it('assigns increasing ids that are not reused after removal', () => {
@@ -222,5 +224,32 @@ describe('schematic geometry', () => {
     const b = schematicBounds(build('source'));
     expect(b.minX).toBe(-40);
     expect(b.maxX).toBe(110 + 40);
+  });
+});
+
+describe('freeSpot', () => {
+  const start = { x: 0, y: 0 };
+
+  it('uses the start position when nothing is there', () => {
+    expect(freeSpot(emptySchematic(), 'source', start)).toEqual(start);
+  });
+
+  it('moves down past an occupied position without overlapping anything', () => {
+    let s = emptySchematic();
+    s = addNode(s, { kind: 'module', label: 'm', x: 0, y: 0 }).schematic;
+    const spot = freeSpot(s, 'load', start);
+    expect(spot.x).toBe(0);
+    expect(spot.y).toBeGreaterThanOrEqual(50 + 20);
+  });
+
+  it('skips a whole stack of nodes', () => {
+    let s = emptySchematic();
+    for (let i = 0; i < 4; i++) s = addNode(s, { kind: 'module', label: 'm', x: 0, y: i * 70 }).schematic;
+    expect(freeSpot(s, 'module', start).y).toBeGreaterThanOrEqual(3 * 70 + 50 + 20);
+  });
+
+  it('ignores nodes that are far to the side', () => {
+    const s = addNode(emptySchematic(), { kind: 'module', label: 'm', x: 500, y: 0 }).schematic;
+    expect(freeSpot(s, 'load', start)).toEqual(start);
   });
 });

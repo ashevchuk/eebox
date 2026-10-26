@@ -1,3 +1,9 @@
+import {
+  DEFAULT_RAIL_PITCH_MM,
+  MAX_RAILS,
+  MAX_RAIL_PITCH_MM,
+  MIN_RAIL_PITCH_MM,
+} from '../layout/limits';
 import { findProblems as findPanelProblems, type ModuleRef, type Placement } from '../layout/placement';
 import {
   MODULE_SPEC,
@@ -5,7 +11,7 @@ import {
   isRecord,
   nonEmptyString,
   oneOf,
-  positiveIntegerList,
+  railLengthsCheck,
   validateList,
   validateObject,
   type FieldSpec,
@@ -50,6 +56,12 @@ const arrayCheck = (v: unknown) => (Array.isArray(v) ? null : 'must be an array'
 const nonNegativeInteger = (v: unknown) =>
   Number.isInteger(v) && (v as number) >= 0 ? null : 'must be a non-negative integer';
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
+const pitchListCheck = (v: unknown) =>
+  Array.isArray(v) &&
+  v.length < MAX_RAILS &&
+  v.every((n) => Number.isInteger(n) && n >= MIN_RAIL_PITCH_MM && n <= MAX_RAIL_PITCH_MM)
+    ? null
+    : `must be an array of whole numbers from ${MIN_RAIL_PITCH_MM} to ${MAX_RAIL_PITCH_MM} (mm)`;
 const moduleRefCheck = (v: unknown) =>
   isRecord(v) &&
   Object.keys(v).length === 2 &&
@@ -72,7 +84,8 @@ const PROJECT_SPEC: FieldSpec = {
   schematic: { required: true, check: objectCheck },
 };
 const PANEL_SPEC: FieldSpec = {
-  railLengthsUnits: { required: true, check: positiveIntegerList },
+  railLengthsUnits: { required: true, check: railLengthsCheck },
+  railPitchesMm: { required: false, check: pitchListCheck },
   placements: { required: true, check: arrayCheck },
 };
 const PLACEMENT_SPEC: FieldSpec = {
@@ -143,10 +156,20 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const nodes = validateList<SchematicNode>(schematicRaw?.nodes, NODE_SPEC, 'project.schematic.nodes', errors);
   const wires = validateList<Wire>(schematicRaw?.wires, WIRE_SPEC, 'project.schematic.wires', errors);
   const modules = validateModules(root?.modules, errors);
+  const railLengthsUnits = (panelRaw?.railLengthsUnits ?? []) as number[];
+  const railPitchesMm =
+    (panelRaw?.railPitchesMm as number[] | undefined) ??
+    railLengthsUnits.slice(1).map(() => DEFAULT_RAIL_PITCH_MM);
+  if (panelRaw && railPitchesMm.length !== railLengthsUnits.length - 1) {
+    errors.push({
+      path: 'project.panel.railPitchesMm',
+      message: `must have one entry per gap between rails (${railLengthsUnits.length - 1})`,
+    });
+  }
   if (!root || !panelRaw || !schematicRaw || errors.length > 0) return { ok: false, errors };
 
   const parsed: Project = {
-    panel: { railLengthsUnits: panelRaw.railLengthsUnits as number[], placements },
+    panel: { railLengthsUnits, railPitchesMm, placements },
     schematic: { nodes, wires },
   };
   return {

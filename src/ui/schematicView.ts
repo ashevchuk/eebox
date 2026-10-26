@@ -12,6 +12,7 @@ import {
 } from '../schematic/model';
 import {
   PORT_RADIUS,
+  freeSpot,
   hitNode,
   hitOutPort,
   hitWire,
@@ -28,6 +29,7 @@ import type { Session } from './session';
 import type { View } from './view';
 
 const GRID = 10;
+const MIN_LABEL_FONT = 8;
 const WIRE_HIT_TOLERANCE = 6;
 const FREE_NODE_LABELS: Record<Exclude<NodeKind, 'module'>, string> = {
   source: 'Source',
@@ -153,12 +155,8 @@ export class SchematicView implements View {
 
   addFreeNode(kind: Exclude<NodeKind, 'module'>): void {
     const project = this.session.project;
-    const { schematic, node } = addNode(project.schematic, {
-      kind,
-      label: FREE_NODE_LABELS[kind],
-      x: snap(this.camera.x),
-      y: snap(this.camera.y),
-    });
+    const spot = freeSpot(project.schematic, kind, { x: snap(this.camera.x), y: snap(this.camera.y) });
+    const { schematic, node } = addNode(project.schematic, { kind, label: FREE_NODE_LABELS[kind], ...spot });
     this.session.commit({ ...project, schematic });
     this.selectNode(node);
   }
@@ -224,8 +222,14 @@ export class SchematicView implements View {
       ctx.fillStyle = COLORS.text;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(orphan ? `${node.label} (missing)` : node.label, r.x + r.width / 2 + 4, r.y + r.height / 2);
+      const label = orphan ? `${node.label} (missing)` : node.label;
+      let fontSize = 12;
+      ctx.font = `${fontSize}px sans-serif`;
+      while (fontSize > MIN_LABEL_FONT && ctx.measureText(label).width > r.width - 14) {
+        fontSize -= 1;
+        ctx.font = `${fontSize}px sans-serif`;
+      }
+      ctx.fillText(label, r.x + r.width / 2 + 4, r.y + r.height / 2);
       ctx.restore();
     }
 

@@ -95,6 +95,30 @@ export function hitWire(schematic: Schematic, p: Point, tolerance: number): Wire
   });
 }
 
+const FREE_SPOT_GAP = 20;
+const FREE_SPOT_STEP = 60;
+const FREE_SPOT_MAX_STEPS = 200;
+
+/** First position at or below `start` where a new node of `kind` overlaps no existing node. */
+export function freeSpot(schematic: Schematic, kind: NodeKind, start: Point): Point {
+  const { width, height } = SIZES[kind];
+  const isFree = (y: number) =>
+    schematic.nodes.every((node) => {
+      const r = nodeRect(node);
+      return (
+        start.x >= r.x + r.width + FREE_SPOT_GAP ||
+        r.x >= start.x + width + FREE_SPOT_GAP ||
+        y >= r.y + r.height + FREE_SPOT_GAP ||
+        r.y >= y + height + FREE_SPOT_GAP
+      );
+    });
+  for (let step = 0; step < FREE_SPOT_MAX_STEPS; step++) {
+    const y = start.y + step * FREE_SPOT_STEP;
+    if (isFree(y)) return { x: start.x, y };
+  }
+  return start;
+}
+
 export function schematicBounds(schematic: Schematic): Bounds {
   if (schematic.nodes.length === 0) return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
   const rects = schematic.nodes.map(nodeRect);

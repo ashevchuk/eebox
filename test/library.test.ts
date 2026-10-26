@@ -113,3 +113,23 @@ describe('importLibrary', () => {
     expect(await storage.list()).toHaveLength(1);
   });
 });
+
+describe('enclosure bounds', () => {
+  const withRails = (railLengthsUnits: unknown) => ({
+    ...minimalLibrary(),
+    enclosures: [{ id: 'e', name: 'E', railLengthsUnits }],
+  });
+
+  it('rejects rails long enough to freeze the renderer', () => {
+    expect(errorPaths(withRails([1_000_000_000]))).toEqual(['enclosures[0].railLengthsUnits']);
+  });
+
+  it('rejects too many rails and an empty rail list', () => {
+    expect(errorPaths(withRails(Array(21).fill(12)))).toEqual(['enclosures[0].railLengthsUnits']);
+    expect(errorPaths(withRails([]))).toEqual(['enclosures[0].railLengthsUnits']);
+  });
+
+  it('accepts the largest allowed enclosure', () => {
+    expect(validateLibrary(withRails(Array(20).fill(144))).ok).toBe(true);
+  });
+});

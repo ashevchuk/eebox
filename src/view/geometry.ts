@@ -4,7 +4,8 @@ import type { Point } from './Camera';
 
 /** World units are millimetres. */
 export const RAIL_HEIGHT = 35;
-export const RAIL_PITCH = 150;
+/** Space above the first and below the last rail, inside the frame. */
+export const ROW_MARGIN = 75;
 export const MODULE_HEIGHT = 90;
 export const FRAME_PADDING = 40;
 
@@ -15,21 +16,24 @@ export interface Rect {
   height: number;
 }
 
-const rowTop = (rail: number) => FRAME_PADDING + rail * RAIL_PITCH;
+export function railCenterY(panel: Panel, rail: number): number {
+  const above = panel.railPitchesMm.slice(0, rail).reduce((sum, pitch) => sum + pitch, 0);
+  return FRAME_PADDING + ROW_MARGIN + above;
+}
 
 export function railRect(panel: Panel, rail: number): Rect {
   return {
     x: FRAME_PADDING,
-    y: rowTop(rail) + (RAIL_PITCH - RAIL_HEIGHT) / 2,
+    y: railCenterY(panel, rail) - RAIL_HEIGHT / 2,
     width: (panel.railLengthsUnits[rail] ?? 0) * MODULE_UNIT_MM,
     height: RAIL_HEIGHT,
   };
 }
 
-export function moduleRect(rail: number, slot: number, widthUnits: number): Rect {
+export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits: number): Rect {
   return {
     x: FRAME_PADDING + slot * MODULE_UNIT_MM,
-    y: rowTop(rail) + (RAIL_PITCH - MODULE_HEIGHT) / 2,
+    y: railCenterY(panel, rail) - MODULE_HEIGHT / 2,
     width: widthUnits * MODULE_UNIT_MM,
     height: MODULE_HEIGHT,
   };
@@ -37,12 +41,9 @@ export function moduleRect(rail: number, slot: number, widthUnits: number): Rect
 
 export function frameRect(panel: Panel): Rect {
   const longest = Math.max(0, ...panel.railLengthsUnits) * MODULE_UNIT_MM;
-  return {
-    x: 0,
-    y: 0,
-    width: longest + FRAME_PADDING * 2,
-    height: panel.railLengthsUnits.length * RAIL_PITCH + FRAME_PADDING * 2,
-  };
+  const lastRail = panel.railLengthsUnits.length - 1;
+  const bottom = lastRail < 0 ? FRAME_PADDING : railCenterY(panel, lastRail) + ROW_MARGIN + FRAME_PADDING;
+  return { x: 0, y: 0, width: longest + FRAME_PADDING * 2, height: bottom };
 }
 
 /**
@@ -56,9 +57,17 @@ export function snapToSlot(
   widthUnits: number,
   anchorUnits: number,
 ): { rail: number; slot: number } | null {
-  const rail = Math.floor((point.y - FRAME_PADDING) / RAIL_PITCH);
+  let rail = -1;
+  let nearest = Infinity;
+  panel.railLengthsUnits.forEach((_length, i) => {
+    const distance = Math.abs(point.y - railCenterY(panel, i));
+    if (distance < nearest) {
+      nearest = distance;
+      rail = i;
+    }
+  });
   const railLength = panel.railLengthsUnits[rail];
-  if (point.y < FRAME_PADDING || railLength === undefined) return null;
+  if (railLength === undefined || nearest > ROW_MARGIN) return null;
   const raw = Math.round((point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits);
   const slot = Math.max(0, Math.min(raw, railLength - widthUnits));
   return { rail, slot: Math.max(0, slot) };
@@ -66,7 +75,7 @@ export function snapToSlot(
 
 export function placementAt(panel: Panel, widthOf: WidthOf, point: Point): Placement | undefined {
   return [...panel.placements].reverse().find((placement) => {
-    const rect = moduleRect(placement.rail, placement.slot, widthOf(placement.module) ?? 1);
+    const rect = moduleRect(panel, placement.rail, placement.slot, widthOf(placement.module) ?? 1);
     return (
       point.x >= rect.x &&
       point.x <= rect.x + rect.width &&
