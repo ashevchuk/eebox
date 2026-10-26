@@ -1,3 +1,5 @@
+import { normalizeLabel } from './labels';
+
 export interface ModuleRef {
   libraryId: string;
   moduleId: string;
@@ -9,6 +11,20 @@ export interface Placement {
   rail: number;
   /** Offset from the rail start in 17.5 mm units. */
   slot: number;
+  /** What the user calls this module on the panel, e.g. the circuit it protects. */
+  label?: string;
+  /** Own width of this copy; only for modules that are resizable in the library. */
+  widthUnits?: number;
+}
+
+/** A comb bus bar lying over the terminals of the modules on one side of a rail. */
+export interface CombPlacement {
+  id: string;
+  module: ModuleRef;
+  rail: number;
+  slot: number;
+  label?: string;
+  widthUnits?: number;
 }
 
 export interface Panel {
@@ -16,10 +32,23 @@ export interface Panel {
   railLengthsUnits: number[];
   /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */
   railPitchesMm: number[];
+  /** One entry per rail; empty text means no label. */
+  railLabels: string[];
   placements: Placement[];
+  combs: CombPlacement[];
 }
 
-export type WidthOf = (module: ModuleRef) => number | undefined;
+/** The width of a placed item: its own override, else the width its module has in the library. */
+export type WidthOf = (item: { module: ModuleRef; widthUnits?: number }) => number | undefined;
+
+/** What a library allows for the width of copies of a module; undefined when it cannot be resized. */
+export interface ResizeInfo {
+  minUnits: number;
+  maxUnits: number;
+  /** The width of the module in the library, which a copy returns to when no override is needed. */
+  baseUnits: number;
+}
+export type ResizeOf = (module: ModuleRef) => ResizeInfo | undefined;
 
 export type PlacementError =
   | { kind: 'unknown-module' }
@@ -27,7 +56,10 @@ export type PlacementError =
   | { kind: 'out-of-rail' }
   | { kind: 'overlap'; with: string }
   | { kind: 'duplicate-id' }
-  | { kind: 'unknown-placement' };
+  | { kind: 'unknown-placement' }
+  | { kind: 'invalid-label' }
+  | { kind: 'not-resizable' }
+  | { kind: 'width-out-of-range' };
 
 export type PlacementResult =
   | { ok: true; panel: Panel }
@@ -44,7 +76,7 @@ function checkFit(
   candidate: Placement,
   ignoreId?: string,
 ): PlacementError | null {
-  const width = widthOf(candidate.module);
+  const width = widthOf(candidate);
   if (width === undefined) return { kind: 'unknown-module' };
   const railLength = panel.railLengthsUnits[candidate.rail];
   if (railLength === undefined) return { kind: 'unknown-rail' };
@@ -54,7 +86,7 @@ function checkFit(
   }
   for (const other of panel.placements) {
     if (other.id === ignoreId || other.rail !== candidate.rail) continue;
-    const otherWidth = widthOf(other.module);
+    const otherWidth = widthOf(other);
     if (otherWidth === undefined) continue;
     if (slot < other.slot + otherWidth && other.slot < slot + width) {
       return { kind: 'overlap', with: other.id };
@@ -132,11 +164,11 @@ export function insertPlacement(
     : addPlacement(panel, widthOf, placement);
   if (strict.ok || strict.error.kind !== 'overlap') return strict;
 
-  const width = widthOf(placement.module) ?? 1;
+  const width = widthOf(placement) ?? 1;
   const railLength = panel.railLengthsUnits[placement.rail] ?? 0;
   const others = panel.placements
     .filter((p) => p.rail === placement.rail && p.id !== replaceId)
-    .map((p) => ({ p, w: widthOf(p.module) ?? 1 }))
+    .map((p) => ({ p, w: widthOf(p) ?? 1 }))
     .sort((a, b) => a.p.slot - b.p.slot);
   const shifted =
     pushRight(others, placement.slot, width, railLength) ?? pushLeft(others, placement.slot, width);
@@ -146,6 +178,40 @@ export function insertPlacement(
     p.id === replaceId ? placement : shifted.has(p.id) ? { ...p, slot: shifted.get(p.id)! } : p,
   );
   return { ok: true, panel: { ...panel, placements: replaceId ? moved : [...moved, placement] } };
+}
+
+/** Gives one copy its own width, within what the library allows, if the neighbours leave room. */
+export function setPlacementWidth(
+  panel: Panel,
+  widthOf: WidthOf,
+  resizeOf: ResizeOf,
+  id: string,
+  units: number,
+): PlacementResult {
+  const current = panel.placements.find((p) => p.id === id);
+  if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
+  const allowed = resizeOf(current.module);
+  if (!allowed) return { ok: false, error: { kind: 'not-resizable' } };
+  if (!Number.isInteger(units) || units < allowed.minUnits || units > allowed.maxUnits) {
+    return { ok: false, error: { kind: 'width-out-of-range' } };
+  }
+  const { widthUnits: _previous, ...rest } = current;
+  const next: Placement = units === allowed.baseUnits ? rest : { ...rest, widthUnits: units };
+  const error = checkFit(panel, widthOf, next, id);
+  if (error) return { ok: false, error };
+  return { ok: true, panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? next : p)) } };
+}
+
+export function setPlacementLabel(panel: Panel, id: string, text: string): PlacementResult {
+  const parsed = normalizeLabel(text);
+  if (!parsed.ok) return { ok: false, error: { kind: 'invalid-label' } };
+  if (!panel.placements.some((p) => p.id === id)) return { ok: false, error: { kind: 'unknown-placement' } };
+  const placements = panel.placements.map((p) => {
+    if (p.id !== id) return p;
+    const { label: _previous, ...rest } = p;
+    return parsed.label === undefined ? rest : { ...rest, label: parsed.label };
+  });
+  return { ok: true, panel: { ...panel, placements } };
 }
 
 export function removePlacement(panel: Panel, id: string): PlacementResult {

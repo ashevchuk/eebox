@@ -1,15 +1,25 @@
+import { buildNets, findNetProblems } from '../electrical/nets';
+import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import {
-  DEFAULT_RAIL_PITCH_MM,
   MAX_RAILS,
+  MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_PITCH_MM,
   MIN_RAIL_PITCH_MM,
 } from '../layout/limits';
-import { findProblems as findPanelProblems, type ModuleRef, type Placement } from '../layout/placement';
+import { findCombProblems } from '../layout/combs';
+import {
+  findProblems as findPanelProblems,
+  type CombPlacement,
+  type ModuleRef,
+  type Placement,
+} from '../layout/placement';
 import {
   MODULE_SPEC,
+  validateModuleDeep,
   identifier,
   isRecord,
   nonEmptyString,
+  labelCheck,
   oneOf,
   railLengthsCheck,
   validateList,
@@ -17,13 +27,13 @@ import {
   type FieldSpec,
   type ValidationError,
 } from '../library/validate';
-import type { ModuleDef } from '../library/types';
+import { CONDUCTORS, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
 
 export const PROJECT_FORMAT = 'eebox-project';
 export const PROJECT_VERSION = 1;
-const NODE_KINDS = ['source', 'busbar', 'load', 'module'] as const;
+const NODE_KINDS = ['source', 'load', 'module'] as const;
 
 export interface ProjectFile {
   format: typeof PROJECT_FORMAT;
@@ -44,9 +54,9 @@ export function buildProjectFile(
   resolve: (ref: ModuleRef) => ModuleDef | undefined,
 ): ProjectFile {
   const modules: Record<string, ModuleDef> = {};
-  for (const placement of project.panel.placements) {
-    const def = resolve(placement.module);
-    if (def) modules[moduleKey(placement.module)] = def;
+  for (const { module } of [...project.panel.placements, ...project.panel.combs]) {
+    const def = resolve(module);
+    if (def) modules[moduleKey(module)] = def;
   }
   return { format: PROJECT_FORMAT, version: PROJECT_VERSION, project, modules };
 }
@@ -55,6 +65,10 @@ const objectCheck = (v: unknown) => (isRecord(v) ? null : 'must be an object');
 const arrayCheck = (v: unknown) => (Array.isArray(v) ? null : 'must be an array');
 const nonNegativeInteger = (v: unknown) =>
   Number.isInteger(v) && (v as number) >= 0 ? null : 'must be a non-negative integer';
+const unitsCheck = (v: unknown) =>
+  Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_RAIL_LENGTH_UNITS
+    ? null
+    : `must be a whole number from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
 const pitchListCheck = (v: unknown) =>
   Array.isArray(v) &&
@@ -62,6 +76,22 @@ const pitchListCheck = (v: unknown) =>
   v.every((n) => Number.isInteger(n) && n >= MIN_RAIL_PITCH_MM && n <= MAX_RAIL_PITCH_MM)
     ? null
     : `must be an array of whole numbers from ${MIN_RAIL_PITCH_MM} to ${MAX_RAIL_PITCH_MM} (mm)`;
+const terminalRefCheck = (v: unknown) =>
+  isRecord(v) && Object.keys(v).length === 2 && nonEmptyString(v.node) === null && nonEmptyString(v.terminal) === null
+    ? null
+    : 'must be an object with node and terminal';
+const conductorsCheck = (v: unknown) =>
+  Array.isArray(v) &&
+  v.length >= 1 &&
+  v.length <= CONDUCTORS.length &&
+  new Set(v).size === v.length &&
+  v.every((c) => (CONDUCTORS as readonly unknown[]).includes(c))
+    ? null
+    : `must list each of 1 to ${CONDUCTORS.length} conductors once, out of: ${CONDUCTORS.join(', ')}`;
+const railLabelsCheck = (v: unknown) =>
+  Array.isArray(v) && v.length <= MAX_RAILS && v.every((l) => l === '' || labelCheck(l) === null)
+    ? null
+    : 'must be a list with one entry per rail, each empty or a valid label';
 const moduleRefCheck = (v: unknown) =>
   isRecord(v) &&
   Object.keys(v).length === 2 &&
@@ -85,15 +115,20 @@ const PROJECT_SPEC: FieldSpec = {
 };
 const PANEL_SPEC: FieldSpec = {
   railLengthsUnits: { required: true, check: railLengthsCheck },
-  railPitchesMm: { required: false, check: pitchListCheck },
+  railPitchesMm: { required: true, check: pitchListCheck },
+  railLabels: { required: true, check: railLabelsCheck },
   placements: { required: true, check: arrayCheck },
+  combs: { required: true, check: arrayCheck },
 };
 const PLACEMENT_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
   rail: { required: true, check: nonNegativeInteger },
   slot: { required: true, check: nonNegativeInteger },
+  label: { required: false, check: labelCheck },
+  widthUnits: { required: false, check: unitsCheck },
 };
+const COMB_PLACEMENT_SPEC: FieldSpec = PLACEMENT_SPEC;
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },
   wires: { required: true, check: arrayCheck },
@@ -101,16 +136,32 @@ const SCHEMATIC_SPEC: FieldSpec = {
 const NODE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   kind: { required: true, check: oneOf(NODE_KINDS) },
-  label: { required: true, check: nonEmptyString },
+  label: { required: true, check: labelCheck },
   x: { required: true, check: finiteNumber },
   y: { required: true, check: finiteNumber },
   placementId: { required: false, check: identifier },
+  conductors: { required: false, check: conductorsCheck },
 };
 const WIRE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
-  from: { required: true, check: identifier },
-  to: { required: true, check: identifier },
+  a: { required: true, check: terminalRefCheck },
+  b: { required: true, check: terminalRefCheck },
+  label: { required: false, check: labelCheck },
 };
+
+/** Module nodes take their terminals from the module; source and load nodes carry their own. */
+function checkNodeShape(node: Record<string, unknown>, path: string, errors: ValidationError[]): void {
+  const isModule = node.kind === 'module';
+  if (isModule && node.conductors !== undefined) {
+    errors.push({ path: `${path}.conductors`, message: 'is not allowed on a module node' });
+  }
+  if (!isModule && node.conductors === undefined) {
+    errors.push({ path: `${path}.conductors`, message: 'is required for source and load nodes' });
+  }
+  if (!isModule && node.placementId !== undefined) {
+    errors.push({ path: `${path}.placementId`, message: 'is only allowed on a module node' });
+  }
+}
 
 function child(parent: Record<string, unknown> | undefined, key: string, spec: FieldSpec, path: string, errors: ValidationError[]) {
   const value = parent?.[key];
@@ -124,6 +175,7 @@ function validateModules(raw: unknown, errors: ValidationError[]): Record<string
     const path = `modules["${key}"]`;
     const def = validateObject(value, MODULE_SPEC, path, errors);
     if (!def) continue;
+    validateModuleDeep(def, path, errors);
     if (key.split('/').length !== 2 || !key.endsWith(`/${def.id as string}`)) {
       errors.push({ path, message: 'key must be "libraryId/moduleId" matching the module id' });
       continue;
@@ -133,17 +185,49 @@ function validateModules(raw: unknown, errors: ValidationError[]): Record<string
   return modules;
 }
 
-function warningsFor(project: Project, modules: Record<string, ModuleDef>): string[] {
-  const widthOf = (ref: ModuleRef) => modules[moduleKey(ref)]?.widthUnits;
-  const panel = findPanelProblems(project.panel, widthOf).map(
-    (p) => `placement ${p.placementId}: ${p.error.kind}${p.error.kind === 'overlap' ? ` with ${p.error.with}` : ''}`,
-  );
-  const schematic = findSchematicProblems(project.schematic, project.panel).map((p) =>
+/** Everything wrong with a project that is still loadable: overlaps, orphans, bad wiring. */
+export function projectWarnings(project: Project, resolve: (ref: ModuleRef) => ModuleDef | undefined): string[] {
+  const widthOf = (item: { module: ModuleRef; widthUnits?: number }) =>
+    item.widthUnits ?? resolve(item.module)?.widthUnits;
+  const describe = (error: { kind: string; with?: string }) =>
+    error.kind === 'overlap' ? `overlap with ${error.with}` : error.kind;
+  const panel = findPanelProblems(project.panel, widthOf).map((p) => `placement ${p.placementId}: ${describe(p.error)}`);
+  const combs = findCombProblems(project.panel, {
+    widthOf,
+    sideOf: (ref) => resolve(ref)?.comb?.side,
+  }).map((p) => `comb ${p.combId}: ${describe(p.error)}`);
+  const schematic = findSchematicProblems(
+    project.schematic,
+    project.panel,
+    nodeTerminalsLookup(project.panel, resolve),
+  ).map((p) =>
     p.kind === 'orphan-module'
       ? `node ${p.nodeId}: its module is not on the panel`
-      : `wire ${p.wireId}: connects a missing node`,
+      : `wire ${p.wireId}: connects a missing node or terminal`,
   );
-  return [...panel, ...schematic];
+  const widths = [
+    ...project.panel.placements.map((p) => ({ kind: 'placement', item: p })),
+    ...project.panel.combs.map((c) => ({ kind: 'comb', item: c })),
+  ].flatMap(({ kind, item }) => {
+    if (item.widthUnits === undefined) return [];
+    const allowed = resolve(item.module)?.resizable;
+    if (!allowed) return [`${kind} ${item.id}: its module cannot be resized`];
+    return item.widthUnits < allowed.minUnits || item.widthUnits > allowed.maxUnits
+      ? [`${kind} ${item.id}: width ${item.widthUnits} is outside ${allowed.minUnits}-${allowed.maxUnits}`]
+      : [];
+  });
+  const nameOf = (owner: { kind: 'placement' | 'node'; id: string }) => {
+    if (owner.kind === 'node') return project.schematic.nodes.find((n) => n.id === owner.id)?.label ?? owner.id;
+    const placement = project.panel.placements.find((p) => p.id === owner.id);
+    return placement?.label ?? (placement && resolve(placement.module)?.name) ?? owner.id;
+  };
+  const nets = findNetProblems(buildNets(project, resolve)).map(
+    (p) =>
+      `${p.kind === 'mixed-phases' ? 'different phases joined' : 'phase, neutral or earth joined'}: ${p.net.terminals
+        .map((t) => `${nameOf(t.owner)} [${t.owner.id}] ${t.terminal.id}`)
+        .join(', ')}`,
+  );
+  return [...panel, ...combs, ...widths, ...schematic, ...nets];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {
@@ -153,29 +237,41 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const panelRaw = child(project, 'panel', PANEL_SPEC, 'project.panel', errors);
   const schematicRaw = child(project, 'schematic', SCHEMATIC_SPEC, 'project.schematic', errors);
   const placements = validateList<Placement>(panelRaw?.placements, PLACEMENT_SPEC, 'project.panel.placements', errors);
-  const nodes = validateList<SchematicNode>(schematicRaw?.nodes, NODE_SPEC, 'project.schematic.nodes', errors);
+  const combs = validateList<CombPlacement>(panelRaw?.combs, COMB_PLACEMENT_SPEC, 'project.panel.combs', errors);
+  const nodes = validateList<SchematicNode>(
+    schematicRaw?.nodes,
+    NODE_SPEC,
+    'project.schematic.nodes',
+    errors,
+    checkNodeShape,
+  );
   const wires = validateList<Wire>(schematicRaw?.wires, WIRE_SPEC, 'project.schematic.wires', errors);
   const modules = validateModules(root?.modules, errors);
   const railLengthsUnits = (panelRaw?.railLengthsUnits ?? []) as number[];
-  const railPitchesMm =
-    (panelRaw?.railPitchesMm as number[] | undefined) ??
-    railLengthsUnits.slice(1).map(() => DEFAULT_RAIL_PITCH_MM);
+  const railPitchesMm = (panelRaw?.railPitchesMm ?? []) as number[];
   if (panelRaw && railPitchesMm.length !== railLengthsUnits.length - 1) {
     errors.push({
       path: 'project.panel.railPitchesMm',
       message: `must have one entry per gap between rails (${railLengthsUnits.length - 1})`,
     });
   }
+  const railLabels = (panelRaw?.railLabels ?? []) as string[];
+  if (panelRaw && railLabels.length !== railLengthsUnits.length) {
+    errors.push({
+      path: 'project.panel.railLabels',
+      message: `must have one entry per rail (${railLengthsUnits.length})`,
+    });
+  }
   if (!root || !panelRaw || !schematicRaw || errors.length > 0) return { ok: false, errors };
 
   const parsed: Project = {
-    panel: { railLengthsUnits, railPitchesMm, placements },
+    panel: { railLengthsUnits, railPitchesMm, railLabels, placements, combs },
     schematic: { nodes, wires },
   };
   return {
     ok: true,
     file: { format: PROJECT_FORMAT, version: PROJECT_VERSION, project: parsed, modules },
-    warnings: warningsFor(parsed, modules),
+    warnings: projectWarnings(parsed, (ref) => modules[moduleKey(ref)]),
   };
 }
 

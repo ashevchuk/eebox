@@ -7,7 +7,8 @@ import { loadAutosave, saveAutosave, type KeyValueStore } from '../src/project/a
 import { bomToCsv, buildBom } from '../src/project/bom';
 import { buildProjectFile, parseProjectFile, parseProjectJson } from '../src/project/file';
 import { decodeShare, encodeShare } from '../src/project/share';
-import { connect, syncModuleNodes, addNode } from '../src/schematic/model';
+import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
+import { addNode, connectAll, syncModuleNodes } from '../src/schematic/model';
 
 const C16: ModuleDef = { id: 'c16', kind: 'breaker', name: 'MCB 1P C16', widthUnits: 1, poles: 1, ratedCurrentA: 16, curve: 'C', sku: 'SKU-1' };
 const RCD: ModuleDef = { id: 'rcd', kind: 'rcd', name: 'RCD 2P', widthUnits: 2, poles: 2 };
@@ -25,9 +26,9 @@ function sampleProject(): Project {
     ],
   };
   let schematic = syncModuleNodes({ nodes: [], wires: [] }, panel, (r) => resolve(r)?.name ?? r.moduleId);
-  const source = addNode(schematic, { kind: 'source', label: 'Mains', x: 0, y: 0 });
+  const source = addNode(schematic, { kind: 'source', label: 'Mains', x: 0, y: -100, conductors: ['L', 'N'] });
   schematic = source.schematic;
-  const wired = connect(schematic, source.node.id, 'n1');
+  const wired = connectAll(schematic, nodeTerminalsLookup(panel, resolve), source.node.id, 'n1');
   if (!wired.ok) throw new Error('fixture wiring failed');
   return { panel, schematic: wired.schematic };
 }
@@ -184,9 +185,9 @@ describe('bill of materials', () => {
   it('writes a header and one CRLF line per row', () => {
     const lines = bomToCsv(buildBom(sampleProject().panel, resolve)).split('\r\n');
     expect(lines[0]).toBe(
-      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity',
+      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity,Labels',
     );
-    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2');
+    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2,');
     expect(lines[3]).toBe('');
   });
 
@@ -213,13 +214,10 @@ describe('panel spacing in the project file', () => {
     expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
   });
 
-  it('fills the default spacing when an older file has none', () => {
-    const file = JSON.parse(JSON.stringify(validFile()));
-    file.project.panel.railLengthsUnits = [12, 12, 12];
-    delete file.project.panel.railPitchesMm;
-    const result = parseProjectFile(file);
-    if (!result.ok) throw new Error('should load');
-    expect(result.file.project.panel.railPitchesMm).toEqual([150, 150]);
+  it.each(['railPitchesMm', 'combs'])('requires %s instead of guessing a default', (field) => {
+    const file = validFile();
+    delete (file.project.panel as unknown as Record<string, unknown>)[field];
+    expect(errorPaths(file)).toEqual([`project.panel.${field}`]);
   });
 
   it('rejects a spacing list that does not match the rows', () => {
@@ -236,5 +234,189 @@ describe('panel spacing in the project file', () => {
     file.project.panel.railPitchesMm = [150];
     file.project.panel.railLengthsUnits = [1_000_000_000, 12];
     expect(errorPaths(file)).toEqual(['project.panel.railLengthsUnits']);
+  });
+});
+
+describe('combs in the project file', () => {
+  const combDef: ModuleDef = {
+    id: 'comb',
+    kind: 'comb',
+    name: 'Comb 3-phase',
+    widthUnits: 6,
+    poles: 3,
+    comb: { pattern: ['L1', 'L2', 'L3'], side: 'top' },
+  };
+  const withComb = () => {
+    const project = sampleProject();
+    const panel = { ...project.panel, combs: [{ id: 'c1', module: ref('comb'), rail: 0, slot: 0 }] };
+    const lookup = (r: ModuleRef) => (r.moduleId === 'comb' ? combDef : resolve(r));
+    return buildProjectFile({ ...project, panel }, lookup);
+  };
+
+  it('stores the comb definition in the snapshot and round-trips', () => {
+    const file = withComb();
+    expect(Object.keys(file.modules)).toContain('lib/comb');
+    expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
+  });
+
+  it('warns about a comb that overlaps another on the same side', () => {
+    const file = withComb();
+    file.project.panel.combs.push({ id: 'c2', module: ref('comb'), rail: 0, slot: 3 });
+    const result = parseProjectFile(JSON.parse(JSON.stringify(file)));
+    if (!result.ok) throw new Error('should load');
+    expect(result.warnings).toEqual(['comb c2: overlap with c1']);
+  });
+
+  it('rejects a module snapshot that declares a comb without a spec', () => {
+    const file = JSON.parse(JSON.stringify(withComb()));
+    delete file.modules['lib/comb'].comb;
+    expect(errorPaths(file)).toEqual(['modules["lib/comb"].comb']);
+  });
+
+  it('counts combs in the bill of materials', () => {
+    const file = withComb();
+    const rows = buildBom(file.project.panel, (r) => file.modules[`${r.libraryId}/${r.moduleId}`]);
+    expect(rows.find((r) => r.moduleId === 'comb')?.quantity).toBe(1);
+  });
+});
+
+describe('schematic in the project file', () => {
+  it('keeps wires between terminals through a round trip', () => {
+    const file = buildProjectFile(sampleProject(), resolve);
+    expect(file.project.schematic.wires.length).toBeGreaterThan(0);
+    const parsed = parseProjectJson(JSON.stringify(file));
+    if (!parsed.ok) throw new Error('should load');
+    expect(parsed.file.project.schematic.wires).toEqual(file.project.schematic.wires);
+  });
+
+  it('requires conductors on a source and forbids them on a module node', () => {
+    const file = validFile();
+    delete (file.project.schematic.nodes[3] as unknown as Record<string, unknown>).conductors;
+    (file.project.schematic.nodes[0] as unknown as Record<string, unknown>).conductors = ['L'];
+    expect(errorPaths(file)).toEqual([
+      'project.schematic.nodes[0].conductors',
+      'project.schematic.nodes[3].conductors',
+    ]);
+  });
+
+  it('rejects a repeated conductor and an unknown one', () => {
+    const file = validFile();
+    (file.project.schematic.nodes[3] as unknown as Record<string, unknown>).conductors = ['L', 'L'];
+    expect(errorPaths(file)).toEqual(['project.schematic.nodes[3].conductors']);
+    (file.project.schematic.nodes[3] as unknown as Record<string, unknown>).conductors = ['Q'];
+    expect(errorPaths(file)).toEqual(['project.schematic.nodes[3].conductors']);
+  });
+
+  it('rejects a wire end that is not a terminal reference, and the old directed shape', () => {
+    const file = validFile();
+    const wire = file.project.schematic.wires[0] as unknown as Record<string, unknown>;
+    wire.a = 'n1';
+    expect(errorPaths(file)).toEqual(['project.schematic.wires[0].a']);
+    const old = validFile();
+    const oldWire = old.project.schematic.wires[0] as unknown as Record<string, unknown>;
+    oldWire.from = 'n1';
+    oldWire.to = 'n2';
+    expect(errorPaths(old)).toEqual(
+      expect.arrayContaining(['project.schematic.wires[0].from', 'project.schematic.wires[0].to']),
+    );
+  });
+
+  it('warns about a wire to a terminal that its node does not have', () => {
+    const file = validFile();
+    file.project.schematic.wires[0]!.b.terminal = 'top:Q';
+    const result = parseProjectFile(JSON.parse(JSON.stringify(file)));
+    if (!result.ok) throw new Error('should load');
+    expect(result.warnings).toEqual(['wire w1: connects a missing node or terminal']);
+  });
+
+  it('warns when different phases are wired together', () => {
+    const project = sampleProject();
+    const modules = {
+      'lib/m3': { id: 'm3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, poles: 3 },
+    } as const;
+    const panel = { ...createPanel([12]), placements: [{ id: 'p1', module: ref('m3'), rail: 0, slot: 0 }] };
+    const schematic = {
+      nodes: [{ id: 'n1', kind: 'module' as const, label: 'M', x: 0, y: 0, placementId: 'p1' }],
+      wires: [{ id: 'w1', a: { node: 'n1', terminal: 'top:L1' }, b: { node: 'n1', terminal: 'top:L2' } }],
+    };
+    const file = { format: 'eebox-project', version: 1, project: { ...project, panel, schematic }, modules };
+    const result = parseProjectFile(JSON.parse(JSON.stringify(file)));
+    if (!result.ok) throw new Error('should load');
+    expect(result.warnings).toEqual(['different phases joined: MCB 3P [p1] top:L1, MCB 3P [p1] top:L2']);
+  });
+});
+
+describe('labels in the project file', () => {
+  const labelled = () => {
+    const file = validFile();
+    file.project.panel.placements[0]!.label = 'F1 Lights';
+    file.project.panel.railLabels = ['Final circuits'];
+    file.project.schematic.wires[0]!.label = 'NYM 3x1.5';
+    return file;
+  };
+  const asRecord = (value: unknown) => value as Record<string, unknown>;
+
+  it('round-trips every kind of label', () => {
+    const file = labelled();
+    expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
+  });
+
+  it('requires one row label per rail, and valid ones', () => {
+    const file = validFile();
+    file.project.panel.railLabels = [];
+    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
+    file.project.panel.railLabels = ['a\nb'];
+    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
+    delete asRecord(file.project.panel).railLabels;
+    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
+  });
+
+  it.each([
+    ['an empty label', ''],
+    ['an untrimmed label', ' F1'],
+    ['a multi-line label', 'F1\nF2'],
+    ['an over-long label', 'x'.repeat(61)],
+    ['a non-string label', 5],
+  ])('rejects %s on a placement, a wire and a node', (_name, bad) => {
+    const file = labelled();
+    asRecord(file.project.panel.placements[0]).label = bad;
+    asRecord(file.project.schematic.wires[0]).label = bad;
+    asRecord(file.project.schematic.nodes[0]).label = bad;
+    expect(errorPaths(file)).toEqual([
+      'project.panel.placements[0].label',
+      'project.schematic.nodes[0].label',
+      'project.schematic.wires[0].label',
+    ]);
+  });
+
+  it('shows custom labels in problem reports instead of module names', () => {
+    const file = labelled();
+    file.project.panel.placements[0]!.slot = 1;
+    const result = parseProjectFile(JSON.parse(JSON.stringify(file)));
+    if (!result.ok) throw new Error('should load');
+    expect(result.warnings).toEqual(['placement p2: overlap with p1']);
+  });
+});
+
+describe('labels in the bill of materials', () => {
+  it('lists the labels of grouped items, in panel order, in their own column', () => {
+    const panel = {
+      ...createPanel([12]),
+      placements: [
+        { id: 'p1', module: ref('c16'), rail: 0, slot: 0, label: 'Kitchen' },
+        { id: 'p2', module: ref('c16'), rail: 0, slot: 1 },
+        { id: 'p3', module: ref('c16'), rail: 0, slot: 2, label: 'Hall' },
+      ],
+    };
+    const csv = bomToCsv(buildBom(panel, resolve)).split('\r\n');
+    expect(csv[0]!.endsWith(',Quantity,Labels')).toBe(true);
+    expect(csv[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,3,Kitchen; Hall');
+  });
+
+  it('leaves the column empty without labels and neutralises formulas in labels', () => {
+    const bare = { ...createPanel([12]), placements: [{ id: 'p1', module: ref('c16'), rail: 0, slot: 0 }] };
+    expect(bomToCsv(buildBom(bare, resolve)).split('\r\n')[1]!.endsWith(',1,1,')).toBe(true);
+    const evil = { ...bare, placements: [{ ...bare.placements[0]!, label: '=HYPERLINK("x")' }] };
+    expect(bomToCsv(buildBom(evil, resolve))).toContain(`"'=HYPERLINK(""x"")"`);
   });
 });

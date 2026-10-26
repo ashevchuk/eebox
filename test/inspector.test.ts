@@ -1,0 +1,306 @@
+import { describe, expect, it } from 'vitest';
+import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
+import type { Project } from '../src/project';
+import {
+  addNode,
+  connect,
+  emptySchematic,
+  syncModuleNodes,
+  type Schematic,
+} from '../src/schematic/model';
+import { applyEdit, inspect, type InspectContext, type InspectorField } from '../src/ui/inspector';
+import type { Mode, Selection } from '../src/ui/session';
+import { combAt, panelOf, place, resolve } from './fixtures';
+
+function build(): Project {
+  const panel = panelOf(
+    [place('p1', 'breaker16', 0, 0), place('p2', 'mcb3', 0, 4), place('p3', 'nbar', 0, 10)],
+    [combAt('c1', 'comb1', 0, 0)],
+    [24, 24],
+  );
+  let schematic: Schematic = syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId);
+  schematic = addNode(schematic, { kind: 'source', label: 'Mains', x: 0, y: -100, conductors: ['L1', 'L2', 'L3', 'N', 'PE'] }).schematic;
+  const terminalsOf = nodeTerminalsLookup(panel, resolve);
+  for (const [a, b] of [
+    [{ node: 'n4', terminal: 'bottom:L1' }, { node: 'n1', terminal: 'top:L' }],
+    [{ node: 'n4', terminal: 'bottom:N' }, { node: 'n3', terminal: 'top:N3' }],
+    [{ node: 'n4', terminal: 'bottom:N' }, { node: 'n3', terminal: 'top:N1' }],
+  ] as const) {
+    const wired = connect(schematic, terminalsOf, a, b);
+    if (!wired.ok) throw new Error(wired.error.kind);
+    schematic = wired.schematic;
+  }
+  return { panel, schematic };
+}
+
+const ctx = (selection: Selection, mode: Mode = 'panel', project: Project = build()): InspectContext => ({
+  project, selection, mode, resolve,
+});
+const fieldsOf = (c: InspectContext) => inspect(c)?.fields ?? [];
+const field = (c: InspectContext, key: string): InspectorField | undefined => fieldsOf(c).find((f) => f.key === key);
+const keysOf = (c: InspectContext) => fieldsOf(c).map((f) => f.key);
+
+function ok(result: ReturnType<typeof applyEdit>): Project {
+  if (!result.ok) throw new Error(result.message || JSON.stringify(result.needsConfirm));
+  return result.project;
+}
+function message(result: ReturnType<typeof applyEdit>): string {
+  if (result.ok) throw new Error('expected a failure');
+  return result.message;
+}
+
+describe('inspect: what is shown', () => {
+  it('shows nothing when nothing is selected or the selection is stale', () => {
+    expect(inspect(ctx({}))).toBeNull();
+    expect(inspect(ctx({}, 'schematic'))).toBeNull();
+    expect(inspect(ctx({ placementId: 'gone', combId: 'gone', rail: 9 }))).toBeNull();
+    expect(inspect(ctx({ nodeId: 'gone', wireId: 'gone' }, 'schematic'))).toBeNull();
+  });
+
+  it('describes a module with its position, details and a label placeholder', () => {
+    const view = inspect(ctx({ placementId: 'p1' }))!;
+    expect(view.title).toBe('Module');
+    expect(field(ctx({ placementId: 'p1' }), 'label')).toMatchObject({ kind: 'text', value: '', placeholder: 'MCB 1P C16' });
+    expect(field(ctx({ placementId: 'p1' }), 'row')).toMatchObject({ kind: 'integer', value: 1, min: 1, max: 2 });
+    expect(field(ctx({ placementId: 'p1' }), 'slot')).toMatchObject({ kind: 'integer', value: 0, min: 0, max: 23 });
+    expect(keysOf(ctx({ placementId: 'p1' }))).toEqual(
+      expect.arrayContaining(['module', 'kind', 'poles', 'rated', 'curve', 'capacity', 'residual', 'sku', 'terminals', 'id']),
+    );
+    expect(field(ctx({ placementId: 'p1' }), 'rated')?.value).toBe('16 A');
+    expect(field(ctx({ placementId: 'p1' }), 'capacity')?.value).toBe('6 kA');
+  });
+
+  it('leaves out the details a module does not have', () => {
+    expect(keysOf(ctx({ placementId: 'p2' }))).not.toContain('rated');
+    expect(keysOf(ctx({ placementId: 'p2' }))).not.toContain('sku');
+  });
+
+  it('lets only resizable modules have an editable width, with the allowed range', () => {
+    expect(field(ctx({ placementId: 'p1' }), 'width')).toMatchObject({ kind: 'readonly', value: '1 units' });
+    expect(field(ctx({ placementId: 'p3' }), 'width')).toMatchObject({ kind: 'integer', value: 3, min: 2, max: 12, hint: '2-12 units' });
+  });
+
+  it('keeps the position range tied to the width of this copy', () => {
+    expect(field(ctx({ placementId: 'p3' }), 'slot')?.max).toBe(24 - 3);
+    const wide = build();
+    wide.panel.placements[2] = { ...wide.panel.placements[2]!, widthUnits: 10 };
+    expect(field(ctx({ placementId: 'p3' }, 'panel', wide), 'slot')?.max).toBe(14);
+  });
+
+  it('summarises terminals, and only counts them on a long bar', () => {
+    expect(field(ctx({ placementId: 'p2' }), 'terminals')?.value).toBe('top L1 L2 L3 · bottom L1 L2 L3');
+    expect(field(ctx({ placementId: 'p3' }), 'terminals')?.value).toBe('top N1 N2 N3 · bottom Nb1 Nb2 Nb3');
+    const bar = build();
+    bar.panel.placements[2] = { ...bar.panel.placements[2]!, widthUnits: 12 };
+    expect(field(ctx({ placementId: 'p3' }, 'panel', bar), 'terminals')?.value).toBe('top 12 · bottom 12');
+  });
+
+  it('describes a comb, preferring it over a placement selected with it', () => {
+    const view = inspect(ctx({ combId: 'c1', placementId: 'p1' }))!;
+    expect(view.title).toBe('Comb');
+    expect(field(ctx({ combId: 'c1' }), 'pattern')?.value).toBe('L');
+    expect(field(ctx({ combId: 'c1' }), 'side')?.value).toBe('top');
+    expect(field(ctx({ combId: 'c1' }), 'width')).toMatchObject({ kind: 'integer', value: 6, min: 2, max: 12 });
+  });
+
+  it('describes a row, with spacing only when there is a row below', () => {
+    const first = inspect(ctx({ rail: 0 }))!;
+    expect(first.title).toBe('Row 1');
+    expect(field(ctx({ rail: 0 }), 'label')).toMatchObject({ value: '', placeholder: 'Row 1' });
+    expect(field(ctx({ rail: 0 }), 'length')).toMatchObject({ value: 24, min: 1, max: 144 });
+    expect(field(ctx({ rail: 0 }), 'spacing')).toMatchObject({ value: 150, min: 90, max: 500 });
+    expect(field(ctx({ rail: 0 }), 'contents')?.value).toBe('3 modules, 1 comb');
+    expect(keysOf(ctx({ rail: 1 }))).not.toContain('spacing');
+    expect(field(ctx({ rail: 1 }), 'contents')?.value).toBe('0 modules, 0 combs');
+  });
+
+  it('shows a module node as its module plus the node position, in the schematic only', () => {
+    const view = inspect(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'))!;
+    expect(view.title).toBe('Module node');
+    expect(keysOf(ctx({ nodeId: 'n1' }, 'schematic'))).toEqual(expect.arrayContaining(['label', 'row', 'slot', 'nodeX', 'nodeY']));
+    expect(keysOf(ctx({ placementId: 'p1' }))).not.toContain('nodeX');
+  });
+
+  it('describes a source with ticked conductors, and an orphaned module node plainly', () => {
+    expect(field(ctx({ nodeId: 'n4' }, 'schematic'), 'conductors')).toMatchObject({
+      kind: 'choices',
+      value: ['L1', 'L2', 'L3', 'N', 'PE'],
+      options: ['L', 'L1', 'L2', 'L3', 'N', 'PE'],
+    });
+    const orphaned: Project = { ...build(), panel: { ...build().panel, placements: [] } };
+    expect(keysOf(ctx({ nodeId: 'n1' }, 'schematic', orphaned))).toEqual(
+      expect.arrayContaining(['label', 'status', 'nodeX', 'nodeY']),
+    );
+    expect(keysOf(ctx({ nodeId: 'n1' }, 'schematic', orphaned))).not.toContain('conductors');
+  });
+
+  it('describes a wire by what it joins, using the labels of the modules', () => {
+    const labelled = ok(applyEdit(ctx({ placementId: 'p1' }), 'label', 'Kitchen'));
+    const c = ctx({ wireId: 'w1' }, 'schematic', labelled);
+    expect(inspect(c)?.title).toBe('Wire');
+    expect(field(c, 'from')?.value).toBe('Mains · bottom L1');
+    expect(field(c, 'to')?.value).toBe('Kitchen · top L');
+    expect(field(c, 'conductor')?.value).toBe('L1');
+  });
+
+  it('prefers a wire over a node in the schematic', () => {
+    expect(inspect(ctx({ wireId: 'w1', nodeId: 'n4' }, 'schematic'))?.title).toBe('Wire');
+  });
+});
+
+describe('applyEdit: labels', () => {
+  it('labels a module, a comb, a row and a wire', () => {
+    expect(ok(applyEdit(ctx({ placementId: 'p1' }), 'label', ' Kitchen ')).panel.placements[0]?.label).toBe('Kitchen');
+    expect(ok(applyEdit(ctx({ combId: 'c1' }), 'label', 'Phase bus')).panel.combs[0]?.label).toBe('Phase bus');
+    expect(ok(applyEdit(ctx({ rail: 1 }), 'label', 'Lighting')).panel.railLabels).toEqual(['', 'Lighting']);
+    expect(ok(applyEdit(ctx({ wireId: 'w1' }, 'schematic'), 'label', 'NYM 3x1.5')).schematic.wires[0]?.label).toBe('NYM 3x1.5');
+  });
+
+  it('labelling a module node labels its module, so both views agree', () => {
+    const next = ok(applyEdit(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'), 'label', 'Kitchen'));
+    expect(next.panel.placements[0]?.label).toBe('Kitchen');
+    expect(next.schematic.nodes).toEqual(build().schematic.nodes);
+  });
+
+  it('clears a label with blank text, but a source or load always keeps one', () => {
+    const labelled = ok(applyEdit(ctx({ placementId: 'p1' }), 'label', 'Kitchen'));
+    const cleared = ok(applyEdit(ctx({ placementId: 'p1' }, 'panel', labelled), 'label', ''));
+    expect('label' in cleared.panel.placements[0]!).toBe(false);
+    expect(message(applyEdit(ctx({ nodeId: 'n4' }, 'schematic'), 'label', ' '))).toBe('This item needs a label.');
+  });
+
+  it('renames a source', () => {
+    expect(ok(applyEdit(ctx({ nodeId: 'n4' }, 'schematic'), 'label', 'Grid')).schematic.nodes[3]?.label).toBe('Grid');
+  });
+
+  it('refuses invalid text with the rule, and leaves the project untouched', () => {
+    const before = build();
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'label', 'a\nb'))).toMatch(/1 to 60 characters/);
+    expect(message(applyEdit(ctx({ rail: 0 }), 'label', 'x'.repeat(61)))).toMatch(/1 to 60 characters/);
+    expect(message(applyEdit(ctx({ wireId: 'w1' }, 'schematic'), 'label', 'x'.repeat(61)))).toMatch(/1 to 60 characters/);
+    expect(before).toEqual(build());
+  });
+});
+
+describe('applyEdit: position and width', () => {
+  it('moves a module to another row and position', () => {
+    const moved = ok(applyEdit(ctx({ placementId: 'p1' }), 'row', '2'));
+    expect(moved.panel.placements[0]).toMatchObject({ rail: 1, slot: 0 });
+    expect(ok(applyEdit(ctx({ placementId: 'p1' }), 'slot', '7')).panel.placements[0]?.slot).toBe(7);
+  });
+
+  it('says what is in the way, or that it does not fit, or that the row does not exist', () => {
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'slot', '4'))).toBe('Overlaps p2.');
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'slot', '24'))).toBe('Does not fit on the rail.');
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'row', '3'))).toBe('There is no such row.');
+  });
+
+  it('asks for a whole number', () => {
+    for (const bad of ['', 'abc', '1.5']) {
+      expect(message(applyEdit(ctx({ placementId: 'p1' }), 'slot', bad))).toBe('Enter a whole number.');
+    }
+  });
+
+  it('moves a comb the same way', () => {
+    expect(ok(applyEdit(ctx({ combId: 'c1' }), 'slot', '3')).panel.combs[0]?.slot).toBe(3);
+    expect(message(applyEdit(ctx({ combId: 'c1' }), 'slot', '20'))).toBe('Does not fit on the rail.');
+  });
+
+  it('gives a bar its own width and a comb too', () => {
+    expect(ok(applyEdit(ctx({ placementId: 'p3' }), 'width', '8')).panel.placements[2]?.widthUnits).toBe(8);
+    expect(ok(applyEdit(ctx({ combId: 'c1' }), 'width', '10')).panel.combs[0]?.widthUnits).toBe(10);
+  });
+
+  it('refuses a width outside the range, on a module that cannot be resized, or into a neighbour', () => {
+    expect(message(applyEdit(ctx({ placementId: 'p3' }), 'width', '13'))).toBe('The width is outside what the library allows.');
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'width', '2'))).toBe('This module cannot be resized.');
+    const crowded = ok(applyEdit(ctx({ placementId: 'p1' }), 'slot', '13'));
+    expect(message(applyEdit(ctx({ placementId: 'p3' }, 'panel', crowded), 'width', '4'))).toBe('Overlaps p1.');
+  });
+
+  it('asks before a narrower bar removes wires from terminals that disappear, then does it', () => {
+    const c = ctx({ placementId: 'p3' });
+    const asked = applyEdit(c, 'width', '2');
+    expect(asked).toMatchObject({ ok: false, needsConfirm: { message: expect.stringContaining('1 wire') } });
+    const confirmed = ok(applyEdit(c, 'width', '2', { confirmed: true }));
+    expect(confirmed.panel.placements[2]?.widthUnits).toBe(2);
+    expect(confirmed.schematic.wires.map((w) => w.id)).toEqual(['w1', 'w3']);
+  });
+
+  it('does not ask when no wire is affected, and keeps every wire when the bar grows', () => {
+    const grown = ok(applyEdit(ctx({ placementId: 'p3' }), 'width', '12'));
+    expect(grown.schematic.wires).toHaveLength(3);
+    const narrow = applyEdit(ctx({ placementId: 'p3' }), 'width', '3');
+    expect(narrow.ok).toBe(true);
+  });
+
+  it('moves the node of a module node', () => {
+    const moved = ok(applyEdit(ctx({ nodeId: 'n1', placementId: 'p1' }, 'schematic'), 'nodeX', '300'));
+    expect(moved.schematic.nodes[0]?.x).toBe(300);
+  });
+});
+
+describe('applyEdit: rows', () => {
+  it('changes the length, refusing what would not fit the modules', () => {
+    expect(ok(applyEdit(ctx({ rail: 1 }), 'length', '12')).panel.railLengthsUnits).toEqual([24, 12]);
+    expect(message(applyEdit(ctx({ rail: 0 }), 'length', '5'))).toBe('Modules on this row would not fit.');
+    expect(message(applyEdit(ctx({ rail: 0 }), 'length', '500'))).toBe('Length is 1 to 144 units.');
+  });
+
+  it('changes the spacing within its limits', () => {
+    expect(ok(applyEdit(ctx({ rail: 0 }), 'spacing', '200')).panel.railPitchesMm).toEqual([200]);
+    expect(message(applyEdit(ctx({ rail: 0 }), 'spacing', '50'))).toBe('Spacing is 90 to 500 mm.');
+  });
+
+  it('moves a row with its contents and keeps it selected at its new position', () => {
+    const result = applyEdit(ctx({ rail: 0 }), 'position', '2');
+    if (!result.ok) throw new Error(result.message);
+    expect(result.selection).toEqual({ rail: 1 });
+    expect(result.project.panel.placements.map((p) => p.rail)).toEqual([1, 1, 1]);
+    expect(message(applyEdit(ctx({ rail: 0 }), 'position', '3'))).toBe('There is no such row.');
+  });
+});
+
+describe('applyEdit: sources and loads', () => {
+  it('moves a node', () => {
+    const moved = ok(applyEdit(ctx({ nodeId: 'n4' }, 'schematic'), 'nodeY', '-250'));
+    expect(moved.schematic.nodes[3]?.y).toBe(-250);
+  });
+
+  it('changes the conductors, asking before it removes wires', () => {
+    const c = ctx({ nodeId: 'n4' }, 'schematic');
+    const asked = applyEdit(c, 'conductors', ['L1', 'L2', 'L3', 'PE']);
+    expect(asked).toMatchObject({ ok: false, needsConfirm: { message: expect.stringContaining('2 wires') } });
+    const confirmed = ok(applyEdit(c, 'conductors', ['L1', 'L2', 'L3', 'PE'], { confirmed: true }));
+    expect(confirmed.schematic.wires.map((w) => w.id)).toEqual(['w1']);
+    expect(confirmed.schematic.nodes[3]?.conductors).toEqual(['L1', 'L2', 'L3', 'PE']);
+  });
+
+  it('changes the conductors without asking when no wire is on them', () => {
+    const next = ok(applyEdit(ctx({ nodeId: 'n4' }, 'schematic'), 'conductors', ['L1', 'L2', 'L3', 'N', 'PE', 'L']));
+    expect(next.schematic.nodes[3]?.conductors).toEqual(['L', 'L1', 'L2', 'L3', 'N', 'PE']);
+  });
+
+  it('refuses an empty set of conductors', () => {
+    expect(message(applyEdit(ctx({ nodeId: 'n4' }, 'schematic'), 'conductors', []))).toBe(
+      'A conductor can be ticked once, and at least one is needed.',
+    );
+  });
+});
+
+describe('applyEdit: guards', () => {
+  it('refuses an unknown property, a read-only one, and an empty selection', () => {
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'poles', '3'))).toBe('That property cannot be edited.');
+    expect(message(applyEdit(ctx({ placementId: 'p1' }), 'nope', 'x'))).toBe('That property cannot be edited.');
+    expect(message(applyEdit(ctx({}), 'label', 'x'))).toBe('Nothing is selected.');
+  });
+
+  it('never mutates the project it was given', () => {
+    const project = build();
+    const snapshot = structuredClone(project);
+    applyEdit(ctx({ placementId: 'p3' }, 'panel', project), 'width', '8');
+    applyEdit(ctx({ rail: 0 }, 'panel', project), 'position', '2');
+    applyEdit(ctx({ nodeId: 'n4' }, 'schematic', project), 'conductors', ['L1'], { confirmed: true });
+    expect(project).toEqual(snapshot);
+  });
+});

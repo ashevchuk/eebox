@@ -6,7 +6,11 @@ export interface BomRow {
   libraryId: string;
   moduleId: string;
   def: ModuleDef | undefined;
+  /** Copies of one module with different custom widths are different items. */
+  widthUnits: number | undefined;
   quantity: number;
+  /** Custom labels of the placed items, in panel order. */
+  labels: string[];
 }
 
 const HEADER = [
@@ -22,18 +26,27 @@ const HEADER = [
   'Residual current (mA)',
   'Width (units)',
   'Quantity',
+  'Labels',
 ];
 
 export function buildBom(panel: Panel, resolve: (ref: ModuleRef) => ModuleDef | undefined): BomRow[] {
   const rows = new Map<string, BomRow>();
-  for (const { module } of panel.placements) {
-    const key = moduleKey(module);
-    const row = rows.get(key);
-    if (row) row.quantity += 1;
-    else rows.set(key, { libraryId: module.libraryId, moduleId: module.moduleId, def: resolve(module), quantity: 1 });
+  for (const { module, label, widthUnits: override } of [...panel.placements, ...panel.combs]) {
+    const def = resolve(module);
+    const widthUnits = override ?? def?.widthUnits;
+    const key = `${moduleKey(module)}|${widthUnits}`;
+    const row =
+      rows.get(key) ??
+      { libraryId: module.libraryId, moduleId: module.moduleId, def, widthUnits, quantity: 0, labels: [] };
+    row.quantity += 1;
+    if (label) row.labels.push(label);
+    rows.set(key, row);
   }
   return [...rows.values()].sort(
-    (a, b) => a.libraryId.localeCompare(b.libraryId) || (a.def?.name ?? a.moduleId).localeCompare(b.def?.name ?? b.moduleId),
+    (a, b) =>
+      a.libraryId.localeCompare(b.libraryId) ||
+      (a.def?.name ?? a.moduleId).localeCompare(b.def?.name ?? b.moduleId) ||
+      (a.widthUnits ?? 0) - (b.widthUnits ?? 0),
   );
 }
 
@@ -46,7 +59,7 @@ function cell(value: string | number | undefined): string {
 }
 
 export function bomToCsv(rows: BomRow[]): string {
-  const lines = rows.map(({ libraryId, moduleId, def, quantity }) =>
+  const lines = rows.map(({ libraryId, moduleId, def, widthUnits, quantity, labels }) =>
     [
       libraryId,
       moduleId,
@@ -58,8 +71,9 @@ export function bomToCsv(rows: BomRow[]): string {
       def?.curve,
       def?.breakingCapacityKA,
       def?.residualCurrentMa,
-      def?.widthUnits,
+      widthUnits,
       quantity,
+      labels.join('; ') || undefined,
     ]
       .map(cell)
       .join(','),

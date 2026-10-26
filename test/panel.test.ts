@@ -70,6 +70,11 @@ describe('setRailCount', () => {
     expect(errorOf(setRailCount(panel, 1))).toBe('rail-not-empty');
   });
 
+  it('refuses to remove a row that still holds a comb', () => {
+    const panel = { ...createPanel([12, 12]), combs: [{ id: 'c1', module: { libraryId: 'lib', moduleId: 'comb' }, rail: 1, slot: 0 }] };
+    expect(errorOf(setRailCount(panel, 1))).toBe('rail-not-empty');
+  });
+
   it('keeps placements when only growing', () => {
     const panel = { ...createPanel([12]), placements: [place('p1', 0, 0)] };
     expect(unwrap(setRailCount(panel, 2)).placements).toHaveLength(1);
@@ -110,6 +115,12 @@ describe('setRailLength', () => {
 
   it('rejects an unknown rail', () => {
     expect(errorOf(setRailLength(createPanel([12]), widthOf, 1, 10))).toBe('unknown-rail');
+  });
+
+  it('refuses shrinking below the end of a comb', () => {
+    const panel = { ...createPanel([12]), combs: [{ id: 'c1', module: { libraryId: 'lib', moduleId: 'comb' }, rail: 0, slot: 4 }] };
+    expect(errorOf(setRailLength(panel, widthOf, 0, 5))).toBe('modules-do-not-fit');
+    expect(setRailLength(panel, widthOf, 0, 6).ok).toBe(true);
   });
 });
 
@@ -163,6 +174,11 @@ describe('moveRail', () => {
     const moved = unwrap(moveRail(stocked(), 2, 0));
     expect(moved.railLengthsUnits).toEqual([30, 10, 20]);
     expect(railOf(moved)).toEqual({ a: 1, b: 2, c: 0, d: 2 });
+  });
+
+  it('moves the combs of a row together with it', () => {
+    const panel = { ...stocked(), combs: [{ id: 'c1', module: { libraryId: 'lib', moduleId: 'comb' }, rail: 0, slot: 0 }] };
+    expect(unwrap(moveRail(panel, 0, 2)).combs[0]?.rail).toBe(2);
   });
 
   it('keeps slots, ids and the spacing that belongs to the positions', () => {

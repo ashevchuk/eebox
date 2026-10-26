@@ -5,6 +5,7 @@ import {
   IndexedDbLibraryStorage,
   MemoryLibraryStorage,
   importLibrary,
+  seedBundledLibrary,
   type LibraryStorage,
 } from './library/storage';
 import type { Library, ModuleDef } from './library/types';
@@ -13,9 +14,11 @@ import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
 import { bomToCsv, buildBom } from './project/bom';
-import { parseProjectJson, type ProjectFile, type ProjectParseResult } from './project/file';
+import { parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
-import { emptySchematic, renameNode } from './schematic/model';
+import { emptySchematic } from './schematic/model';
+import { confirmDialog } from './ui/dialog';
+import { InspectorView } from './ui/inspectorView';
 import { downloadBlob } from './ui/download';
 import { renderToPng } from './ui/exportImage';
 import { PanelEditor } from './ui/panelEditor';
@@ -33,7 +36,7 @@ const enclosureSelect = byId<HTMLSelectElement>('enclosure');
 const statusEl = byId<HTMLElement>('status');
 const undoButton = byId<HTMLButtonElement>('undo');
 const redoButton = byId<HTMLButtonElement>('redo');
-const labelInput = byId<HTMLInputElement>('node-label');
+const deleteButton = byId<HTMLButtonElement>('delete-selection');
 const ctx = canvas.getContext('2d')!;
 
 const storage: LibraryStorage =
@@ -77,9 +80,9 @@ function syncUi(): void {
   document.body.dataset.mode = session.mode;
   byId('mode-panel').classList.toggle('active', session.mode === 'panel');
   byId('mode-schematic').classList.toggle('active', session.mode === 'schematic');
-  const node = session.project.schematic.nodes.find((n) => n.id === session.selection.nodeId);
-  labelInput.disabled = !node;
-  labelInput.value = node?.label ?? '';
+  byId('bundle-mode').classList.toggle('active', schematicView.bundleMode);
+  const { placementId, combId, nodeId, wireId } = session.selection;
+  deleteButton.disabled = !(session.mode === 'panel' ? placementId || combId : nodeId || wireId);
 }
 
 session.subscribe(() => {
@@ -250,7 +253,7 @@ async function refreshLibraries(): Promise<void> {
   session.changed();
 }
 
-function newPanel(): void {
+async function newPanel(): Promise<void> {
   const [libraryId, enclosureId] = enclosureSelect.value.split('/');
   const enclosure = session.libraries
     .find((l) => l.id === libraryId)
@@ -259,7 +262,7 @@ function newPanel(): void {
     showStatus('No enclosure available: import a library that defines one.', true);
     return;
   }
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   session.reset({
     panel: createPanel(enclosure.railLengthsUnits),
     schematic: emptySchematic(),
@@ -274,8 +277,9 @@ function downloadLibrary(library: Library): void {
 const hasWork = (project: Project): boolean =>
   project.panel.placements.length > 0 || project.schematic.nodes.length > 0;
 
-function confirmDiscard(): boolean {
-  return !hasWork(session.project) || confirm('Discard the current panel and schematic?');
+async function confirmDiscard(): Promise<boolean> {
+  if (!hasWork(session.project)) return true;
+  return confirmDialog('Discard the current panel and schematic?', 'Discard');
 }
 
 function describeErrors(source: string, errors: ValidationError[]): string[] {
@@ -308,7 +312,7 @@ async function openSharedHash(): Promise<void> {
   const result = await decodeShare(location.hash.slice(SHARE_PREFIX.length));
   history.replaceState(null, '', location.href.split('#')[0]);
   if (!result.ok) showStatus(describeErrors('Share link', result.errors).join('\n'), true);
-  else if (confirmDiscard()) applyLoaded(result.file, result.warnings, 'Shared project');
+  else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, 'Shared project');
 }
 
 async function exportPng(): Promise<void> {
@@ -317,6 +321,17 @@ async function exportPng(): Promise<void> {
   } catch (error) {
     showStatus(`PNG export failed: ${(error as Error).message}`, true);
   }
+}
+
+function checkProject(): void {
+  const problems = projectWarnings(session.project, session.resolve);
+  if (problems.length === 0) {
+    showStatus('Check passed: no problems found.');
+    return;
+  }
+  const shown = problems.slice(0, 6);
+  const hidden = problems.length - shown.length;
+  showStatus([...shown, ...(hidden > 0 ? [`${hidden} more`] : [])].join('\n'), true);
 }
 
 function exportBom(): void {
@@ -376,20 +391,28 @@ byId<HTMLInputElement>('open-project').addEventListener('change', async (e) => {
   input.value = '';
   const result = parseProjectJson(text);
   if (!result.ok) showStatus(describeErrors(file.name, result.errors).join('\n'), true);
-  else if (confirmDiscard()) applyLoaded(result.file, result.warnings, file.name);
+  else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, file.name);
 });
 
-labelInput.addEventListener('change', () => {
-  const id = session.selection.nodeId;
-  const label = labelInput.value.trim();
-  const result = id && label ? renameNode(session.project.schematic, id, label) : null;
-  if (result?.ok) session.commit({ ...session.project, schematic: result.schematic });
-  else syncUi();
-});
+const inspector = new InspectorView(byId('inspector-content'), session, (message) =>
+  confirmDialog(message, 'Continue'),
+);
+
+// Commit a typed value before a click elsewhere changes the selection under it.
+window.addEventListener(
+  'pointerdown',
+  () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && inspector.owns(active)) active.blur();
+  },
+  true,
+);
+
+deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
 byId('mode-panel').addEventListener('click', () => setMode('panel'));
 byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
-byId('new-panel').addEventListener('click', newPanel);
+byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
 byId('save-project').addEventListener('click', () =>
   downloadBlob(new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }), 'panel.eebox.json'),
@@ -397,9 +420,14 @@ byId('save-project').addEventListener('click', () =>
 byId('share-link').addEventListener('click', () => void shareLink());
 byId('export-png').addEventListener('click', () => void exportPng());
 byId('export-bom').addEventListener('click', exportBom);
-byId('add-source').addEventListener('click', () => schematicView.addFreeNode('source'));
-byId('add-busbar').addEventListener('click', () => schematicView.addFreeNode('busbar'));
-byId('add-load').addEventListener('click', () => schematicView.addFreeNode('load'));
+for (const preset of ['source1', 'source3', 'load1', 'load3'] as const) {
+  byId(`add-${preset}`).addEventListener('click', () => schematicView.addFreeNode(preset));
+}
+byId('check').addEventListener('click', checkProject);
+byId('bundle-mode').addEventListener('click', () => {
+  schematicView.bundleMode = !schematicView.bundleMode;
+  syncUi();
+});
 byId('sync-modules').addEventListener('click', () => schematicView.syncModules());
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
@@ -436,7 +464,8 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
   if (shared) history.replaceState(null, '', location.href.split('#')[0]);
   if (shared?.ok) {
     const storedHasWork = stored?.ok === true && hasWork(stored.file.project);
-    if (!storedHasWork || confirm('Open the shared project and replace your autosaved one?')) {
+    const replace = () => confirmDialog('Open the shared project and replace your autosaved one?', 'Open shared project');
+    if (!storedHasWork || (await replace())) {
       applyLoaded(shared.file, shared.warnings, 'Shared project');
       return;
     }
@@ -448,13 +477,13 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
     return;
   }
   if (stored) showStatus(describeErrors('Autosave ignored:', stored.errors).join('\n'), true);
-  newPanel();
+  await newPanel();
 }
 
 async function init(): Promise<void> {
   const stored = autosaveStore ? loadAutosave(autosaveStore) : null;
   try {
-    if ((await storage.list()).length === 0) await importLibrary(storage, genericIecText);
+    await seedBundledLibrary(storage, genericIecText);
     await refreshLibraries();
   } catch (error) {
     showStatus(`Library storage failed: ${(error as Error).message}`, true);

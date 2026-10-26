@@ -3,18 +3,24 @@
   "id": "generic-iec",
   "name": "Generic IEC modules",
   "modules": [
-    { "id": "mcb-1p-b10", "kind": "breaker", "name": "MCB 1P B10", "widthUnits": 1, "poles": 1, "ratedCurrentA": 10, "curve": "B", "breakingCapacityKA": 6 },
-    { "id": "mcb-1p-c16", "kind": "breaker", "name": "MCB 1P C16", "widthUnits": 1, "poles": 1, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6 },
-    { "id": "mcb-2p-c25", "kind": "breaker", "name": "MCB 2P C25", "widthUnits": 2, "poles": 2, "ratedCurrentA": 25, "curve": "C", "breakingCapacityKA": 6 },
-    { "id": "mcb-3p-c32", "kind": "breaker", "name": "MCB 3P C32", "widthUnits": 3, "poles": 3, "ratedCurrentA": 32, "curve": "C", "breakingCapacityKA": 6 },
-    { "id": "rcd-2p-40-30", "kind": "rcd", "name": "RCD 2P 40A 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 40, "residualCurrentMa": 30 },
-    { "id": "rcd-4p-63-30", "kind": "rcd", "name": "RCD 4P 63A 30mA", "widthUnits": 4, "poles": 4, "ratedCurrentA": 63, "residualCurrentMa": 30 },
-    { "id": "rcbo-1pn-c16-30", "kind": "rcbo", "name": "RCBO 1P+N C16 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6, "residualCurrentMa": 30 },
-    { "id": "main-switch-3p-63", "kind": "switch", "name": "Main switch 3P 63A", "widthUnits": 3, "poles": 3, "ratedCurrentA": 63 }
+    {"id": "mcb-1p-b10", "kind": "breaker", "name": "MCB 1P B10", "widthUnits": 1, "poles": 1, "ratedCurrentA": 10, "curve": "B", "breakingCapacityKA": 6},
+    {"id": "mcb-1p-c16", "kind": "breaker", "name": "MCB 1P C16", "widthUnits": 1, "poles": 1, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6},
+    {"id": "mcb-2p-c25", "kind": "breaker", "name": "MCB 2P C25", "widthUnits": 2, "poles": 2, "ratedCurrentA": 25, "curve": "C", "breakingCapacityKA": 6},
+    {"id": "mcb-3p-c32", "kind": "breaker", "name": "MCB 3P C32", "widthUnits": 3, "poles": 3, "ratedCurrentA": 32, "curve": "C", "breakingCapacityKA": 6},
+    {"id": "rcd-2p-40-30", "kind": "rcd", "name": "RCD 2P 40A 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 40, "residualCurrentMa": 30},
+    {"id": "rcd-4p-63-30", "kind": "rcd", "name": "RCD 4P 63A 30mA", "widthUnits": 4, "poles": 4, "ratedCurrentA": 63, "residualCurrentMa": 30},
+    {"id": "rcbo-1pn-c16-30", "kind": "rcbo", "name": "RCBO 1P+N C16 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6, "residualCurrentMa": 30},
+    {"id": "main-switch-3p-63", "kind": "switch", "name": "Main switch 3P 63A", "widthUnits": 3, "poles": 3, "ratedCurrentA": 63},
+    {"id": "contactor-3p-25-230", "kind": "contactor", "name": "Contactor 3P 25A, 230V coil", "widthUnits": 3, "poles": 3, "ratedCurrentA": 25, "terminals": [{"name": "L1", "conductor": "L1", "side": "top", "unit": 0}, {"name": "L2", "conductor": "L2", "side": "top", "unit": 1}, {"name": "L3", "conductor": "L3", "side": "top", "unit": 2}, {"name": "A1", "conductor": "L", "side": "top", "unit": 0}, {"name": "A2", "conductor": "N", "side": "top", "unit": 2}, {"name": "T1", "conductor": "L1", "side": "bottom", "unit": 0}, {"name": "T2", "conductor": "L2", "side": "bottom", "unit": 1}, {"name": "T3", "conductor": "L3", "side": "bottom", "unit": 2}]},
+    {"id": "n-bar-12", "kind": "busbar", "name": "Neutral bar 12 terminals", "widthUnits": 6, "poles": 1, "terminals": [{"name": "N", "conductor": "N", "side": "top", "net": "N", "count": 6}, {"name": "Nb", "conductor": "N", "side": "bottom", "net": "N", "count": 6}], "resizable": {"minUnits": 2, "maxUnits": 24}},
+    {"id": "pe-bar-12", "kind": "busbar", "name": "Earth bar 12 terminals", "widthUnits": 6, "poles": 1, "terminals": [{"name": "PE", "conductor": "PE", "side": "top", "net": "PE", "count": 6}, {"name": "PEb", "conductor": "PE", "side": "bottom", "net": "PE", "count": 6}], "resizable": {"minUnits": 2, "maxUnits": 24}},
+    {"id": "comb-3ph-12", "kind": "comb", "name": "Comb 3-phase, 12 units", "widthUnits": 12, "poles": 3, "comb": {"pattern": ["L1", "L2", "L3"], "side": "top"}, "resizable": {"minUnits": 2, "maxUnits": 54}},
+    {"id": "comb-1ph-12", "kind": "comb", "name": "Comb 1-phase, 12 units", "widthUnits": 12, "poles": 1, "comb": {"pattern": ["L"], "side": "top"}, "resizable": {"minUnits": 2, "maxUnits": 54}},
+    {"id": "comb-lpn-12", "kind": "comb", "name": "Comb L+N, 12 units", "widthUnits": 12, "poles": 2, "comb": {"pattern": ["L", "N"], "side": "top"}, "resizable": {"minUnits": 2, "maxUnits": 54}}
   ],
   "enclosures": [
-    { "id": "enc-1x12", "name": "Enclosure 1 row x 12 units", "railLengthsUnits": [12] },
-    { "id": "enc-2x18", "name": "Enclosure 2 rows x 18 units", "railLengthsUnits": [18, 18] },
-    { "id": "enc-3x24", "name": "Enclosure 3 rows x 24 units", "railLengthsUnits": [24, 24, 24] }
+    {"id": "enc-1x12", "name": "Enclosure 1 row x 12 units", "railLengthsUnits": [12]},
+    {"id": "enc-2x18", "name": "Enclosure 2 rows x 18 units", "railLengthsUnits": [18, 18]},
+    {"id": "enc-3x24", "name": "Enclosure 3 rows x 24 units", "railLengthsUnits": [24, 24, 24]}
   ]
 }

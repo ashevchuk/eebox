@@ -7,8 +7,10 @@ import {
   FRAME_PADDING,
   ROW_MARGIN,
   frameRect,
+  labelRoom,
   moduleRect,
   placementAt,
+  railAtPoint,
   railCenterY,
   railRect,
   snapToSlot,
@@ -164,7 +166,51 @@ describe('panel geometry with custom pitches', () => {
   });
 
   it('keeps the default frame height of the single-pitch layout', () => {
-    expect(frameRect(createPanel([10, 10])).height).toBe(2 * 150 + 80);
+    expect(frameRect(createPanel([10, 10])).height).toBe(2 * FRAME_PADDING + 2 * ROW_MARGIN + DEFAULT_RAIL_PITCH_MM);
     expect(frameRect(createPanel([])).height).toBe(FRAME_PADDING);
+  });
+});
+
+describe('labelRoom', () => {
+  it('stops above the combs that overhang the next row', () => {
+    const panel = createPanel([10, 10]);
+    expect(labelRoom(panel, 0)).toBe(DEFAULT_RAIL_PITCH_MM - 90 - 10 - 8);
+  });
+
+  it('runs to the end of the frame under the last row', () => {
+    const panel = createPanel([10, 10]);
+    expect(labelRoom(panel, 1)).toBe(ROW_MARGIN + FRAME_PADDING - 45 - 8);
+  });
+
+  it('grows with the spacing between rows', () => {
+    const wide = { ...createPanel([10, 10]), railPitchesMm: [250] };
+    expect(labelRoom(wide, 0)).toBe(labelRoom(createPanel([10, 10]), 0) + 100);
+  });
+
+  it('never goes negative', () => {
+    const tight = { ...createPanel([10, 10]), railPitchesMm: [90] };
+    expect(labelRoom(tight, 0)).toBe(0);
+  });
+});
+
+describe('railAtPoint', () => {
+  const panel = () => ({ ...createPanel([10, 6]), railPitchesMm: [200] });
+
+  it('finds the row whose rail bar is under the point', () => {
+    const p = panel();
+    expect(railAtPoint(p, { x: FRAME_PADDING + 40, y: railCenterY(p, 0) })).toBe(0);
+    expect(railAtPoint(p, { x: FRAME_PADDING + 40, y: railCenterY(p, 1) + 10 })).toBe(1);
+  });
+
+  it('stops at the end of a shorter rail and at the edges of the bar', () => {
+    const p = panel();
+    expect(railAtPoint(p, { x: FRAME_PADDING + 6 * 17.5 + 5, y: railCenterY(p, 1) })).toBeUndefined();
+    expect(railAtPoint(p, { x: FRAME_PADDING + 6 * 17.5 + 5, y: railCenterY(p, 0) })).toBe(0);
+    expect(railAtPoint(p, { x: FRAME_PADDING + 20, y: railCenterY(p, 0) + 30 })).toBeUndefined();
+  });
+
+  it('finds nothing on a panel without rails or away from them', () => {
+    expect(railAtPoint(createPanel([]), { x: 50, y: 50 })).toBeUndefined();
+    expect(railAtPoint(panel(), { x: 5000, y: 5000 })).toBeUndefined();
   });
 });

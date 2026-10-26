@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import genericIecText from '../libraries/generic-iec.json?raw';
-import { MemoryLibraryStorage, importLibrary } from '../src/library/storage';
+import { MemoryLibraryStorage, importLibrary, seedBundledLibrary } from '../src/library/storage';
+import type { Library } from '../src/library/types';
 import { exportLibraryJson, parseLibraryJson, validateLibrary } from '../src/library/validate';
 
 const minimalLibrary = () => ({
@@ -131,5 +132,64 @@ describe('enclosure bounds', () => {
 
   it('accepts the largest allowed enclosure', () => {
     expect(validateLibrary(withRails(Array(20).fill(144))).ok).toBe(true);
+  });
+});
+
+describe('seedBundledLibrary', () => {
+  const countingStorage = () => {
+    const inner = new MemoryLibraryStorage();
+    const puts: string[] = [];
+    return {
+      puts,
+      list: () => inner.list(),
+      remove: (id: string) => inner.remove(id),
+      put: (library: Library) => (puts.push(library.id), inner.put(library)),
+    };
+  };
+  const bundled = () => {
+    const parsed = parseLibraryJson(genericIecText);
+    if (!parsed.ok) throw new Error('bundled library must be valid');
+    return parsed.library;
+  };
+
+  it('stores the bundled library in an empty storage', async () => {
+    const storage = countingStorage();
+    await seedBundledLibrary(storage, genericIecText);
+    expect((await storage.list()).map((l) => l.id)).toEqual(['generic-iec']);
+  });
+
+  it('replaces an outdated copy so new modules reach existing users', async () => {
+    const storage = countingStorage();
+    await storage.put({ ...bundled(), modules: bundled().modules.slice(0, 2) });
+    await seedBundledLibrary(storage, genericIecText);
+    expect((await storage.list())[0]?.modules).toHaveLength(bundled().modules.length);
+  });
+
+  it('does not write when the stored copy is current', async () => {
+    const storage = countingStorage();
+    await seedBundledLibrary(storage, genericIecText);
+    storage.puts.length = 0;
+    await seedBundledLibrary(storage, genericIecText);
+    expect(storage.puts).toEqual([]);
+  });
+
+  it('does not bring back a removed bundled library while other libraries exist', async () => {
+    const storage = countingStorage();
+    await storage.put({ ...bundled(), id: 'mine', name: 'Mine' });
+    await seedBundledLibrary(storage, genericIecText);
+    expect((await storage.list()).map((l) => l.id)).toEqual(['mine']);
+  });
+
+  it('leaves other libraries alone when it replaces its own', async () => {
+    const storage = countingStorage();
+    await storage.put({ ...bundled(), id: 'mine', name: 'Mine' });
+    await storage.put({ ...bundled(), name: 'Old name' });
+    await seedBundledLibrary(storage, genericIecText);
+    const names = Object.fromEntries((await storage.list()).map((l) => [l.id, l.name]));
+    expect(names).toEqual({ mine: 'Mine', 'generic-iec': bundled().name });
+  });
+
+  it('reports a broken bundled library instead of ignoring it', async () => {
+    await expect(seedBundledLibrary(new MemoryLibraryStorage(), '{"schemaVersion":1}')).rejects.toThrow('bundled library is invalid');
   });
 });

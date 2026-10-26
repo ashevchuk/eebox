@@ -1,20 +1,24 @@
+import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import {
   insertPlacement,
   nextPlacementId,
   removePlacement,
   type ModuleRef,
+  type Panel,
 } from '../layout/placement';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
-import { FRAME_PADDING, frameRect, placementAt, snapToSlot } from '../view/geometry';
+import { FRAME_PADDING, combAtPoint, frameRect, placementAt, railAtPoint, snapToSlot } from '../view/geometry';
 import { render, type Ghost } from '../view/render';
-import type { Panel } from '../layout/placement';
 import type { Session } from './session';
 import type { View } from './view';
 
 interface Drag {
+  kind: 'placement' | 'comb';
   def: ModuleDef;
+  /** Width of the dragged item, which differs from the library width for a resized copy. */
+  widthUnits: number;
   module: ModuleRef;
   anchorUnits: number;
   movingId: string | null;
@@ -35,15 +39,18 @@ export class PanelView implements View {
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
+    const { drag } = this;
     render(
       ctx,
       this.camera,
       {
-        panel: this.drag?.next ?? this.session.project.panel,
+        panel: drag?.next ?? this.session.project.panel,
         resolve: this.session.resolve,
-        selection: this.session.selection.placementId ?? null,
-        movingId: this.drag?.movingId ?? null,
-        ghost: this.drag?.ghost ?? null,
+        selectedPlacementId: this.session.selection.placementId ?? null,
+        selectedCombId: this.session.selection.combId ?? null,
+        selectedRail: this.session.selection.rail ?? null,
+        moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
+        ghost: drag?.ghost ?? null,
       },
       width,
       height,
@@ -53,20 +60,40 @@ export class PanelView implements View {
 
   startPaletteDrag(e: PointerEvent, def: ModuleDef, module: ModuleRef, world: Point): void {
     this.session.selection = {};
-    this.startDrag(def, module, def.widthUnits / 2, null);
+    this.startDrag(def.kind === 'comb' ? 'comb' : 'placement', def, module, def.widthUnits, def.widthUnits / 2, null);
     this.pointerMove(e, world, false);
   }
 
   pointerDown(_e: PointerEvent, world: Point): boolean {
     const panel = this.session.project.panel;
+    const comb = combAtPoint(
+      panel,
+      (item) => {
+        const def = this.session.resolve(item.module);
+        return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
+      },
+      world,
+    );
+    if (comb) {
+      this.session.select({ combId: comb.id });
+      const def = this.session.resolve(comb.module);
+      if (def) {
+        const width = comb.widthUnits ?? def.widthUnits;
+        this.startDrag('comb', def, comb.module, width, this.grabbedUnits(world, comb.slot, width), comb.id);
+      }
+      return true;
+    }
     const hit = placementAt(panel, this.session.widthOf, world);
-    this.session.select(hit ? { placementId: hit.id } : {});
-    if (!hit) return false;
+    if (!hit) {
+      const rail = railAtPoint(panel, world);
+      this.session.select(rail === undefined ? {} : { rail });
+      return false;
+    }
+    this.session.select({ placementId: hit.id });
     const def = this.session.resolve(hit.module);
     if (def) {
-      const grabbedUnits = (world.x - FRAME_PADDING) / MODULE_UNIT_MM - hit.slot;
-      const anchorUnits = Math.max(0, Math.min(grabbedUnits, def.widthUnits));
-      this.startDrag(def, hit.module, anchorUnits, hit.id);
+      const width = hit.widthUnits ?? def.widthUnits;
+      this.startDrag('placement', def, hit.module, width, this.grabbedUnits(world, hit.slot, width), hit.id);
     }
     return true;
   }
@@ -77,11 +104,10 @@ export class PanelView implements View {
     const panel = this.session.project.panel;
     drag.ghost = null;
     drag.next = null;
-    const snap = overCanvas ? snapToSlot(panel, world, drag.def.widthUnits, drag.anchorUnits) : null;
+    const snap = overCanvas ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits) : null;
     if (snap) {
-      const placement = { id: drag.movingId ?? drag.newId, module: drag.module, ...snap };
-      const result = insertPlacement(panel, this.session.widthOf, placement, drag.movingId ?? undefined);
-      drag.ghost = { module: drag.def, ...snap, valid: result.ok };
+      const result = this.tryDrop(drag, panel, snap);
+      drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, ...snap, valid: result.ok };
       drag.next = result.ok ? result.panel : null;
     }
     this.session.changed();
@@ -91,35 +117,62 @@ export class PanelView implements View {
     const drag = this.drag;
     if (!drag) return;
     this.drag = null;
-    const { ghost, next, movingId, newId } = drag;
+    const { ghost, next, movingId, newId, kind } = drag;
+    const list = kind === 'comb' ? this.session.project.panel.combs : this.session.project.panel.placements;
     const unchanged =
-      movingId !== null &&
-      this.session.project.panel.placements.some(
-        (p) => p.id === movingId && p.rail === ghost?.rail && p.slot === ghost?.slot,
-      );
+      movingId !== null && list.some((p) => p.id === movingId && p.rail === ghost?.rail && p.slot === ghost?.slot);
     if (next && !unchanged) {
       this.session.commit({ ...this.session.project, panel: next });
-      this.session.select({ placementId: movingId ?? newId });
+      const id = movingId ?? newId;
+      this.session.select(kind === 'comb' ? { combId: id } : { placementId: id });
     } else {
       this.session.changed();
     }
   }
 
   deleteSelection(): void {
-    const id = this.session.selection.placementId;
-    if (!id) return;
-    const result = removePlacement(this.session.project.panel, id);
-    if (result.ok) this.session.commit({ ...this.session.project, panel: result.panel });
+    const { placementId, combId } = this.session.selection;
+    const panel = this.session.project.panel;
+    const result = combId ? removeComb(panel, combId) : placementId ? removePlacement(panel, placementId) : null;
+    if (result?.ok) this.session.commit({ ...this.session.project, panel: result.panel });
     this.session.select({});
   }
 
-  private startDrag(def: ModuleDef, module: ModuleRef, anchorUnits: number, movingId: string | null): void {
+  private grabbedUnits(world: Point, slot: number, widthUnits: number): number {
+    const grabbed = (world.x - FRAME_PADDING) / MODULE_UNIT_MM - slot;
+    return Math.max(0, Math.min(grabbed, widthUnits));
+  }
+
+  private tryDrop(drag: Drag, panel: Panel, snap: { rail: number; slot: number }) {
+    const id = drag.movingId ?? drag.newId;
+    if (drag.kind === 'comb') {
+      const { combLookup } = this.session;
+      return drag.movingId
+        ? moveComb(panel, combLookup, drag.movingId, snap.rail, snap.slot)
+        : addComb(panel, combLookup, { id, module: drag.module, ...snap });
+    }
+    const moved = panel.placements.find((p) => p.id === drag.movingId);
+    const placement = { ...(moved ?? { id, module: drag.module }), ...snap };
+    return insertPlacement(panel, this.session.widthOf, placement, drag.movingId ?? undefined);
+  }
+
+  private startDrag(
+    kind: Drag['kind'],
+    def: ModuleDef,
+    module: ModuleRef,
+    widthUnits: number,
+    anchorUnits: number,
+    movingId: string | null,
+  ): void {
+    const panel = this.session.project.panel;
     this.drag = {
+      kind,
       def,
+      widthUnits,
       module,
       anchorUnits,
       movingId,
-      newId: nextPlacementId(this.session.project.panel),
+      newId: kind === 'comb' ? nextCombId(panel) : nextPlacementId(panel),
       ghost: null,
       next: null,
     };

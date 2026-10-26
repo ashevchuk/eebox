@@ -1,5 +1,6 @@
+import { lookupsOf } from '../layout/lookups';
 import { createPanel } from '../layout/panel';
-import type { ModuleRef, WidthOf } from '../layout/placement';
+import type { ModuleRef } from '../layout/placement';
 import type { Library, ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
@@ -12,6 +13,9 @@ export interface Selection {
   placementId?: string;
   nodeId?: string;
   wireId?: string;
+  combId?: string;
+  /** Index of the selected row (rail). */
+  rail?: number;
 }
 
 export const emptyProject = (): Project => ({
@@ -46,7 +50,10 @@ export class Session {
     this.snapshot.get(moduleKey(ref)) ??
     this.libraries.find((l) => l.id === ref.libraryId)?.modules.find((m) => m.id === ref.moduleId);
 
-  readonly widthOf: WidthOf = (ref) => this.resolve(ref)?.widthUnits;
+  private readonly lookups = lookupsOf(this.resolve);
+  readonly widthOf = this.lookups.widthOf;
+  readonly resizeOf = this.lookups.resizeOf;
+  readonly combLookup = this.lookups.combLookup;
 
   subscribe(listener: () => void): void {
     this.listeners.add(listener);
@@ -95,9 +102,11 @@ export class Session {
 
   private afterHistoryMove(): void {
     const { panel, schematic } = this.project;
-    const { placementId, nodeId, wireId } = this.selection;
+    const { placementId, nodeId, wireId, combId, rail } = this.selection;
     this.selection = {
       ...(placementId && panel.placements.some((p) => p.id === placementId) ? { placementId } : {}),
+      ...(combId && panel.combs.some((c) => c.id === combId) ? { combId } : {}),
+      ...(rail !== undefined && rail < panel.railLengthsUnits.length ? { rail } : {}),
       ...(nodeId && schematic.nodes.some((n) => n.id === nodeId) ? { nodeId } : {}),
       ...(wireId && schematic.wires.some((w) => w.id === wireId) ? { wireId } : {}),
     };

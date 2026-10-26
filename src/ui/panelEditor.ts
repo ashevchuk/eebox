@@ -1,14 +1,23 @@
 import {
+  MAX_LABEL_LENGTH,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_PITCH_MM,
   MIN_RAIL_PITCH_MM,
 } from '../layout/limits';
-import { moveRail, setRailCount, setRailLength, setRailPitch, type PanelEditResult } from '../layout/panel';
+import {
+  moveRail,
+  setRailCount,
+  setRailLabel,
+  setRailLength,
+  setRailPitch,
+  type PanelEditResult,
+} from '../layout/panel';
 import type { Panel } from '../layout/placement';
 import type { Session } from './session';
 
 interface RailRow {
+  label: HTMLInputElement;
   length: HTMLInputElement;
   pitch: HTMLInputElement | null;
   up: HTMLButtonElement;
@@ -46,11 +55,12 @@ export class PanelEditor {
 
   /** Inputs the user is typing in are left alone unless a rejected edit must be reverted. */
   private sync(force: boolean): void {
-    const set = (input: HTMLInputElement, value: number) => {
+    const set = (input: HTMLInputElement, value: number | string) => {
       if (force || input !== document.activeElement) input.value = String(value);
     };
     set(this.countInput, this.panel.railLengthsUnits.length);
     this.rows.forEach((row, i) => {
+      set(row.label, this.panel.railLabels[i] ?? '');
       set(row.length, this.panel.railLengthsUnits[i] ?? 0);
       if (row.pitch) set(row.pitch, this.panel.railPitchesMm[i] ?? 0);
       row.up.disabled = i === 0;
@@ -73,6 +83,16 @@ export class PanelEditor {
     input.type = 'number';
     input.step = '1';
     input.addEventListener('change', () => onChange(input.valueAsNumber));
+    return input;
+  }
+
+  private textInput(onChange: (value: string) => void): HTMLInputElement {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = MAX_LABEL_LENGTH;
+    input.placeholder = 'Row label';
+    input.className = 'row-label';
+    input.addEventListener('change', () => onChange(input.value));
     return input;
   }
 
@@ -118,8 +138,18 @@ export class PanelEditor {
         this.apply((panel) => moveRail(panel, rail, rail + 1), ''),
       );
       const line = this.text('div', `Row ${rail + 1} `, 'settings-line');
+      line.addEventListener('focusin', () => this.session.select({ rail }));
       line.append(length, this.text('span', ' units '), up, down);
-      this.container.append(line);
+      const label = this.textInput((value) =>
+        this.apply(
+          (panel) => setRailLabel(panel, rail, value),
+          `Row label: up to ${MAX_LABEL_LENGTH} characters, without line breaks.`,
+        ),
+      );
+      const labelLine = this.text('div', '', 'settings-line');
+      labelLine.addEventListener('focusin', () => this.session.select({ rail }));
+      labelLine.append(label);
+      this.container.append(line, labelLine);
 
       let pitch: HTMLInputElement | null = null;
       if (rail < count - 1) {
@@ -133,7 +163,7 @@ export class PanelEditor {
         gap.append(pitch, this.text('span', ' mm between rails'));
         this.container.append(gap);
       }
-      this.rows.push({ length, pitch, up, down });
+      this.rows.push({ label, length, pitch, up, down });
     }
   }
 }

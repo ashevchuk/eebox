@@ -1,11 +1,14 @@
 import { MODULE_UNIT_MM } from '../library/types';
-import type { Panel, Placement, WidthOf } from '../layout/placement';
+import type { CombPlacement, Panel, Placement, WidthOf } from '../layout/placement';
+import type { TerminalSide } from '../library/types';
 import type { Point } from './Camera';
 
 /** World units are millimetres. */
 export const RAIL_HEIGHT = 35;
 /** Space above the first and below the last rail, inside the frame. */
-export const ROW_MARGIN = 75;
+export const ROW_MARGIN = 110;
+/** How far from a rail a drop still counts as being on that rail. */
+const SNAP_DISTANCE = 75;
 export const MODULE_HEIGHT = 90;
 export const FRAME_PADDING = 40;
 
@@ -39,6 +42,49 @@ export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits:
   };
 }
 
+const COMB_HEIGHT = 18;
+export const COMB_OVERHANG = 10;
+const LABEL_GAP = 8;
+
+/** A comb lies along the terminal edge of the modules it covers, mostly just outside them. */
+export function combRect(
+  panel: Panel,
+  rail: number,
+  slot: number,
+  widthUnits: number,
+  side: TerminalSide,
+): Rect {
+  const module = moduleRect(panel, rail, slot, widthUnits);
+  const y = side === 'top' ? module.y - COMB_OVERHANG : module.y + module.height - (COMB_HEIGHT - COMB_OVERHANG);
+  return { x: module.x, y, width: module.width, height: COMB_HEIGHT };
+}
+
+/**
+ * Length available for a label printed under the modules of a rail: down to the combs that
+ * overhang the next row, or to the end of the frame for the last row.
+ */
+export function labelRoom(panel: Panel, rail: number): number {
+  const bottom = railCenterY(panel, rail) + MODULE_HEIGHT / 2;
+  const limit =
+    rail + 1 < panel.railLengthsUnits.length
+      ? railCenterY(panel, rail + 1) - MODULE_HEIGHT / 2 - COMB_OVERHANG
+      : frameRect(panel).height;
+  return Math.max(0, limit - bottom - LABEL_GAP);
+}
+
+export function combAtPoint(
+  panel: Panel,
+  infoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
+  point: Point,
+): CombPlacement | undefined {
+  return [...panel.combs].reverse().find((comb) => {
+    const info = infoOf(comb);
+    if (!info) return false;
+    const r = combRect(panel, comb.rail, comb.slot, info.widthUnits, info.side);
+    return point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y && point.y <= r.y + r.height;
+  });
+}
+
 export function frameRect(panel: Panel): Rect {
   const longest = Math.max(0, ...panel.railLengthsUnits) * MODULE_UNIT_MM;
   const lastRail = panel.railLengthsUnits.length - 1;
@@ -67,15 +113,24 @@ export function snapToSlot(
     }
   });
   const railLength = panel.railLengthsUnits[rail];
-  if (railLength === undefined || nearest > ROW_MARGIN) return null;
+  if (railLength === undefined || nearest > SNAP_DISTANCE) return null;
   const raw = Math.round((point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits);
   const slot = Math.max(0, Math.min(raw, railLength - widthUnits));
   return { rail, slot: Math.max(0, slot) };
 }
 
+/** The row whose rail bar is under the point, if any. */
+export function railAtPoint(panel: Panel, point: Point): number | undefined {
+  const index = panel.railLengthsUnits.findIndex((_length, rail) => {
+    const r = railRect(panel, rail);
+    return point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y - 2 && point.y <= r.y + r.height + 2;
+  });
+  return index < 0 ? undefined : index;
+}
+
 export function placementAt(panel: Panel, widthOf: WidthOf, point: Point): Placement | undefined {
   return [...panel.placements].reverse().find((placement) => {
-    const rect = moduleRect(panel, placement.rail, placement.slot, widthOf(placement.module) ?? 1);
+    const rect = moduleRect(panel, placement.rail, placement.slot, widthOf(placement) ?? 1);
     return (
       point.x >= rect.x &&
       point.x <= rect.x + rect.width &&

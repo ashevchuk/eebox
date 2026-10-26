@@ -6,3 +6,4 @@ export const MAX_RAIL_PITCH_MM = 500;
 /** Bounds keep an absurd value from a library or a share link from freezing the renderer. */
 export const MAX_RAILS = 20;
 export const MAX_RAIL_LENGTH_UNITS = 144;
+export const MAX_LABEL_LENGTH = 60;

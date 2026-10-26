@@ -13,7 +13,7 @@ import {
 } from '../src/layout/placement';
 
 const WIDTHS: Record<string, number> = { one: 1, two: 2, four: 4 };
-const widthOf: WidthOf = (ref) => WIDTHS[ref.moduleId];
+const widthOf: WidthOf = (item) => item.widthUnits ?? WIDTHS[item.module.moduleId];
 
 const place = (id: string, moduleId: string, rail: number, slot: number): Placement => ({
   id,
@@ -164,7 +164,7 @@ describe('findProblems', () => {
 
 describe('insertPlacement', () => {
   const W: Record<string, number> = { one: 1, two: 2, four: 4 };
-  const widthByName: WidthOf = (ref) => W[ref.moduleId];
+  const widthByName: WidthOf = (item) => item.widthUnits ?? W[item.module.moduleId];
   const rowOf = (...entries: Array<[string, string, number]>): Panel => ({
     ...createPanel([6, 6]),
     placements: entries.map(([id, moduleId, slot]) => place(id, moduleId, 0, slot)),

@@ -65,6 +65,23 @@ export class IndexedDbLibraryStorage implements LibraryStorage {
   }
 }
 
+/**
+ * Keeps the bundled library current: it is stored when the storage is empty and replaced when the
+ * stored copy differs, so new modules reach existing users. A bundled library the user removed
+ * stays removed as long as other libraries exist. Its id is reserved for it.
+ */
+export async function seedBundledLibrary(storage: LibraryStorage, text: string): Promise<void> {
+  const parsed = parseLibraryJson(text);
+  if (!parsed.ok) {
+    const [first] = parsed.errors;
+    throw new Error(`bundled library is invalid: ${first?.path ?? ''} ${first?.message ?? ''}`.trim());
+  }
+  const stored = await storage.list();
+  const existing = stored.find((l) => l.id === parsed.library.id);
+  const outdated = existing !== undefined && JSON.stringify(existing) !== JSON.stringify(parsed.library);
+  if (stored.length === 0 || outdated) await storage.put(parsed.library);
+}
+
 /** Stores the library only if it validates; a library with the same id is replaced. */
 export async function importLibrary(
   storage: LibraryStorage,
