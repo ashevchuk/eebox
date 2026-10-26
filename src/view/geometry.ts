@@ -1,0 +1,77 @@
+import { MODULE_UNIT_MM } from '../library/types';
+import type { Panel, Placement, WidthOf } from '../layout/placement';
+import type { Point } from './Camera';
+
+/** World units are millimetres. */
+export const RAIL_HEIGHT = 35;
+export const RAIL_PITCH = 150;
+export const MODULE_HEIGHT = 90;
+export const FRAME_PADDING = 40;
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const rowTop = (rail: number) => FRAME_PADDING + rail * RAIL_PITCH;
+
+export function railRect(panel: Panel, rail: number): Rect {
+  return {
+    x: FRAME_PADDING,
+    y: rowTop(rail) + (RAIL_PITCH - RAIL_HEIGHT) / 2,
+    width: (panel.railLengthsUnits[rail] ?? 0) * MODULE_UNIT_MM,
+    height: RAIL_HEIGHT,
+  };
+}
+
+export function moduleRect(rail: number, slot: number, widthUnits: number): Rect {
+  return {
+    x: FRAME_PADDING + slot * MODULE_UNIT_MM,
+    y: rowTop(rail) + (RAIL_PITCH - MODULE_HEIGHT) / 2,
+    width: widthUnits * MODULE_UNIT_MM,
+    height: MODULE_HEIGHT,
+  };
+}
+
+export function frameRect(panel: Panel): Rect {
+  const longest = Math.max(0, ...panel.railLengthsUnits) * MODULE_UNIT_MM;
+  return {
+    x: 0,
+    y: 0,
+    width: longest + FRAME_PADDING * 2,
+    height: panel.railLengthsUnits.length * RAIL_PITCH + FRAME_PADDING * 2,
+  };
+}
+
+/**
+ * Maps a world point to the rail row under it and the slot that puts the
+ * grabbed point (`anchorUnits` from the module's left edge) under the pointer.
+ * The slot is clamped into the rail so dragging past an end snaps inward.
+ */
+export function snapToSlot(
+  panel: Panel,
+  point: Point,
+  widthUnits: number,
+  anchorUnits: number,
+): { rail: number; slot: number } | null {
+  const rail = Math.floor((point.y - FRAME_PADDING) / RAIL_PITCH);
+  const railLength = panel.railLengthsUnits[rail];
+  if (point.y < FRAME_PADDING || railLength === undefined) return null;
+  const raw = Math.round((point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits);
+  const slot = Math.max(0, Math.min(raw, railLength - widthUnits));
+  return { rail, slot: Math.max(0, slot) };
+}
+
+export function placementAt(panel: Panel, widthOf: WidthOf, point: Point): Placement | undefined {
+  return [...panel.placements].reverse().find((placement) => {
+    const rect = moduleRect(placement.rail, placement.slot, widthOf(placement.module) ?? 1);
+    return (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.width &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.height
+    );
+  });
+}

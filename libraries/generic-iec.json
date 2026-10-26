@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "generic-iec",
+  "name": "Generic IEC modules",
+  "modules": [
+    { "id": "mcb-1p-b10", "kind": "breaker", "name": "MCB 1P B10", "widthUnits": 1, "poles": 1, "ratedCurrentA": 10, "curve": "B", "breakingCapacityKA": 6 },
+    { "id": "mcb-1p-c16", "kind": "breaker", "name": "MCB 1P C16", "widthUnits": 1, "poles": 1, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6 },
+    { "id": "mcb-2p-c25", "kind": "breaker", "name": "MCB 2P C25", "widthUnits": 2, "poles": 2, "ratedCurrentA": 25, "curve": "C", "breakingCapacityKA": 6 },
+    { "id": "mcb-3p-c32", "kind": "breaker", "name": "MCB 3P C32", "widthUnits": 3, "poles": 3, "ratedCurrentA": 32, "curve": "C", "breakingCapacityKA": 6 },
+    { "id": "rcd-2p-40-30", "kind": "rcd", "name": "RCD 2P 40A 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 40, "residualCurrentMa": 30 },
+    { "id": "rcd-4p-63-30", "kind": "rcd", "name": "RCD 4P 63A 30mA", "widthUnits": 4, "poles": 4, "ratedCurrentA": 63, "residualCurrentMa": 30 },
+    { "id": "rcbo-1pn-c16-30", "kind": "rcbo", "name": "RCBO 1P+N C16 30mA", "widthUnits": 2, "poles": 2, "ratedCurrentA": 16, "curve": "C", "breakingCapacityKA": 6, "residualCurrentMa": 30 },
+    { "id": "main-switch-3p-63", "kind": "switch", "name": "Main switch 3P 63A", "widthUnits": 3, "poles": 3, "ratedCurrentA": 63 }
+  ],
+  "enclosures": [
+    { "id": "enc-1x12", "name": "Enclosure 1 row x 12 units", "railLengthsUnits": [12] },
+    { "id": "enc-2x18", "name": "Enclosure 2 rows x 18 units", "railLengthsUnits": [18, 18] },
+    { "id": "enc-3x24", "name": "Enclosure 3 rows x 24 units", "railLengthsUnits": [24, 24, 24] }
+  ]
+}

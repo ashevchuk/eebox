@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>eebox</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0c10;
+        --panel: #14161d;
+        --border: #262b36;
+        --text: #e7e9ef;
+        --text-dim: #9aa1b3;
+        --accent: #f5c518;
+        --accent-ink: #14161d;
+        --error: #f87171;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      }
+      body { display: flex; flex-direction: column; }
+      header {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 6px 10px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+      header strong { color: var(--accent); margin-right: 8px; }
+      button, select, .file-button {
+        font: inherit;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+      button.active { border-color: var(--accent); color: var(--accent); }
+      body[data-mode='panel'] .schematic-only,
+      body[data-mode='schematic'] .panel-only,
+      body[data-mode='schematic'] #palette { display: none; }
+      #node-label {
+        font: inherit;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 3px 8px;
+        width: 160px;
+      }
+      button:hover:not(:disabled), .file-button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      #status { color: var(--text-dim); margin-left: auto; white-space: pre-line; text-align: right; }
+      #status.error { color: var(--error); }
+      main { flex: 1; display: flex; min-height: 0; }
+      #palette {
+        width: 240px;
+        flex: 0 0 auto;
+        overflow-y: auto;
+        padding: 8px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+      }
+      .library-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 8px 0 4px;
+        font-weight: 600;
+      }
+      .library-title span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+      .library-title button { padding: 0 6px; font-size: 11px; }
+      .module {
+        padding: 4px 8px;
+        margin-bottom: 3px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      .module:hover { border-color: var(--accent); }
+      .module small { color: var(--text-dim); }
+      #palette .hint { color: var(--text-dim); }
+      #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+      #stage-wrap { flex: 1; min-width: 0; position: relative; }
+      #stage-wrap.drop::after {
+        content: 'Drop library JSON';
+        position: absolute;
+        inset: 8px;
+        display: grid;
+        place-items: center;
+        border: 2px dashed var(--accent);
+        color: var(--accent);
+        font-size: 18px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body data-mode="panel">
+    <header>
+      <strong>eebox</strong>
+      <button id="mode-panel">Panel</button>
+      <button id="mode-schematic">Schematic</button>
+      <select id="enclosure" class="panel-only" title="Enclosure"></select>
+      <button id="new-panel" class="panel-only">New panel</button>
+      <button id="add-source" class="schematic-only">+ Source</button>
+      <button id="add-busbar" class="schematic-only">+ Busbar</button>
+      <button id="add-load" class="schematic-only">+ Load</button>
+      <button id="sync-modules" class="schematic-only">Sync modules</button>
+      <input id="node-label" class="schematic-only" placeholder="Label" disabled />
+      <button id="undo">Undo</button>
+      <button id="redo">Redo</button>
+      <button id="fit">Fit</button>
+      <label class="file-button">
+        Open…
+        <input id="open-project" type="file" accept=".json,application/json" hidden />
+      </label>
+      <button id="save-project">Save</button>
+      <button id="share-link">Share link</button>
+      <button id="export-png">PNG</button>
+      <button id="export-bom">BOM CSV</button>
+      <label class="file-button">
+        Import library…
+        <input id="import" type="file" accept=".json,application/json" multiple hidden />
+      </label>
+      <div id="status"></div>
+    </header>
+    <main>
+      <aside id="palette"></aside>
+      <div id="stage-wrap"><canvas id="stage"></canvas></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
