@@ -336,7 +336,7 @@ try {
     expectEqual(await browser.evaluate(`document.querySelectorAll('dialog[open] .colours-table tbody tr').length`), 9, 'one row for each conductor');
     await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'pue'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click()`);
-    expectEqual(await browser.evaluate(`JSON.parse(localStorage.getItem('eebox:colour-scheme')).scheme`), 'pue', 'stored scheme');
+    await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:colour-scheme') ?? '{}').scheme === 'pue'`, 'the chosen scheme to be stored');
     await clickButton('Schematic');
     const svg = await browser.evaluate(`(async () => {
       let blob = null; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
