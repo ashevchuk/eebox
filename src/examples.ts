@@ -1,6 +1,7 @@
 import houseText from '../examples/house-panel.json?raw';
 import studioText from '../examples/studio-flat.json?raw';
 import workshopText from '../examples/workshop-backup.json?raw';
+import autoBackupText from '../examples/workshop-auto-backup.json?raw';
 
 export interface Example {
   id: string;
@@ -28,5 +29,11 @@ export const EXAMPLES: readonly Example[] = [
     title: 'Workshop with a backup input',
     description: 'Three phase with a generator: a changeover switch between mains and generator, an RCD, a lathe on a 3-pole breaker and the lighting.',
     text: workshopText,
+  },
+  {
+    id: 'workshop-auto-backup',
+    title: 'Automatic backup with a transfer controller',
+    description: 'Three phase: a transfer controller watches mains and generator and closes one of two contactors. Switch Mains off in the inspector to see the generator take over.',
+    text: autoBackupText,
   },
 ];

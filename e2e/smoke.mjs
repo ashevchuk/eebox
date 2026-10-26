@@ -81,6 +81,45 @@ try {
     expectTrue(!(await inspectorText()).includes('MCB 1P C16'), 'the modules to be gone');
   });
 
+  await step('two modules are selected with a rubber band and moved together', async () => {
+    const dropModule = async (x) => {
+      const at = await browser.evaluate(`(async () => {
+        const search = document.getElementById('palette-search');
+        search.value = 'mcb 1p c16'; search.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 300));
+        const r = document.querySelector('#palette .module').getBoundingClientRect();
+        return [r.x + 20, r.y + r.height / 2];
+      })()`);
+      await browser.mouse('mousePressed', at[0], at[1]);
+      await browser.mouse('mouseMoved', at[0] + 60, at[1] + 20);
+      await browser.mouse('mouseMoved', x + 40, 400);
+      await browser.mouse('mouseMoved', x, 395);
+      await browser.mouse('mouseReleased', x, 395);
+    };
+    const slots = () =>
+      browser.evaluate(`(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+        const file = JSON.parse(localStorage.getItem('eebox:autosave'));
+        return file.project.panel.placements.map((p) => p.slot);
+      })()`);
+    await dropModule(640);
+    await dropModule(760);
+    const before = await slots();
+    expectEqual(before.length, 2, 'two modules placed');
+    await browser.mouse('mousePressed', 520, 160, 8);
+    await browser.mouse('mouseMoved', 900, 400, 8);
+    await browser.mouse('mouseMoved', 1300, 650, 8);
+    await browser.mouse('mouseReleased', 1300, 650, 8);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('2 items selected')`, 'the band to select both');
+    await browser.mouse('mousePressed', 640, 395);
+    await browser.mouse('mouseMoved', 660, 395);
+    await browser.mouse('mouseMoved', 700, 395);
+    await browser.mouse('mouseReleased', 700, 395);
+    const after = await slots();
+    expectTrue(after.every((slot, i) => slot > before[i]), `both modules to move right, were ${before} now ${after}`);
+    expectTrue(Math.abs(after[1] - after[0] - (before[1] - before[0])) < 1e-6, 'the distance between them to stay');
+  });
+
   await step('a parts list in CSV is imported as a library with a 22.5 mm relay in it', async () => {
     await browser.evaluate(`(async () => {
       const file = new File([${JSON.stringify(partsCsv)}], 'parts.csv');
@@ -201,7 +240,7 @@ try {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('open-example').click()`);
     await browser.waitFor(`document.querySelector('.examples-dialog[open]')`, 'the examples dialog');
-    expectEqual(await browser.evaluate(`[...document.querySelectorAll('.example-item strong')].map((s) => s.textContent)`), ['Studio flat', 'House panel', 'Workshop with a backup input'], 'examples listed');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('.example-item strong')].map((s) => s.textContent)`), ['Studio flat', 'House panel', 'Workshop with a backup input', 'Automatic backup with a transfer controller'], 'examples listed');
     await browser.evaluate(`[...document.querySelectorAll('.example-item')].find((b) => b.textContent.startsWith('Workshop')).click()`);
     await browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 300)); [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click(); })()`);
     await browser.waitFor(`document.getElementById('status').textContent.includes('Workshop with a backup input loaded')`, 'the example to load');

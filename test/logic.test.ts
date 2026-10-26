@@ -5,6 +5,7 @@ import type { ModuleRef } from '../src/layout/placement';
 import { evaluateExpression, parseExpression } from '../src/library/logicExpression';
 import type { ModuleDef } from '../src/library/types';
 import { validateLibrary } from '../src/library/validate';
+import { buildProjectFile, parseProjectJson } from '../src/project/file';
 import { addNode, connect, emptySchematic, setSourceOff, syncModuleNodes, type Schematic } from '../src/schematic/model';
 import { panelOf, place } from './fixtures';
 
@@ -173,5 +174,81 @@ describe('logic in a library', () => {
   it('needs explicit terminals', () => {
     const { terminals: _t, ...bare } = relay;
     expect(paths({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [bare] })).toEqual(['modules[0].logic']);
+  });
+});
+
+describe('flags: latched and timed devices', () => {
+  const impulse: ModuleDef = {
+    id: 'impulse', kind: 'relay', name: 'Impulse relay', widthUnits: 1, poles: 2,
+    terminals: [{ name: '1', conductor: 'L', side: 'top' }, { name: '2', conductor: 'L', side: 'bottom' }],
+    logic: { inputs: {}, flags: { on: { label: 'Output on', default: true } }, contacts: [{ between: ['top:1', 'bottom:2'], closedWhen: 'on' }] },
+  };
+  const delayed: ModuleDef = {
+    id: 'delayed', kind: 'relay', name: 'On-delay', widthUnits: 1, poles: 2,
+    terminals: [
+      { name: 'A1', conductor: 'L', side: 'top' }, { name: 'A2', conductor: 'N', side: 'top' },
+      { name: '15', conductor: 'C', side: 'bottom' }, { name: '18', conductor: 'C', side: 'bottom' },
+    ],
+    logic: {
+      inputs: { V: { terminals: ['top:A1', 'top:A2'], when: 'all' } },
+      flags: { elapsed: { label: 'Delay elapsed', default: false } },
+      contacts: [{ between: ['bottom:15', 'bottom:18'], closedWhen: 'V & elapsed' }],
+    },
+  };
+  Object.assign(defs, { impulse, delayed });
+
+  function lampBehind(moduleId: string, flags?: Record<string, boolean>) {
+    const panel0 = panelOf([{ ...place('p1', moduleId, 0, 0), ...(flags ? { flags } : {}) }]);
+    let schematic: Schematic = syncModuleNodes(emptySchematic(), panel0, (r) => r.moduleId);
+    const add = (kind: 'source' | 'load', label: string, conductors: Array<'L' | 'N'>) => {
+      schematic = addNode(schematic, { kind, label, x: 0, y: 0, conductors }).schematic;
+      return schematic.nodes[schematic.nodes.length - 1]!.id;
+    };
+    const mains = add('source', 'Mains', ['L', 'N']);
+    const lamp = add('load', 'Lamp', ['L']);
+    const terminalsOf = nodeTerminalsLookup(panel0, resolve);
+    const wire = (a: [string, string], b: [string, string]) => {
+      const result = connect(schematic, terminalsOf, { node: a[0], terminal: a[1] }, { node: b[0], terminal: b[1] });
+      if (!result.ok) throw new Error(result.error.kind);
+      schematic = result.schematic;
+    };
+    if (moduleId === 'impulse') {
+      wire([mains, 'bottom:L'], ['n1', 'top:1']);
+      wire(['n1', 'bottom:2'], [lamp, 'top:L']);
+    } else {
+      wire([mains, 'bottom:L'], ['n1', 'top:A1']);
+      wire([mains, 'bottom:N'], ['n1', 'top:A2']);
+      wire([mains, 'bottom:L'], ['n1', 'bottom:15']);
+      wire(['n1', 'bottom:18'], [lamp, 'top:L']);
+    }
+    return energy({ panel: panel0, schematic }, resolve).deadNodes.has(lamp);
+  }
+
+  it('use the default of a flag until the person sets it', () => {
+    expect(lampBehind('impulse')).toBe(false);
+    expect(lampBehind('impulse', { on: false })).toBe(true);
+    expect(lampBehind('delayed')).toBe(true);
+    expect(lampBehind('delayed', { elapsed: true })).toBe(false);
+  });
+
+  it('are validated in a library: names, labels and use in expressions', () => {
+    const paths = (logic: unknown) => {
+      const result = validateLibrary({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [{ ...impulse, logic }] });
+      return result.ok ? [] : result.errors.map((e) => e.path);
+    };
+    expect(paths(impulse.logic)).toEqual([]);
+    expect(paths({ ...impulse.logic, flags: { on: { label: '', default: true } } })).toEqual(['modules[0].logic.flags.on.label']);
+    expect(paths({ ...impulse.logic, flags: { on: { label: 'x' } } })).toEqual(['modules[0].logic.flags.on.default']);
+    expect(paths({ ...impulse.logic, contacts: [{ between: ['top:1', 'bottom:2'], closedWhen: 'other' }] })).toEqual(['modules[0].logic.contacts[0].closedWhen']);
+    expect(paths({ inputs: { on: { terminals: ['top:1'], when: 'any' } }, flags: { on: { label: 'x', default: true } }, contacts: [] })).toEqual(['modules[0].logic.flags.on']);
+  });
+});
+
+describe('project file with logic state', () => {
+  it('keeps the auto position and flags of a placed device through saving and opening', () => {
+    const panel = panelOf([{ ...place('p1', 'contactor', 0, 0), state: 'auto' }, { ...place('p2', 'relay', 0, 2), flags: { x: true } }]);
+    const file = buildProjectFile({ panel, schematic: emptySchematic() }, resolve);
+    const reopened = parseProjectJson(JSON.stringify(file));
+    expect(reopened.ok && reopened.file.project.panel.placements.map((p) => [p.state, p.flags])).toEqual([['auto', undefined], [undefined, { x: true }]]);
   });
 });

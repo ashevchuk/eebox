@@ -233,6 +233,15 @@ function monitoringRelays(): ModuleDef[] {
   ];
 }
 
+type Logic = NonNullable<ModuleDef['logic']>;
+
+/** Switches the phase from `top:L` to `bottom:LO` while the device is supplied and its flag is on. */
+const suppliedSwitch = (flag: string, label: string): Logic => ({
+  inputs: { V: { terminals: ['top:L', 'top:N'], when: 'all' } },
+  flags: { [flag]: { label, default: true } },
+  contacts: [{ between: ['top:L', 'bottom:LO'], closedWhen: `${flag} & V` }],
+});
+
 /** Lighting relays switch one phase: the load current enters at the top and leaves at the bottom. */
 function lightingRelays(): ModuleDef[] {
   return [
@@ -244,6 +253,7 @@ function lightingRelays(): ModuleDef[] {
       poles: 2,
       ratedCurrentA: SWITCHED_LOAD_RATING_A,
       terminals: [top('1', 'L'), top('A1', 'L'), bottom('2', 'L'), bottom('A2', 'N')],
+      logic: { inputs: {}, flags: { on: { label: 'Output on', default: true } }, contacts: [{ between: ['top:1', 'bottom:2'], closedWhen: 'on' }] },
     },
     {
       id: 'stair-timer-1p',
@@ -253,6 +263,7 @@ function lightingRelays(): ModuleDef[] {
       poles: 2,
       ratedCurrentA: SWITCHED_LOAD_RATING_A,
       terminals: [top('L', 'L'), top('P', 'L'), top('N', 'N'), bottom('LO', 'L')],
+      logic: suppliedSwitch('running', 'Timer running'),
     },
     {
       id: 'twilight-switch-1p',
@@ -262,6 +273,7 @@ function lightingRelays(): ModuleDef[] {
       poles: 2,
       ratedCurrentA: SWITCHED_LOAD_RATING_A,
       terminals: [top('L', 'L'), top('N', 'N'), top('S1', 'C'), top('S2', 'C'), bottom('LO', 'L')],
+      logic: suppliedSwitch('dark', 'Dark'),
     },
     {
       id: 'time-switch-1p',
@@ -271,6 +283,40 @@ function lightingRelays(): ModuleDef[] {
       poles: 2,
       ratedCurrentA: SWITCHED_LOAD_RATING_A,
       terminals: [top('L', 'L'), top('N', 'N'), bottom('LO', 'L')],
+      logic: suppliedSwitch('scheduled', 'Schedule on'),
+    },
+  ];
+}
+
+/**
+ * Timer relays with one change-over contact. Time is not simulated: the flag says whether the delay
+ * has run out, and the person sets it to see the circuit before and after.
+ */
+function timerRelays(): ModuleDef[] {
+  const terminals = [top('A1', 'L'), top('A2', 'N'), bottom('15', 'C'), bottom('16', 'C'), bottom('18', 'C')];
+  const supplied: Logic['inputs'] = { V: { terminals: ['top:A1', 'top:A2'], when: 'all' } };
+  const changeOver = (energised: string): Logic['contacts'] => [
+    { between: ['bottom:15', 'bottom:18'], closedWhen: energised },
+    { between: ['bottom:15', 'bottom:16'], closedWhen: `!(${energised})` },
+  ];
+  return [
+    {
+      id: 'on-delay-relay',
+      kind: 'relay',
+      name: 'On-delay timer relay',
+      widthUnits: 1,
+      poles: 2,
+      terminals,
+      logic: { inputs: supplied, flags: { elapsed: { label: 'Delay elapsed', default: false } }, contacts: changeOver('V & elapsed') },
+    },
+    {
+      id: 'off-delay-relay',
+      kind: 'relay',
+      name: 'Off-delay timer relay',
+      widthUnits: 1,
+      poles: 2,
+      terminals,
+      logic: { inputs: supplied, flags: { running: { label: 'Delay running', default: false } }, contacts: changeOver('V | running') },
     },
   ];
 }
@@ -408,6 +454,7 @@ export function genericModules(): ModuleDef[] {
     ...contactors(),
     ...monitoringRelays(),
     ...lightingRelays(),
+    ...timerRelays(),
     ...metersAndSmallDevices(),
     ...changeoverSwitches(),
     ...transferController(),
@@ -426,7 +473,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '5';
+export const GENERIC_LIBRARY_VERSION = '6';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

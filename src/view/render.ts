@@ -25,6 +25,8 @@ export interface Scene {
   /** The placement or comb being dragged; drawn dimmed at its old position. */
   moving: { kind: 'placement' | 'comb'; id: string } | null;
   ghost: Ghost | null;
+  /** A rubber band being dragged to select several items, in world coordinates. */
+  band?: Rect | null;
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -281,5 +283,15 @@ export function render(
       ? combRect(panel, rail, slot, widthUnits, module.comb.side)
       : moduleRect(panel, rail, slot, widthUnits);
     fillRect(ctx, area, color);
+  }
+
+  if (scene.band) {
+    ctx.fillStyle = 'rgba(245, 197, 24, 0.12)';
+    ctx.fillRect(scene.band.x, scene.band.y, scene.band.width, scene.band.height);
+    ctx.strokeStyle = COLORS.selection;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(scene.band.x, scene.band.y, scene.band.width, scene.band.height);
+    ctx.setLineDash([]);
   }
 }

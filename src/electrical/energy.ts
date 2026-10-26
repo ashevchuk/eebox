@@ -127,6 +127,7 @@ export function energy(project: Project, resolve: Resolve): Energy {
   let closed: ReadonlySet<Contact> = new Set();
   let state = solve(closed);
   let inputs = new Map<string, Record<string, boolean>>();
+  const flagValues = new Map<string, Record<string, boolean>>();
   for (let pass = 0; pass < MAX_LOGIC_PASSES && contacts.length > 0; pass++) {
     const { components, fed } = state;
     inputs = new Map();
@@ -144,10 +145,11 @@ export function energy(project: Project, resolve: Resolve): Energy {
           : powered.length === roots.length && new Set(roots).size === roots.length;
       }
       inputs.set(placement.id, values);
+      flagValues.set(placement.id, Object.fromEntries(Object.entries(def.logic.flags ?? {}).map(([name, flag]) => [name, placement.flags?.[name] ?? flag.default])));
     }
     const next = new Set(
       contacts.filter((c) => {
-        const values = inputs.get(c.placementId) ?? {};
+        const values = { ...flagValues.get(c.placementId), ...inputs.get(c.placementId) };
         return c.closedWhen.ok && evaluateExpression(c.closedWhen.expression, (name) => values[name] ?? false);
       }),
     );

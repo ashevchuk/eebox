@@ -99,8 +99,23 @@ export const MAX_LOGIC_INPUTS = 8;
 export const MAX_LOGIC_CONTACTS = 32;
 export const MAX_INPUT_TERMINALS = 8;
 
+export const MAX_LOGIC_FLAGS = 8;
+export const MAX_FLAG_LABEL_LENGTH = 40;
+
+export const LOGIC_FLAG_SPEC: FieldSpec = {
+  label: {
+    required: true,
+    check: (v) =>
+      typeof v === 'string' && v.trim() === v && v.length >= 1 && v.length <= MAX_FLAG_LABEL_LENGTH && !/[\u0000-\u001f\u007f]/.test(v)
+        ? null
+        : `must be 1 to ${MAX_FLAG_LABEL_LENGTH} characters on one line`,
+  },
+  default: { required: true, check: (v) => (typeof v === 'boolean' ? null : 'must be true or false') },
+};
+
 export const LOGIC_SPEC: FieldSpec = {
   inputs: { required: true, check: (v) => (isRecord(v) ? null : 'must be an object') },
+  flags: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   contacts: { required: true, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
 };
 export const LOGIC_INPUT_SPEC: FieldSpec = {
@@ -238,6 +253,15 @@ function validateLogic(raw: unknown, terminalIds: Set<string>, path: string, err
     }
     terminals.forEach((id, i) => knownTerminal(id, `${inputPath}.terminals[${i}]`));
   }
+  const flags = (logic.flags ?? {}) as Record<string, unknown>;
+  const flagNames = Object.keys(flags);
+  if (flagNames.length > MAX_LOGIC_FLAGS) errors.push({ path: `${path}.flags`, message: `at most ${MAX_LOGIC_FLAGS} flags` });
+  for (const name of flagNames) {
+    const flagPath = `${path}.flags.${name}`;
+    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) errors.push({ path: flagPath, message: 'the name must be letters, digits and _, starting with a letter' });
+    if (names.includes(name)) errors.push({ path: flagPath, message: 'is also the name of an input' });
+    validateObject(flags[name], LOGIC_FLAG_SPEC, flagPath, errors);
+  }
   const contacts = logic.contacts as unknown[];
   if (contacts.length > MAX_LOGIC_CONTACTS) errors.push({ path: `${path}.contacts`, message: `at most ${MAX_LOGIC_CONTACTS} contacts` });
   contacts.forEach((entry, index) => {
@@ -251,7 +275,7 @@ function validateLogic(raw: unknown, terminalIds: Set<string>, path: string, err
       return;
     }
     for (const name of parsed.names) {
-      if (!names.includes(name)) errors.push({ path: `${contactPath}.closedWhen`, message: `"${name}" is not an input` });
+      if (!names.includes(name) && !flagNames.includes(name)) errors.push({ path: `${contactPath}.closedWhen`, message: `"${name}" is not an input or a flag` });
     }
   });
 }

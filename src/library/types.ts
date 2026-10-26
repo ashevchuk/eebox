@@ -77,6 +77,13 @@ export interface LogicInput {
   when: 'all' | 'any';
 }
 
+/** A fact about the device that no terminal shows, such as a latched impulse relay or an elapsed timer; the person sets it on a placed copy. */
+export interface LogicFlag {
+  /** What the inspector calls it. */
+  label: string;
+  default: boolean;
+}
+
 /** Two terminals that are joined while an expression over the input names is true. */
 export interface LogicContact {
   between: [string, string];
@@ -86,6 +93,8 @@ export interface LogicContact {
 /** What a relay or contactor does with the voltages it senses, so the power view can follow its contacts. */
 export interface ModuleLogic {
   inputs: Record<string, LogicInput>;
+  /** Named on/off facts that contact expressions may use next to the inputs. */
+  flags?: Record<string, LogicFlag>;
   contacts: LogicContact[];
 }
 

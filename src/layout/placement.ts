@@ -20,6 +20,8 @@ export interface Placement {
   terminalLabels?: Record<string, string>;
   /** Position of a device that switches: `closed` or `open`, or `1`, `2` or `open` with two inputs. */
   state?: string;
+  /** Values of the logic flags the person has set; a flag not listed has its default. */
+  flags?: Record<string, boolean>;
 }
 
 /** A module taken off its rail: it keeps its id, so a schematic node and wires find it again. */
@@ -251,6 +253,21 @@ export function setPlacementState(panel: Panel, id: string, state: string | unde
     if (p.id !== id) return p;
     const { state: _previous, ...rest } = p;
     return state === undefined ? rest : { ...rest, state };
+  });
+  return { ok: true, panel: { ...panel, placements } };
+}
+
+/** Sets a logic flag of a placed module, or clears it with `undefined` so it takes its default. */
+export function setPlacementFlag(panel: Panel, id: string, flag: string, value: boolean | undefined, known: readonly string[]): PlacementResult {
+  if (!panel.placements.some((p) => p.id === id)) return { ok: false, error: { kind: 'unknown-placement' } };
+  if (!known.includes(flag)) return { ok: false, error: { kind: 'invalid-state' } };
+  const placements = panel.placements.map((p) => {
+    if (p.id !== id) return p;
+    const { flags: previous, ...rest } = p;
+    const flags = { ...previous };
+    if (value === undefined) delete flags[flag];
+    else flags[flag] = value;
+    return Object.keys(flags).length === 0 ? rest : { ...rest, flags };
   });
   return { ok: true, panel: { ...panel, placements } };
 }

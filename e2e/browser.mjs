@@ -79,7 +79,8 @@ export async function launch({ width = 1516, height = 784 } = {}) {
       }
       throw new Error(`timed out waiting for ${what}`);
     },
-    mouse: async (type, x, y) => send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }),
+    /** `modifiers` is the DevTools bit mask: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift. */
+    mouse: async (type, x, y, modifiers = 0) => send('Input.dispatchMouseEvent', { type, x, y, modifiers, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }),
     media: (media) => send('Emulation.setEmulatedMedia', { media }),
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'),
     pdf: async () => Buffer.from((await send('Page.printToPDF', { preferCSSPageSize: true, printBackground: true })).data, 'base64'),

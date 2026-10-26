@@ -1,0 +1,728 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "railLengthsUnits": [
+        24
+      ],
+      "railPitchesMm": [],
+      "railLabels": [
+        ""
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "ats-controller-3pn"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "ATS"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "contactor-3p-40-230"
+          },
+          "rail": 0,
+          "slot": 4,
+          "label": "KM1 mains"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "contactor-3p-40-230"
+          },
+          "rail": 0,
+          "slot": 7,
+          "label": "KM2 generator"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcd-4p-40-30"
+          },
+          "rail": 0,
+          "slot": 10,
+          "label": "RCD"
+        }
+      ],
+      "combs": [],
+      "shelf": [],
+      "title": "Workshop with automatic backup"
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "Automatic transfer controller 3P+N",
+          "x": 350,
+          "y": 150,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "Contactor 3P 40A, 230V coil",
+          "x": 0,
+          "y": 420,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "Contactor 3P 40A, 230V coil",
+          "x": 700,
+          "y": 420,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "RCD 4P 40A 30mA",
+          "x": 350,
+          "y": 650,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "source",
+          "label": "Mains",
+          "x": 0,
+          "y": 0,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "id": "n5"
+        },
+        {
+          "kind": "source",
+          "label": "Generator",
+          "x": 700,
+          "y": 0,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "id": "n6"
+        },
+        {
+          "kind": "load",
+          "label": "Machines",
+          "x": 350,
+          "y": 900,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N"
+          ],
+          "id": "n7",
+          "load": {
+            "powerW": 5000,
+            "powerFactor": 0.9,
+            "crossSectionMm2": 2.5,
+            "lengthM": 20
+          }
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1a"
+          }
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1b"
+          }
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2a"
+          }
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2b"
+          }
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3a"
+          }
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3b"
+          }
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:Na"
+          }
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:Nb"
+          }
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:T1"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:T1"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w15",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w16",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:T2"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w17",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:T2"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w18",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w19",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w20",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w21",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:T3"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w22",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:T3"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w23",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w24",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:A2"
+          }
+        },
+        {
+          "id": "w25",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:A2"
+          }
+        },
+        {
+          "id": "w26",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w27",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w28",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w29",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "bottom:CA1"
+          }
+        },
+        {
+          "id": "w30",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:CA2"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:A1"
+          }
+        },
+        {
+          "id": "w31",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "bottom:CB1"
+          }
+        },
+        {
+          "id": "w32",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:CB2"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:A1"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/ats-controller-3pn": {
+      "id": "ats-controller-3pn",
+      "kind": "relay",
+      "name": "Automatic transfer controller 3P+N",
+      "widthUnits": 4,
+      "poles": 4,
+      "terminals": [
+        {
+          "name": "L1a",
+          "conductor": "L1",
+          "side": "top"
+        },
+        {
+          "name": "L2a",
+          "conductor": "L2",
+          "side": "top"
+        },
+        {
+          "name": "L3a",
+          "conductor": "L3",
+          "side": "top"
+        },
+        {
+          "name": "Na",
+          "conductor": "N",
+          "side": "top"
+        },
+        {
+          "name": "L1b",
+          "conductor": "L1",
+          "side": "top"
+        },
+        {
+          "name": "L2b",
+          "conductor": "L2",
+          "side": "top"
+        },
+        {
+          "name": "L3b",
+          "conductor": "L3",
+          "side": "top"
+        },
+        {
+          "name": "Nb",
+          "conductor": "N",
+          "side": "top"
+        },
+        {
+          "name": "CA1",
+          "conductor": "C",
+          "side": "bottom"
+        },
+        {
+          "name": "CA2",
+          "conductor": "C",
+          "side": "bottom"
+        },
+        {
+          "name": "CB1",
+          "conductor": "C",
+          "side": "bottom"
+        },
+        {
+          "name": "CB2",
+          "conductor": "C",
+          "side": "bottom"
+        },
+        {
+          "name": "GS1",
+          "conductor": "C",
+          "side": "bottom"
+        },
+        {
+          "name": "GS2",
+          "conductor": "C",
+          "side": "bottom"
+        }
+      ],
+      "logic": {
+        "inputs": {
+          "A": {
+            "terminals": [
+              "top:L1a",
+              "top:L2a",
+              "top:L3a",
+              "top:Na"
+            ],
+            "when": "all"
+          },
+          "B": {
+            "terminals": [
+              "top:L1b",
+              "top:L2b",
+              "top:L3b",
+              "top:Nb"
+            ],
+            "when": "all"
+          }
+        },
+        "contacts": [
+          {
+            "between": [
+              "bottom:CA1",
+              "bottom:CA2"
+            ],
+            "closedWhen": "A"
+          },
+          {
+            "between": [
+              "bottom:CB1",
+              "bottom:CB2"
+            ],
+            "closedWhen": "B & !A"
+          },
+          {
+            "between": [
+              "bottom:GS1",
+              "bottom:GS2"
+            ],
+            "closedWhen": "!A"
+          }
+        ]
+      },
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 8
+      }
+    },
+    "generic-iec/contactor-3p-40-230": {
+      "id": "contactor-3p-40-230",
+      "kind": "contactor",
+      "name": "Contactor 3P 40A, 230V coil",
+      "widthUnits": 3,
+      "poles": 3,
+      "ratedCurrentA": 40,
+      "terminals": [
+        {
+          "name": "L1",
+          "conductor": "L1",
+          "side": "top",
+          "unit": 0
+        },
+        {
+          "name": "L2",
+          "conductor": "L2",
+          "side": "top",
+          "unit": 1
+        },
+        {
+          "name": "L3",
+          "conductor": "L3",
+          "side": "top",
+          "unit": 2
+        },
+        {
+          "name": "A1",
+          "conductor": "L",
+          "side": "top",
+          "unit": 0
+        },
+        {
+          "name": "A2",
+          "conductor": "N",
+          "side": "top",
+          "unit": 2
+        },
+        {
+          "name": "T1",
+          "conductor": "L1",
+          "side": "bottom",
+          "unit": 0
+        },
+        {
+          "name": "T2",
+          "conductor": "L2",
+          "side": "bottom",
+          "unit": 1
+        },
+        {
+          "name": "T3",
+          "conductor": "L3",
+          "side": "bottom",
+          "unit": 2
+        }
+      ],
+      "logic": {
+        "inputs": {
+          "coil": {
+            "terminals": [
+              "top:A1",
+              "top:A2"
+            ],
+            "when": "all"
+          }
+        },
+        "contacts": [
+          {
+            "between": [
+              "top:L1",
+              "bottom:T1"
+            ],
+            "closedWhen": "coil"
+          },
+          {
+            "between": [
+              "top:L2",
+              "bottom:T2"
+            ],
+            "closedWhen": "coil"
+          },
+          {
+            "between": [
+              "top:L3",
+              "bottom:T3"
+            ],
+            "closedWhen": "coil"
+          }
+        ]
+      }
+    },
+    "generic-iec/rcd-4p-40-30": {
+      "id": "rcd-4p-40-30",
+      "kind": "rcd",
+      "name": "RCD 4P 40A 30mA",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 40,
+      "residualCurrentMa": 30
+    }
+  }
+}

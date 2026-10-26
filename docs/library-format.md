@@ -84,12 +84,16 @@ voltage the device senses; `contacts` joins two terminals while an expression ov
 
 - Terminals are written as ids, `top:A1`. An input with `"when": "all"` senses voltage when every
   terminal is fed from a source, on different nets (the two terminals of a coil); `"any"` when one is.
+- `flags` names facts that no terminal shows, such as a latched impulse relay or an elapsed timer:
+  `"flags": { "on": { "label": "Output on", "default": true } }`. A person sets them on a placed copy
+  in the inspector, and expressions use them like inputs: `"closedWhen": "V & elapsed"`. A flag may not
+  share a name with an input.
 - Expressions use input names, `!` (not), `&` (and), `|` (or) and parentheses: `B & !A`.
 - Voltage is followed through wires, bars, combs, closed breakers and switches on phase, neutral and
   earth, and through the closed contacts, repeating until no contact changes. A contactor with logic
   has the position *auto* (follow the coil), *closed* and *open* (override it).
-- At most 8 inputs of 8 terminals and 32 contacts per module. Control conductors are not followed, and
-  timing, latching and impulse behaviour are not modelled.
+- At most 8 inputs of 8 terminals and 32 contacts per module. Control conductors are not followed. Time
+  is not simulated: a timer or an impulse relay is a flag the person sets to see the circuit before and after.
 
 ### Comb
 

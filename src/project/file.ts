@@ -142,7 +142,15 @@ const COMB_PLACEMENT_SPEC: FieldSpec = {
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
 };
-const STATES = ['closed', 'open', '1', '2'] as const;
+const STATES = ['auto', 'closed', 'open', '1', '2'] as const;
+const MAX_FLAGS = 8;
+const flagsCheck = (v: unknown) =>
+  isRecord(v) &&
+  Object.keys(v).length >= 1 &&
+  Object.keys(v).length <= MAX_FLAGS &&
+  Object.entries(v).every(([name, value]) => /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && typeof value === 'boolean')
+    ? null
+    : `must map flag names to true or false, at most ${MAX_FLAGS}`;
 const SHELF_ITEM_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
@@ -150,11 +158,13 @@ const SHELF_ITEM_SPEC: FieldSpec = {
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
+  flags: { required: false, check: flagsCheck },
 };
 const PLACEMENT_SPEC: FieldSpec = {
   ...COMB_PLACEMENT_SPEC,
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
+  flags: { required: false, check: flagsCheck },
 };
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },

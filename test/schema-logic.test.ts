@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import schemaText from '../libraries/library.schema.json?raw';
 import {
   LOGIC_CONTACT_SPEC,
+  LOGIC_FLAG_SPEC,
+  MAX_FLAG_LABEL_LENGTH,
+  MAX_LOGIC_FLAGS,
   LOGIC_INPUT_SPEC,
   LOGIC_SPEC,
   MAX_INPUT_TERMINALS,
@@ -25,6 +28,7 @@ describe('logic in the library schema', () => {
     ['logic', defs.logic, LOGIC_SPEC],
     ['logic input', defs.logicInput, LOGIC_INPUT_SPEC],
     ['logic contact', defs.logicContact, LOGIC_CONTACT_SPEC],
+    ['logic flag', defs.logicFlag, LOGIC_FLAG_SPEC],
   ] as const) {
     it(`${name}: same fields, same required fields, no extras allowed`, () => {
       expect(sorted(Object.keys(definition.properties))).toEqual(sorted(Object.keys(spec)));
@@ -36,6 +40,8 @@ describe('logic in the library schema', () => {
   it('has the same limits', () => {
     expect(defs.logic.properties.inputs.maxProperties).toBe(MAX_LOGIC_INPUTS);
     expect(defs.logic.properties.contacts.maxItems).toBe(MAX_LOGIC_CONTACTS);
+    expect(defs.logic.properties.flags.maxProperties).toBe(MAX_LOGIC_FLAGS);
+    expect(defs.logicFlag.properties.label.maxLength).toBe(MAX_FLAG_LABEL_LENGTH);
     expect(defs.logicInput.properties.terminals.maxItems).toBe(MAX_INPUT_TERMINALS);
     expect(defs.logicContact.properties.closedWhen.maxLength).toBe(MAX_EXPRESSION_LENGTH);
   });

@@ -161,3 +161,30 @@ export function placementAt(panel: Panel, widthOf: WidthOf, point: Point): Place
     );
   });
 }
+
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** Normalises two corners into a rectangle, whichever way the user dragged. */
+export function rectBetween(a: Point, b: Point): Rect {
+  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
+}
+
+/** Ids of the modules and combs whose outline touches the rectangle. */
+export function itemsInRect(
+  panel: Panel,
+  widthOf: WidthOf,
+  combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
+  area: Rect,
+): { placements: string[]; combs: string[] } {
+  return {
+    placements: panel.placements
+      .filter((p) => overlaps(moduleRect(panel, p.rail, p.slot, widthOf(p) ?? 1), area))
+      .map((p) => p.id),
+    combs: panel.combs
+      .filter((c) => {
+        const info = combInfoOf(c);
+        return info !== undefined && overlaps(combRect(panel, c.rail, c.slot, info.widthUnits, info.side), area);
+      })
+      .map((c) => c.id),
+  };
+}

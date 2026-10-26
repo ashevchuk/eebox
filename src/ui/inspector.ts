@@ -18,6 +18,7 @@ import { takeOff } from '../layout/shelf';
 import {
   movePlacement,
   setPlacementLabel,
+  setPlacementFlag,
   setPlacementState,
   setPlacementWidth,
   setTerminalLabel,
@@ -211,6 +212,9 @@ function powerFields(placement: Placement, def: ModuleDef | undefined, power: En
         ? 'auto follows the coil, closed and open override it'
         : positions.includes('1') ? '1 or 2 picks the input, open breaks the circuit' : 'open breaks the circuit',
     });
+  }
+  for (const [name, flag] of Object.entries(def.logic?.flags ?? {})) {
+    fields.push({ key: `flag:${name}`, label: flag.label, kind: 'select', value: (placement.flags?.[name] ?? flag.default) ? 'on' : 'off', options: ['on', 'off'] });
   }
   if (power.hasSource) {
     for (const [name, sensed] of Object.entries(power.inputsOf(placement.id) ?? {})) {
@@ -526,6 +530,11 @@ export function applyEdit(
       const { placement, node } = target;
       if (key === 'label') {
         const result = setPlacementLabel(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key.startsWith('flag:')) {
+        const def = resolve(placement.module);
+        const result = setPlacementFlag(panel, placement.id, key.slice('flag:'.length), text === 'on', Object.keys(def?.logic?.flags ?? {}));
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if (key === 'state') {

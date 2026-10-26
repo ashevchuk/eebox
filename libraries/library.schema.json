@@ -294,6 +294,17 @@
             "$ref": "#/definitions/logicInput"
           }
         },
+        "flags": {
+          "type": "object",
+          "maxProperties": 8,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/logicFlag"
+          },
+          "description": "Facts a person sets on a placed copy, such as a latched impulse relay or an elapsed timer; contact expressions may use them like inputs."
+        },
         "contacts": {
           "type": "array",
           "maxItems": 32,
@@ -325,6 +336,24 @@
             "any"
           ],
           "description": "all: every terminal carries voltage, on separate nets, as a coil's two terminals do. any: at least one does."
+        }
+      }
+    },
+    "logicFlag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "default"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "default": {
+          "type": "boolean"
         }
       }
     },

@@ -1,4 +1,5 @@
 import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
+import { moveGroup } from '../layout/group';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import {
   insertPlacement,
@@ -13,7 +14,7 @@ import { deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
-import { FRAME_PADDING, combAtPoint, frameRect, placementAt, railAtPoint, snapToSlot, type Neighbour } from '../view/geometry';
+import { FRAME_PADDING, combAtPoint, frameRect, itemsInRect, placementAt, railAtPoint, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
 import { render, type Ghost } from '../view/render';
 import { groupSelection, selectedIds, toggleItem } from './selection';
 import type { Session } from './session';
@@ -32,12 +33,15 @@ interface Drag {
   newId: string;
   ghost: Ghost | null;
   next: Panel | null;
+  /** Set when the drag moves everything selected together; `origin` is where the grabbed item started. */
+  group: { placements: string[]; combs: string[]; origin: { rail: number; slot: number } } | null;
 }
 
 export class PanelView implements View {
   readonly camera = new Camera();
   private drag: Drag | null = null;
   private clip: Clip | null = null;
+  private band: { from: Point; to: Point } | null = null;
 
   constructor(private readonly session: Session) {}
 
@@ -60,6 +64,7 @@ export class PanelView implements View {
         selectedIds: new Set([...selectedIds(this.session.selection).placements, ...selectedIds(this.session.selection).combs]),
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
+        band: this.band ? rectBetween(this.band.from, this.band.to) : null,
       },
       width,
       height,
@@ -95,8 +100,18 @@ export class PanelView implements View {
       },
       world,
     );
+    const chosen = selectedIds(this.session.selection);
+    const inGroup = (kind: 'placement' | 'comb', id: string) =>
+      this.session.selection.placementIds !== undefined || this.session.selection.combIds !== undefined
+        ? (kind === 'placement' ? chosen.placements : chosen.combs).includes(id)
+        : false;
     if (comb && e.shiftKey) {
       this.session.select(toggleItem(this.session.selection, 'comb', comb.id));
+      return true;
+    }
+    if (comb && inGroup('comb', comb.id)) {
+      const width = comb.widthUnits ?? this.session.resolve(comb.module)?.widthUnits ?? 1;
+      this.startGroupDrag('comb', comb, width, world);
       return true;
     }
     if (comb) {
@@ -109,6 +124,10 @@ export class PanelView implements View {
       return true;
     }
     const hit = placementAt(panel, this.session.widthOf, world);
+    if (!hit && e.shiftKey) {
+      this.band = { from: world, to: world };
+      return true;
+    }
     if (!hit) {
       const rail = railAtPoint(panel, world);
       this.session.select(rail === undefined ? {} : { rail });
@@ -116,6 +135,10 @@ export class PanelView implements View {
     }
     if (e.shiftKey) {
       this.session.select(toggleItem(this.session.selection, 'placement', hit.id));
+      return true;
+    }
+    if (inGroup('placement', hit.id)) {
+      this.startGroupDrag('placement', hit, this.session.widthOf(hit) ?? 1, world);
       return true;
     }
     this.session.select({ placementId: hit.id });
@@ -128,6 +151,11 @@ export class PanelView implements View {
   }
 
   pointerMove(_e: PointerEvent, world: Point, overCanvas: boolean): void {
+    if (this.band) {
+      this.band = { ...this.band, to: world };
+      this.session.changed();
+      return;
+    }
     const drag = this.drag;
     if (!drag) return;
     const panel = this.session.project.panel;
@@ -146,16 +174,34 @@ export class PanelView implements View {
   private neighboursOf(drag: Drag, panel: Panel): Neighbour[] {
     const others = drag.kind === 'comb' ? panel.combs : panel.placements;
     return others
-      .filter((item) => item.id !== drag.movingId)
+      .filter((item) => item.id !== drag.movingId && !(drag.group?.placements.includes(item.id) || drag.group?.combs.includes(item.id)))
       .map((item) => ({ rail: item.rail, slot: item.slot, widthUnits: this.session.widthOf(item) ?? 1 }));
   }
 
   pointerUp(): void {
+    if (this.band) {
+      const area: Rect = rectBetween(this.band.from, this.band.to);
+      this.band = null;
+      const panel = this.session.project.panel;
+      const found = itemsInRect(panel, this.session.widthOf, (item) => {
+        const def = this.session.resolve(item.module);
+        return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
+      }, area);
+      this.session.select(groupSelection(found.placements, found.combs));
+      return;
+    }
     const drag = this.drag;
     if (!drag) return;
     this.drag = null;
     const { ghost, next, movingId, newId, kind } = drag;
     const list = kind === 'comb' ? this.session.project.panel.combs : this.session.project.panel.placements;
+    if (drag.group) {
+      const { origin } = drag.group;
+      const moved = ghost !== null && (ghost.rail !== origin.rail || ghost.slot !== origin.slot);
+      if (next && moved) this.session.commit({ ...this.session.project, panel: next });
+      else this.session.changed();
+      return;
+    }
     const unchanged =
       movingId !== null && list.some((p) => p.id === movingId && p.rail === ghost?.rail && p.slot === ghost?.slot);
     if (next && !unchanged) {
@@ -225,6 +271,11 @@ export class PanelView implements View {
 
   private tryDrop(drag: Drag, panel: Panel, snap: { rail: number; slot: number }) {
     const id = drag.movingId ?? drag.newId;
+    if (drag.group) {
+      const { origin, placements, combs } = drag.group;
+      const moved = moveGroup(panel, this.session.widthOf, this.session.combLookup, placements, combs, snap.rail - origin.rail, snap.slot - origin.slot);
+      return moved.ok ? { ok: true as const, panel: moved.panel } : { ok: false as const };
+    }
     if (drag.shelfId) return placeFromShelf(panel, this.session.widthOf, drag.shelfId, snap.rail, snap.slot);
     if (drag.kind === 'comb') {
       const { combLookup } = this.session;
@@ -258,6 +309,15 @@ export class PanelView implements View {
       newId: shelfId ?? (kind === 'comb' ? nextCombId(panel) : nextPlacementId(panel)),
       ghost: null,
       next: null,
+      group: null,
     };
+  }
+
+  private startGroupDrag(kind: Drag['kind'], item: { id: string; module: ModuleRef; rail: number; slot: number }, width: number, world: Point): void {
+    const def = this.session.resolve(item.module);
+    if (!def) return;
+    this.startDrag(kind, def, item.module, width, this.grabbedUnits(world, item.slot, width), item.id);
+    const chosen = selectedIds(this.session.selection);
+    this.drag!.group = { placements: chosen.placements, combs: chosen.combs, origin: { rail: item.rail, slot: item.slot } };
   }
 }
