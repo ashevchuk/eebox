@@ -456,7 +456,7 @@ try {
     await browser.evaluate(`(() => { const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Name'); const i = row.querySelector('input'); i.value = 'Swap test'; i.dispatchEvent(new Event('change', { bubbles: true })); [...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click(); })()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face');
     await drawRect([2, 30], [12, 40]);
-    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'the rectangle');
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 2`, 'the rectangle');
     const exported = await browser.evaluate(`(async () => {
       let blob = null; let name = ''; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
       const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { name = this.download; };
@@ -466,7 +466,7 @@ try {
       return { name, text: blob ? await blob.text() : '' };
     })()`);
     expectEqual(exported.name, 'swap-test-face.svg', 'the name of the exported file');
-    expectTrue(exported.text.startsWith('<svg ') && (exported.text.match(/<rect /g) ?? []).length === 3, 'the exported face has not its three rectangles');
+    expectTrue(exported.text.startsWith('<svg ') && (exported.text.match(/<rect /g) ?? []).length === 2, 'the exported face has not its two rectangles');
     await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the module to be saved');
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
@@ -474,20 +474,20 @@ try {
     await browser.waitFor(`document.getElementById('inspector').innerText.includes('Swap test')`, 'the placed module to take the design');
     await browser.waitFor(`document.getElementById('status').textContent.includes('now uses')`, 'the status to say so');
     await browser.waitFor(`localStorage.getItem('eebox:autosave').includes('Swap test')`, 'the autosave to hold the design');
-    expectEqual(await savedArt(), 3, 'the shapes of the module the project stored');
+    expectEqual(await savedArt(), 2, 'the shapes of the module the project stored');
 
     await designer();
     expectEqual([await field('Id'), await field('Name')], ['mcb-1p-b6-copy', 'Swap test'], 'the module the second edit opens');
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face again');
     await drawRect([2, 45], [12, 55]);
-    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 4`, 'the second rectangle');
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'the second rectangle');
     await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the second save');
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
     await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
     await browser.waitFor(`document.getElementById('status').textContent.includes('has the new')`, 'the panel to take the second edit');
-    await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:autosave')).modules && Object.values(JSON.parse(localStorage.getItem('eebox:autosave')).modules).find((m) => m.name === 'Swap test')?.art?.length === 4`, 'the project to hold the four shapes');
+    await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:autosave')).modules && Object.values(JSON.parse(localStorage.getItem('eebox:autosave')).modules).find((m) => m.name === 'Swap test')?.art?.length === 3`, 'the project to hold the three shapes');
     const found = (query) => browser.evaluate(`(async () => {
       const search = document.getElementById('palette-search'); search.value = ${JSON.stringify(query)}; search.dispatchEvent(new Event('input', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 300));

@@ -801,16 +801,6 @@
           "anchor": "stretch"
         },
         {
-          "kind": "rect",
-          "x": 12.2,
-          "y": 3.5,
-          "width": 3.6,
-          "height": 5,
-          "fill": "#e5e7eb",
-          "anchor": "tile",
-          "period": 1
-        },
-        {
           "kind": "ellipse",
           "cx": 64,
           "cy": 75,

@@ -38,10 +38,9 @@ const bandWindow = (width: number, fill: string): ArtShape => ({
   anchor: 'stretch',
 });
 
-/** A dark slot across the band with a light tip beside the terminal of each unit: the handle of a breaker. */
+/** A dark slot across the band, where the handle of a breaker sits. */
 const lever = (width: number): ArtShape[] => [
   { kind: 'rect', x: EDGE_MM, y: WINDOW_TOP_MM, width: width - 2 * EDGE_MM, height: WINDOW_HEIGHT_MM, fill: INK, anchor: 'stretch' },
-  { kind: 'rect', x: 12.2, y: 3.5, width: 3.6, height: 5, fill: PALE, anchor: 'tile', period: 1 },
 ];
 
 /** A round test button, lower down at the right where the name does not run. */
