@@ -21,7 +21,7 @@ const stroked = { stroke: INK, strokeWidth: 0.3 };
 
 /** Screw head with a slot over each unit of a terminal bar, under the terminals. */
 const screws = (): ArtShape[] =>
-  [7, 83].flatMap((y): ArtShape[] => [
+  [7, 84].flatMap((y): ArtShape[] => [
     { kind: 'ellipse', cx: MODULE_UNIT_MM / 2, cy: y, rx: 3.6, ry: 3.6, fill: PALE, stroke: STEEL, strokeWidth: 0.4, anchor: 'tile', period: 1 },
     { kind: 'line', x1: MODULE_UNIT_MM / 2 - 2.4, y1: y - 1.2, x2: MODULE_UNIT_MM / 2 + 2.4, y2: y + 1.2, stroke: STEEL, strokeWidth: 0.5, anchor: 'tile', period: 1 },
   ]);
@@ -86,7 +86,6 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
       case 'switch':
         return [
           { kind: 'rect', x: EDGE_MM, y: 2, width: width - 2 * EDGE_MM, height: 10.5, fill: '#facc15', ...stroked, anchor: 'stretch' },
-          { kind: 'rect', x: mid - 7, y: 3.5, width: 14, height: 7.5, fill: '#dc2626', ...stroked, anchor: 'centre' },
         ];
       case 'contactor':
         return [

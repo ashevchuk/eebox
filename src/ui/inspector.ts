@@ -40,7 +40,9 @@ import {
 } from '../electrical/loads';
 import type { Finding } from '../electrical/problems';
 import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
-import { mmFromUnits } from '../layout/units';
+import { mmFromUnits, roundUnits } from '../layout/units';
+import { MODULE_UNIT_MM } from '../library/types';
+import { LENGTH_UNITS, type LengthUnit } from '../project/lengthUnitStorage';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
 import { CONDUCTORS, familyOf, type Conductor, type ModuleDef } from '../library/types';
@@ -104,6 +106,8 @@ export interface InspectContext {
   fromLibraries: Resolve;
   /** Cable table and voltage drop norms; the built-in ones when absent. */
   cableSettings?: CableSettings;
+  /** How positions and widths are shown and typed; the project always keeps module units. */
+  lengthUnit?: LengthUnit;
   /** Faults and advice, so the inspector can say why something is marked. */
   findings?: Finding[];
 }
@@ -128,7 +132,8 @@ type Target =
   | { kind: 'group'; count: number }
   | { kind: 'wire'; wire: Wire }
   | { kind: 'wires'; wires: Wire[] }
-  | { kind: 'node'; node: SchematicNode };
+  | { kind: 'node'; node: SchematicNode }
+  | { kind: 'nodes'; count: number };
 
 /** Adds copies of what is selected, edge to edge after it; the number is typed in and nothing is kept in the field. */
 const REPEAT_FIELD: InspectorField = {
@@ -147,6 +152,7 @@ function targetOf({ project, selection, mode }: InspectContext): Target {
     if (chosen.length > 1) return { kind: 'wires', wires: chosen };
     const wire = chosen[0];
     if (wire) return { kind: 'wire', wire };
+    if (selection.nodeIds && selection.nodeIds.length > 1) return { kind: 'nodes', count: selection.nodeIds.length };
     const node = schematic.nodes.find((n) => n.id === selection.nodeId);
     if (!node) return { kind: 'panel' };
     const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
@@ -265,21 +271,34 @@ function moduleDetails(def: ModuleDef | undefined, widthUnits: number): Inspecto
   return details;
 }
 
+/** The key of the field that picks how lengths are shown; it changes the display, not the project. */
+export const LENGTH_UNIT_FIELD = 'lengthUnit';
+
+const lengthIn = (unit: LengthUnit, units: number): number => (unit === 'mm' ? mmFromUnits(units) : units);
+const lengthText = (unit: LengthUnit, units: number): string => (unit === 'mm' ? `${units} units` : `${mmFromUnits(units)} mm`);
+
+function unitsOf(typed: number | null, unit: LengthUnit = 'units'): number | null {
+  return typed === null || unit === 'units' ? typed : roundUnits(typed / MODULE_UNIT_MM);
+}
+
 function positionFields(
   item: Placement | CombPlacement,
   def: ModuleDef | undefined,
   project: Project,
   width: number,
+  unit: LengthUnit,
 ): InspectorField[] {
   const rails = project.panel.railLengthsUnits;
   const railLength = rails[item.rail] ?? 0;
   const resizable = def?.resizable;
+  const named = unit === 'mm' ? 'mm' : 'units';
   return [
     integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
-    decimal('slot', 'Position', item.slot, 0, Math.max(0, railLength - width), `units from the start of the rail, ${mmFromUnits(item.slot)} mm`),
+    decimal('slot', 'Position', lengthIn(unit, item.slot), 0, lengthIn(unit, Math.max(0, railLength - width)), `${named} from the start of the rail, ${lengthText(unit, item.slot)}`),
     resizable
-      ? decimal('width', 'Width', width, resizable.minUnits, resizable.maxUnits, `${resizable.minUnits}-${resizable.maxUnits} units, ${mmFromUnits(width)} mm`)
+      ? decimal('width', 'Width', lengthIn(unit, width), lengthIn(unit, resizable.minUnits), lengthIn(unit, resizable.maxUnits), `${lengthIn(unit, resizable.minUnits)}-${lengthIn(unit, resizable.maxUnits)} ${named}, ${lengthText(unit, width)}`)
       : readonly('width', 'Width', `${width} units (${mmFromUnits(width)} mm)`),
+    { key: LENGTH_UNIT_FIELD, label: 'Show lengths in', kind: 'select', value: unit, options: LENGTH_UNITS },
   ];
 }
 
@@ -338,7 +357,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...faultFields(ctx.findings, (p) => p.placements.includes(placement.id)),
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
-          ...positionFields(placement, def, project, width),
+          ...positionFields(placement, def, project, width, ctx.lengthUnit ?? 'units'),
           ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
           ...(node ? [] : [REPEAT_FIELD]),
@@ -358,7 +377,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         fields: [
           readonly('module', 'Module', def?.name ?? `${comb.module.moduleId} (missing)`),
           text('label', 'Label', comb.label ?? '', def?.name),
-          ...positionFields(comb, def, project, width),
+          ...positionFields(comb, def, project, width, ctx.lengthUnit ?? 'units'),
           ...(def?.comb
             ? [readonly('pattern', 'Pins', def.comb.pattern.join(' ')), readonly('side', 'Side', def.comb.side)]
             : []),
@@ -372,6 +391,12 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: `${target.wires.length} wires selected`,
         actions: target.wires.some((w) => w.route) ? [{ key: 'routeAutomatically', label: 'Route automatically' }] : [],
         fields: [readonly('count', 'Selected', target.wires.length), readonly('route', 'Routed by hand', target.wires.filter((w) => w.route).length)],
+      };
+    case 'nodes':
+      return {
+        title: `${target.count} nodes selected`,
+        fields: [readonly('count', 'Selected', target.count)],
+        actions: [],
       };
     case 'group':
       return {
@@ -596,7 +621,7 @@ export function applyEdit(
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if ((key === 'nodeX' || key === 'nodeY') && node) return moveNodeTo(node);
-      const value = key === 'slot' || key === 'width' ? numberOf(raw) : integerOf(raw);
+      const value = key === 'slot' || key === 'width' ? unitsOf(numberOf(raw), ctx.lengthUnit) : integerOf(raw);
       if (key === 'row' || key === 'slot') {
         if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
         const result = movePlacement(
@@ -627,7 +652,7 @@ export function applyEdit(
         const result = setCombLabel(panel, comb.id, text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
-      const value = key === 'slot' || key === 'width' ? numberOf(raw) : integerOf(raw);
+      const value = key === 'slot' || key === 'width' ? unitsOf(numberOf(raw), ctx.lengthUnit) : integerOf(raw);
       if (key === 'row' || key === 'slot') {
         if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
         const result = moveComb(
@@ -647,6 +672,7 @@ export function applyEdit(
       return fail('That property cannot be edited.');
     }
     case 'wires':
+    case 'nodes':
     case 'group':
       return fail('That property cannot be edited.');
     case 'rail': {

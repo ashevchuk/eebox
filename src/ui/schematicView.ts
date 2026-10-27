@@ -11,12 +11,17 @@ import {
   hitWire,
   pathMidpoint,
   portOf,
+  WIRE_LABEL_HEIGHT,
+  WIRE_LABEL_PADDING,
+  boundsWithBoxes,
   boundsWithRoutes,
+  wireLabelBox,
   schematicBounds,
   type Endpoint,
   type Layout,
 } from '../schematic/geometry';
 import { markedBy } from '../electrical/problems';
+import { alignNodes, arrangeNodes, distributeNodes, type NodeAlign } from '../schematic/arrange';
 import { laneTargets, snapLane, type SnapTarget } from '../schematic/laneSnap';
 import { moveLane, type Lanes } from '../schematic/manualRoute';
 import { spreadOverlaps } from '../schematic/overlaps';
@@ -45,9 +50,10 @@ import { Camera, type Bounds, type Point } from '../view/Camera';
 import { drawConductorDot, strokeConductor } from '../view/conductorDraw';
 import { rectBetween } from '../view/geometry';
 import { theme } from '../view/theme';
+import type { TextVisibility } from '../view/textVisibility';
 import { FONT_FAMILY } from '../view/font';
 import { LEVER_COLORS } from '../view/render';
-import { selectedWires, toggleWire, wireGroupSelection } from './selection';
+import { nodeGroupSelection, selectedNodes, selectedWires, toggleNode, toggleWire, wireGroupSelection } from './selection';
 import type { Session } from './session';
 import type { View } from './view';
 
@@ -106,6 +112,10 @@ const NODE_FILL = { module: '#e5e7eb', source: '#f5c518', load: '#a7f3d0' } as c
 
 const TERMINAL_LABEL_WIDTH = 24;
 
+function wireLabelText(label: string | undefined, amps: number | undefined, texts: TextVisibility): string {
+  return [texts.wireLabels ? label : undefined, texts.currents && amps !== undefined ? `${formatAmps(amps)} A` : undefined].filter(Boolean).join(' \u00b7 ');
+}
+
 function fitToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
   let shortened = text;
@@ -123,7 +133,8 @@ interface Frame {
 
 export class SchematicView implements View {
   readonly camera = new Camera();
-  private moving: { id: string; dx: number; dy: number; x: number; y: number } | null = null;
+  /** A node being dragged, and the places of all that go with it, as they were when it was taken. */
+  private moving: { id: string; dx: number; dy: number; x: number; y: number; group: Map<string, { x: number; y: number }> } | null = null;
   private wiring: { from: TerminalRef; cursor: Point } | null = null;
   private bundle: { from: string; cursor: Point } | null = null;
   /** A wire being pulled by one of its pieces; it starts to move only after the pointer has gone a few pixels. */
@@ -141,7 +152,8 @@ export class SchematicView implements View {
     guide: { axis: 'x' | 'y'; value: number } | null;
   } | null = null;
   /** A rubber band being dragged over the schematic to select wires. */
-  private band: { from: Point; to: Point } | null = null;
+  /** A rubber band being dragged over empty space: with Shift it takes wires, with Ctrl nodes. */
+  private band: { from: Point; to: Point; nodes: boolean } | null = null;
   /** The piece of a wire under the pointer, for the cursor and the highlight. */
   private hover: { wireId: string; segment: Segment } | null = null;
   /** While on, dragging from a node wires all its poles to the node it is dropped on, as Shift does. */
@@ -151,7 +163,14 @@ export class SchematicView implements View {
 
   fitBounds(): Bounds {
     const { schematic, layout } = this.frame();
-    return boundsWithRoutes(schematicBounds(layout), routeWires(schematic, layout));
+    const routes = routeWires(schematic, layout);
+    const { currents } = this.analysis();
+    const labels = schematic.wires.flatMap((wire) => {
+      const path = routes.get(wire.id);
+      const text = wireLabelText(wire.label, currents.get(wire.id), this.session.texts);
+      return path && text ? [wireLabelBox(text, pathMidpoint(path))] : [];
+    });
+    return boundsWithBoxes(boundsWithRoutes(schematicBounds(layout), routes), labels);
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
@@ -162,7 +181,8 @@ export class SchematicView implements View {
     ctx.scale(this.camera.scale, this.camera.scale);
 
     const frame = this.frame();
-    const { nodeId, placementId } = this.session.selection;
+    const { placementId } = this.session.selection;
+    const chosenNodes = new Set(selectedNodes(this.session.selection));
     const chosenWires = new Set(selectedWires(this.session.selection));
     this.drawCombLinks(ctx, frame);
     const routes = routeWires(frame.schematic, frame.layout);
@@ -183,7 +203,7 @@ export class SchematicView implements View {
     }
     this.drawWireEditing(ctx, frame, routes);
     for (const { node } of frame.layout.values()) {
-      const selected = node.id === nodeId || (node.placementId !== undefined && node.placementId === placementId);
+      const selected = chosenNodes.has(node.id) || (node.placementId !== undefined && node.placementId === placementId);
       const dead = power.deadNodes.has(node.id);
       if (dead) {
         ctx.save();
@@ -205,7 +225,7 @@ export class SchematicView implements View {
     for (const wire of frame.schematic.wires) {
       const path = routes.get(wire.id);
       const amps = currents.get(wire.id);
-      const text = [wire.label, amps === undefined ? undefined : `${formatAmps(amps)} A`].filter(Boolean).join(' \u00b7 ');
+      const text = wireLabelText(wire.label, amps, this.session.texts);
       if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
     }
     this.drawPreview(ctx, frame);
@@ -225,9 +245,16 @@ export class SchematicView implements View {
       this.selectNode(node);
       return true;
     }
+    if (node && (e.ctrlKey || e.metaKey)) {
+      this.session.select(toggleNode(this.session.selection, node.id, (id) => this.placementOf(id)));
+      return true;
+    }
     if (node) {
-      this.moving = { id: node.id, dx: world.x - node.x, dy: world.y - node.y, x: node.x, y: node.y };
-      this.selectNode(node);
+      const chosen = selectedNodes(this.session.selection);
+      const together = chosen.length > 1 && chosen.includes(node.id) ? chosen : [node.id];
+      const group = new Map(frame.schematic.nodes.filter((n) => together.includes(n.id)).map((n) => [n.id, { x: n.x, y: n.y }] as const));
+      this.moving = { id: node.id, dx: world.x - node.x, dy: world.y - node.y, x: node.x, y: node.y, group };
+      if (together.length === 1) this.selectNode(node);
       return true;
     }
     const routes = routeWires(frame.schematic, frame.layout);
@@ -236,8 +263,8 @@ export class SchematicView implements View {
       this.session.select(toggleWire(this.session.selection, wire.id));
       return true;
     }
-    if (e.shiftKey) {
-      this.band = { from: world, to: world };
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      this.band = { from: world, to: world, nodes: !e.shiftKey };
       return true;
     }
     const group = selectedWires(this.session.selection);
@@ -445,10 +472,16 @@ export class SchematicView implements View {
       return;
     }
     if (this.band) {
-      const area = rectBetween(this.band.from, this.band.to);
+      const band = this.band;
+      const area = rectBetween(band.from, band.to);
       this.band = null;
       const frame = this.frame();
-      this.session.select(wireGroupSelection(wiresInRect(routeWires(frame.schematic, frame.layout), area)));
+      if (band?.nodes) {
+        const inside = [...frame.layout.values()].filter(({ rect }) => rect.x + rect.width >= area.x && rect.x <= area.x + area.width && rect.y + rect.height >= area.y && rect.y <= area.y + area.height).map(({ node }) => node.id);
+        this.session.select(nodeGroupSelection(inside, (id) => this.placementOf(id)));
+      } else {
+        this.session.select(wireGroupSelection(wiresInRect(routeWires(frame.schematic, frame.layout), area)));
+      }
       return;
     }
     const { wiring, bundle, moving } = this;
@@ -479,24 +512,31 @@ export class SchematicView implements View {
         }
       }
     } else if (moving) {
-      const original = project.schematic.nodes.find((n) => n.id === moving.id);
-      if (original && (original.x !== moving.x || original.y !== moving.y)) {
-        const result = moveNode(project.schematic, moving.id, moving.x, moving.y);
-        if (result.ok) commit(result.schematic);
+      const grabbed = moving.group.get(moving.id);
+      const [dx, dy] = grabbed ? [moving.x - grabbed.x, moving.y - grabbed.y] : [0, 0];
+      if (dx !== 0 || dy !== 0) {
+        let schematic = project.schematic;
+        for (const [id, at] of moving.group) {
+          const result = moveNode(schematic, id, at.x + dx, at.y + dy);
+          if (result.ok) schematic = result.schematic;
+        }
+        commit(schematic);
       }
     }
     this.session.changed();
   }
 
   deleteSelection(): void {
-    const { nodeId } = this.session.selection;
+    const nodes = selectedNodes(this.session.selection);
     let { schematic } = this.session.project;
     let changed = false;
-    if (nodeId) {
-      const result = removeNode(schematic, nodeId);
-      if (result.ok) {
-        schematic = result.schematic;
-        changed = true;
+    if (nodes.length > 0) {
+      for (const id of nodes) {
+        const result = removeNode(schematic, id);
+        if (result.ok) {
+          schematic = result.schematic;
+          changed = true;
+        }
       }
     } else {
       for (const id of selectedWires(this.session.selection)) {
@@ -589,14 +629,54 @@ export class SchematicView implements View {
     const terminalsOf = nodeTerminalsLookup(panel, this.session.resolve);
     const moving = this.moving;
     const dragged = this.wireDrag?.started ? this.wireDrag : null;
+    const shift = moving ? { dx: moving.x - (moving.group.get(moving.id)?.x ?? moving.x), dy: moving.y - (moving.group.get(moving.id)?.y ?? moving.y) } : { dx: 0, dy: 0 };
     const withNode: Schematic = moving
-      ? { ...schematic, nodes: schematic.nodes.map((n) => (n.id === moving.id ? { ...n, x: moving.x, y: moving.y } : n)) }
+      ? { ...schematic, nodes: schematic.nodes.map((n) => (moving.group.has(n.id) ? { ...n, x: moving.group.get(n.id)!.x + shift.dx, y: moving.group.get(n.id)!.y + shift.dy } : n)) }
       : schematic;
     const routed = dragged ? new Map([[dragged.wireId, dragged.lanes], ...dragged.companions.map((c): [string, Lanes] => [c.wire, c.lanes])]) : null;
     const shown: Schematic = routed
       ? { ...withNode, wires: withNode.wires.map((w) => (routed.has(w.id) ? { ...w, route: routed.get(w.id)! } : w)) }
       : withNode;
     return { schematic: shown, terminalsOf, layout: computeLayout(shown, terminalsOf) };
+  }
+
+  private placementOf(nodeId: string): string | undefined {
+    return this.session.project.schematic.nodes.find((n) => n.id === nodeId)?.placementId;
+  }
+
+  /** Selects every node of the schematic. */
+  selectAll(): void {
+    this.session.select(nodeGroupSelection(this.session.project.schematic.nodes.map((n) => n.id), (id) => this.placementOf(id)));
+  }
+
+  /** Lines the selected nodes up; with fewer than two selected nothing is done. */
+  alignSelected(how: NodeAlign): void {
+    const ids = selectedNodes(this.session.selection);
+    if (ids.length < 2) return this.session.notify('Select two or more nodes first: Ctrl+click adds one, a Ctrl-drag over empty space takes those inside.', true);
+    const { layout } = this.frame();
+    this.commitSchematic(alignNodes(this.session.project.schematic, layout, ids, how), 'The nodes are already in line.');
+  }
+
+  /** Spaces the selected nodes evenly; it needs three. */
+  distributeSelected(axis: 'horizontal' | 'vertical'): void {
+    const ids = selectedNodes(this.session.selection);
+    if (ids.length < 3) return this.session.notify('Select three or more nodes first.', true);
+    const { layout } = this.frame();
+    this.commitSchematic(distributeNodes(this.session.project.schematic, layout, ids, axis), 'The nodes are already evenly spaced.');
+  }
+
+  /** Puts every node in a row by its distance from a source, and keeps the wires of the rows from crossing much. */
+  arrangeAll(): void {
+    if (this.session.project.schematic.nodes.length === 0) return this.session.notify('There are no nodes to arrange.', true);
+    const { layout } = this.frame();
+    this.commitSchematic(arrangeNodes(this.session.project.schematic, layout), 'The nodes are already arranged so.');
+  }
+
+  private commitSchematic(schematic: Schematic, unchanged: string): void {
+    const project = this.session.project;
+    const same = schematic.nodes.every((n, i) => n.x === project.schematic.nodes[i]!.x && n.y === project.schematic.nodes[i]!.y);
+    if (same) return this.session.notify(unchanged);
+    this.session.commit({ ...project, schematic });
   }
 
   private selectNode(node: SchematicNode): void {
@@ -687,9 +767,9 @@ export class SchematicView implements View {
     ctx.font = `9px ${FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const width = ctx.measureText(text).width + 8;
+    const width = ctx.measureText(text).width + WIRE_LABEL_PADDING;
     ctx.fillStyle = theme().wireLabelBackground;
-    ctx.fillRect(at.x - width / 2, at.y - 7, width, 14);
+    ctx.fillRect(at.x - width / 2, at.y - WIRE_LABEL_HEIGHT / 2, width, WIRE_LABEL_HEIGHT);
     ctx.fillStyle = theme().wireLabelText;
     ctx.fillText(text, at.x, at.y);
     ctx.restore();
@@ -731,10 +811,11 @@ export class SchematicView implements View {
       fontSize -= 1;
       ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     }
-    ctx.fillText(label, r.x + r.width / 2 + 3, r.y + r.height / 2);
+    const { texts } = this.session;
+    if (texts.nodeLabels) ctx.fillText(label, r.x + r.width / 2 + 3, r.y + r.height / 2);
     ctx.font = `8px ${FONT_FAMILY}`;
-    if (node.earthing) ctx.fillText(node.earthing, r.x + r.width / 2 + 3, r.y + 8);
-    for (const { terminal, point } of layout.ports) {
+    if (node.earthing && texts.earthing) ctx.fillText(node.earthing, r.x + r.width / 2 + 3, r.y + 8);
+    for (const { terminal, point } of texts.terminalNames ? layout.ports : []) {
       const custom = placement?.terminalLabels?.[terminal.id];
       ctx.fillText(custom ? fitToWidth(ctx, custom, TERMINAL_LABEL_WIDTH) : terminal.name, point.x, point.y + (terminal.side === 'top' ? 9 : -9));
     }

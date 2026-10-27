@@ -71,8 +71,9 @@
       .menu-list hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
       .wide-button { width: 100%; margin-bottom: 6px; }
       .module { position: relative; }
-      .module-action { display: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 0 6px; font-size: 11px; }
-      .module:hover .module-action { display: inline-block; }
+      .module-actions { display: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); gap: 3px; }
+      .module-action { padding: 0 6px; font-size: 11px; }
+      .module:hover .module-actions { display: flex; }
       .designer-dialog { width: min(1060px, 96vw); }
       .designer-body { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
       .designer-stage { overflow: auto; padding: 12px; }
@@ -90,6 +91,9 @@
       .svg-import-preview { margin: 8px 0; max-height: 220px; overflow: auto; }
       .svg-import-notes { margin: 6px 0; padding-left: 18px; color: var(--text-dim); font-size: 12px; }
       .face-layers { margin-bottom: 8px; }
+      .face-angle { width: 64px; }
+      .face-align { align-items: center; }
+      .face-align-label { color: var(--text-dim); font-size: 12px; flex-basis: 100%; }
       .face-layers h3 { margin: 6px 0; }
       .face-layer { display: block; width: 100%; margin: 2px 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .face-layer.selected { border-color: var(--accent); color: var(--accent); }
@@ -136,10 +140,12 @@
       .menu-list .menu-item:hover:not(:disabled), .menu-list .menu-item:focus-visible { background: var(--bg); outline: none; }
       body[data-mode='panel'] .schematic-only,
       body[data-mode='schematic'] .panel-only,
-      body[data-mode='schematic'] #sidebar { display: none; }
-      body.hide-sidebar #sidebar, body.hide-inspector #inspector { display: none; }
+      body[data-mode='schematic'] #sidebar, body[data-mode='schematic'] #sidebar-resizer { display: none; }
+      body.hide-sidebar #sidebar, body.hide-inspector #inspector, body.hide-sidebar #sidebar-resizer, body.hide-inspector #inspector-resizer { display: none; }
+      .resizer { flex: 0 0 5px; margin: 0 -2px; z-index: 1; cursor: col-resize; background: transparent; touch-action: none; }
+      .resizer:hover, .resizer:focus-visible, .resizer.dragging { background: var(--accent); outline: none; }
       #inspector {
-        width: 270px;
+        width: var(--inspector-width, 270px);
         flex: 0 0 auto;
         overflow-y: auto;
         padding: 8px 10px;
@@ -189,7 +195,7 @@
       #status.error { color: var(--error); border-color: var(--error); }
       main { flex: 1; display: flex; min-height: 0; }
       #sidebar {
-        width: 240px;
+        width: var(--sidebar-width, 240px);
         flex: 0 0 auto;
         overflow-y: auto;
         padding: 8px;
@@ -205,7 +211,11 @@
       }
       .library-title span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
       .library-title button { padding: 0 6px; font-size: 11px; }
+      .module-thumbnail { flex: none; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; }
       .module {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         padding: 4px 8px;
         margin-bottom: 3px;
         border: 1px solid var(--border);
@@ -216,6 +226,7 @@
       }
       .module:hover { border-color: var(--accent); }
       .module small { color: var(--text-dim); }
+      .module-name { flex: 1; min-width: 0; }
       #palette .hint { color: var(--text-dim); }
       #palette-search {
         width: 100%;
@@ -234,6 +245,14 @@
       #shelf { padding: 8px 0; border-bottom: 1px solid var(--border); }
       #shelf h3 { margin: 0 0 6px; font-size: 13px; }
       #shelf .hint { flex-basis: auto; }
+      #snippets { padding: 8px 0; border-bottom: 1px solid var(--border); }
+      #snippets h3 { margin: 0 0 6px; font-size: 13px; }
+      .snippet { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+      .snippet-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .snippet-name small { color: var(--text-dim); }
+      .snippet button { padding: 0 6px; font-size: 11px; }
+      .text-dialog-field { display: block; margin-bottom: 12px; }
+      .text-dialog-field input { width: 100%; margin-top: 4px; }
       .shelf-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
       .shelf-item button { padding: 0 6px; }
       #panel-settings h3 { margin: 0 0 6px; font-size: 13px; }
@@ -263,7 +282,7 @@
         #print-sheet h2 { font-size: 14pt; margin: 7mm 0 3mm; }
         #print-sheet h2:first-child { margin-top: 0; }
         #print-sheet figure { margin: 0; break-after: page; break-inside: avoid; }
-        #print-sheet svg { width: 100%; height: auto; max-height: 150mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        #print-sheet svg { width: 100%; height: auto; max-height: var(--drawing-max-height, 150mm); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         #print-sheet figcaption { font-size: 9pt; margin-top: 2mm; }
         #print-sheet table { width: 100%; border-collapse: collapse; font-size: 9pt; }
         #print-sheet th, #print-sheet td { border: 1px solid #000; padding: 1mm 2mm; text-align: left; }
@@ -284,7 +303,7 @@
         .marker { box-sizing: border-box; width: 42mm; height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
         .marker-detail { font-size: 6.5pt; }
       }
-      .app-dialog p { margin: 0 0 14px; }
+      .app-dialog p { margin: 0 0 14px; white-space: pre-line; }
       .editor-dialog { width: min(1100px, 94vw); height: min(760px, 88vh); max-width: none; padding: 0; overflow: hidden; }
       .editor-dialog[open] { display: grid; grid-template-rows: auto 1fr auto; }
       .editor-dialog header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -309,6 +328,69 @@
       button.primary { border-color: var(--accent); color: var(--accent); }
       #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
       #stage-wrap { flex: 1; min-width: 0; position: relative; }
+      .app-dialog.projects-dialog { width: min(640px, 96vw); max-width: none; }
+      .projects-help { color: var(--text-dim); margin: 4px 0 10px; }
+      .projects-list { max-height: 50vh; overflow: auto; }
+      .projects-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 4px; }
+      .projects-row.current { border-color: var(--accent); }
+      .projects-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .projects-name small { color: var(--text-dim); }
+      .projects-earlier { margin: 12px 0 2px; font-size: 13px; }
+      .print-dialog fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
+      .print-page { display: flex; gap: 16px; margin-bottom: 12px; }
+      .print-note { color: var(--text-dim); font-size: 12px; }
+      .text-options { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px; }
+      .text-options-heading { color: var(--text-dim); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
+      .text-option { display: block; white-space: nowrap; cursor: pointer; }
+      .text-presets { display: flex; gap: 8px; margin-bottom: 8px; }
+      .app-dialog.export-text-dialog { width: min(460px, 96vw); max-width: none; }
+      .table-edit { width: 100%; box-sizing: border-box; min-width: 4em; background: transparent; border: 1px solid transparent; border-radius: 3px; padding: 1px 4px; font: inherit; color: inherit; }
+      .table-edit:hover, .table-edit:focus { border-color: var(--accent); background: var(--bg); }
+      td.numeric .table-edit { text-align: right; }
+      .tables-body td.mark-ok { color: #4ade80; }
+      .tables-body td.mark-warning { color: #f87171; font-weight: 600; }
+      .tables-body td.mark-unknown { color: #fbbf24; }
+      .tables-problem { color: var(--error, #ef4444); margin: 6px 0 0; }
+      .app-dialog.tables-dialog { width: min(920px, 96vw); max-width: none; }
+      .tables-tabs { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+      .tables-tabs .active { border-color: var(--accent); color: var(--accent); }
+      .tables-body { max-height: 60vh; overflow: auto; }
+      .tables-body table { border-collapse: collapse; width: 100%; }
+      .tables-body th { position: sticky; top: 0; background: var(--panel); text-align: left; cursor: pointer; white-space: nowrap; border-bottom: 1px solid var(--border); padding: 4px 8px; }
+      .tables-body td { padding: 3px 8px; border-bottom: 1px solid var(--border); }
+      .tables-body .numeric { text-align: right; font-variant-numeric: tabular-nums; }
+      .tables-empty, .tables-note { color: var(--text-dim); margin: 10px 2px; }
+      .app-dialog.help-dialog { width: min(640px, 94vw); max-width: none; }
+      .help-dialog h3 { margin: 14px 0 4px; font-size: 13px; color: var(--accent); }
+      .help-dialog table { border-collapse: collapse; width: 100%; }
+      .help-dialog td { padding: 3px 6px; vertical-align: top; border-bottom: 1px solid var(--border); }
+      .help-dialog td:first-child { width: 42%; white-space: nowrap; }
+      .help-dialog kbd { font: 12px ui-monospace, monospace; color: var(--text); }
+      #problems { position: absolute; left: 12px; bottom: 12px; width: min(480px, calc(100% - 24px)); max-height: 45%; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 5; }
+      #problems[hidden] { display: none; }
+      #minimap { position: absolute; right: 12px; bottom: 12px; width: 200px; height: 130px; border: 1px solid var(--border); border-radius: 4px; z-index: 4; cursor: crosshair; touch-action: none; }
+      #minimap[hidden] { display: none; }
+      #search { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 6; padding: 8px; }
+      #search[hidden] { display: none; }
+      #tour { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 7; padding: 10px 14px; }
+      #tour[hidden] { display: none; }
+      #tour p { margin: 6px 0 10px; white-space: normal; }
+      .tour-actions { display: flex; justify-content: flex-end; gap: 8px; }
+      .tour-target { outline: 2px solid var(--accent); outline-offset: 2px; position: relative; z-index: 3; }
+      #search input { width: 100%; box-sizing: border-box; }
+      .search-results { list-style: none; margin: 6px 0 0; padding: 0; max-height: 320px; overflow: auto; }
+      .search-result { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 4px; padding: 5px 8px; }
+      .search-result small, .search-none { color: var(--text-dim); }
+      .search-result.active, .search-result:hover { background: var(--bg); }
+      .search-none { padding: 5px 8px; }
+      .problems-header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--border); }
+      .problems-list { list-style: none; margin: 0; padding: 4px; }
+      .problem { display: flex; gap: 8px; width: 100%; text-align: left; align-items: baseline; margin: 2px 0; }
+      .problem:disabled { opacity: 0.8; cursor: default; }
+      .problem-badge { flex: none; min-width: 52px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .problem.error .problem-badge { color: var(--error); }
+      .problem.advice .problem-badge { color: var(--accent); }
+      .problem.note .problem-badge { color: var(--text-dim); }
       #stage-wrap.drop::after {
         content: 'Drop library JSON';
         position: absolute;
@@ -330,7 +412,7 @@
         <button id="mode-schematic">Schematic</button>
       </div>
       <div class="menu">
-        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">File</button>
+        <button class="menu-button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
         <div class="menu-list" role="menu" hidden>
           <div class="menu-row panel-only">
             <select id="enclosure" title="Enclosure"></select>
@@ -342,7 +424,13 @@
             <input id="open-project" type="file" accept=".json,application/json" hidden />
           </label>
           <button class="menu-item" role="menuitem" id="open-example" title="Open one of the bundled example projects">Examples…</button>
+          <button class="menu-item" role="menuitem" id="open-projects" title="Keep projects in this browser and open them again">Projects…</button>
           <button class="menu-item" role="menuitem" id="save-project">Save</button>
+          <button class="menu-item" role="menuitem" id="backup-all" title="Download the project on the screen, the saved projects, your libraries and your settings in one file">Back up everything…</button>
+          <label class="menu-item file-button" role="menuitem" tabindex="0" title="Put a backup file back: projects are added, libraries and settings are replaced">
+            Restore from backup…
+            <input id="restore-all" type="file" accept=".json,application/json" hidden />
+          </label>
           <button class="menu-item" role="menuitem" id="share-link">Share link</button>
           <hr />
           <button class="menu-item" role="menuitem" id="colour-scheme" title="Choose the colours of phases, neutral and earth, or set your own">Colours…</button>
@@ -355,18 +443,44 @@
         </div>
       </div>
       <div class="menu">
+        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">View</button>
+        <div class="menu-list" role="menu" hidden>
+          <div id="view-text-options" class="text-options"></div>
+          <hr />
+          <div class="text-options"><label class="text-option"><input id="view-minimap" type="checkbox" checked /> Minimap</label></div>
+          <hr />
+          <button class="menu-item" role="menuitem" id="show-all-text">Show all text</button>
+          <button class="menu-item" role="menuitem" id="hide-all-text">Hide all text</button>
+        </div>
+      </div>
+      <div class="menu">
         <button class="menu-button" aria-haspopup="menu" aria-expanded="false">Export</button>
         <div class="menu-list" role="menu" hidden>
           <button class="menu-item" role="menuitem" id="export-png">PNG image</button>
           <button class="menu-item" role="menuitem" id="export-svg">SVG image</button>
+          <button class="menu-item" role="menuitem" id="view-checks" title="Whether each circuit's cable, voltage drop, breaker, RCD and earth hold, and why not">Calculation summary…</button>
+          <button class="menu-item" role="menuitem" id="view-tables" title="The parts, circuits, wires and ferrules of the project, to read and sort here">Tables…</button>
           <button class="menu-item" role="menuitem" id="export-bom">Parts list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wires" title="Every wire with its two ends, conductor, cross-section, length and current">Wire list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wire-labels" title="One label for each end of each wire, for a label printer: semicolon-separated, UTF-8">Wire end labels (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-circuits" title="Loads with their breaker, cable and voltage drop, and the ferrules needed">Circuits and ferrules (CSV)</button>
+          <button class="menu-item" role="menuitem" id="export-text" title="Which text PNG, SVG and print carry, apart from what the screen shows">Text in exports…</button>
           <hr />
           <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the lists">Print…</button>
           <button class="menu-item" role="menuitem" id="print-full-size" title="Print the panel at 1:1 on overlapping A4 sheets to glue together">Print full size…</button>
           <button class="menu-item" role="menuitem" id="print-labels" title="Print labels for the modules at actual size and markers for the cables">Print labels…</button>
+        </div>
+      </div>
+      <div class="menu panel-only">
+        <button class="menu-button" aria-haspopup="menu" aria-expanded="false">Modules</button>
+        <div class="menu-list" role="menu" hidden>
+          <button class="menu-item" role="menuitem" id="pack-left" title="Close the gaps between the selected modules, towards the left one">Pack left</button>
+          <button class="menu-item" role="menuitem" id="pack-right" title="Close the gaps between the selected modules, towards the right one">Pack right</button>
+          <button class="menu-item" role="menuitem" id="spread-modules" title="Equal gaps between the selected modules, the first and last staying put (three or more on a rail)">Spread evenly</button>
+          <button class="menu-item" role="menuitem" id="row-start" title="Put the selected modules edge to edge at the start of their rails">To the start of the row</button>
+          <button class="menu-item" role="menuitem" id="row-end" title="Put the selected modules edge to edge at the end of their rails">To the end of the row</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="duplicate-row" title="A copy of the selected row with its modules, combs and label, right below it">Duplicate row</button>
         </div>
       </div>
       <div class="menu schematic-only">
@@ -384,6 +498,16 @@
           <button class="menu-item" role="menuitem" id="spread-wires" title="Move apart the wires that run on top of each other">Separate overlapping wires</button>
           <button class="menu-item" role="menuitem" id="route-automatically" title="Take the hand-drawn routes off all wires and let the program route them">Route all wires automatically</button>
           <button class="menu-item" role="menuitem" id="remove-orphans" title="Remove nodes of modules that are gone from the panel, when they have no wires">Remove orphans</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="arrange-nodes" title="Put every node in a row by its distance from a source, the loads at the bottom">Arrange nodes</button>
+          <button class="menu-item" role="menuitem" id="align-left" title="Line the selected nodes up on their left edge">Align left</button>
+          <button class="menu-item" role="menuitem" id="align-centre" title="Line the selected nodes up on their middle, one above another">Align centre</button>
+          <button class="menu-item" role="menuitem" id="align-right" title="Line the selected nodes up on their right edge">Align right</button>
+          <button class="menu-item" role="menuitem" id="align-top" title="Line the selected nodes up on their top edge">Align top</button>
+          <button class="menu-item" role="menuitem" id="align-middle" title="Line the selected nodes up on their middle, side by side">Align middle</button>
+          <button class="menu-item" role="menuitem" id="align-bottom" title="Line the selected nodes up on their bottom edge">Align bottom</button>
+          <button class="menu-item" role="menuitem" id="distribute-horizontally" title="Space three or more selected nodes evenly from left to right">Distribute across</button>
+          <button class="menu-item" role="menuitem" id="distribute-vertically" title="Space three or more selected nodes evenly from top to bottom">Distribute down</button>
         </div>
       </div>
       <span class="toolbar-separator"></span>
@@ -392,6 +516,8 @@
         <button id="redo">Redo</button>
         <button id="delete-selection" title="Remove the selected item (Delete)" disabled>Delete</button>
         <button id="fit">Fit</button>
+        <button id="zoom-selection" title="Zoom to what is selected; shows everything when nothing is (F)">Zoom to selection</button>
+        <button id="find" title="Find a module, node or wire by its label (Ctrl+F)">Find</button>
         <button id="ruler" class="panel-only" title="Measure on the panel: drag from point to point; ends snap to edges (R)">Ruler</button>
       </div>
       <span class="toolbar-separator"></span>
@@ -402,6 +528,7 @@
       </div>
       <span class="toolbar-separator"></span>
       <button id="check" title="Look for overlaps, orphaned nodes, wrongly joined conductors and design problems">Check</button>
+      <button id="help" title="The keys and gestures (?)">?</button>
       <button id="bundle-mode" class="schematic-only" title="While on, drag from a node to another node to wire all poles (same as Shift-drag)">Wire all poles</button>
       <div id="status"></div>
       <div class="hint schematic-only">Drag terminal to terminal to wire it. Shift-drag, or switch on Wire all poles, from node to node to wire every pole. Drag a wire to move it; drag its piece at a terminal sideways to bend it.</div>
@@ -410,11 +537,14 @@
       <aside id="sidebar">
         <section id="panel-settings"></section>
         <section id="shelf"></section>
+        <section id="snippets"></section>
         <button id="new-module" class="wide-button" title="Design a module of your own">New module…</button>
         <input id="palette-search" type="search" placeholder="Search modules: c16 2p, 30ma, rcd…" autocomplete="off" />
         <div id="palette"></div>
       </aside>
-      <div id="stage-wrap"><canvas id="stage"></canvas></div>
+      <div id="sidebar-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" tabindex="0" title="Drag to resize, double-click to reset"></div>
+      <div id="stage-wrap"><canvas id="stage"></canvas><canvas id="minimap" title="Click or drag to move the view"></canvas><div id="search" hidden></div><div id="tour" hidden></div><div id="problems" hidden></div></div>
+      <div id="inspector-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the inspector" tabindex="0" title="Drag to resize, double-click to reset"></div>
       <aside id="inspector"><div id="inspector-content"></div></aside>
     </main>
     <div id="print-sheet"></div>

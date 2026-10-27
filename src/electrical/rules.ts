@@ -33,9 +33,16 @@ export interface RuleFinding {
   message: string;
   nodes: string[];
   placements: string[];
+  /** Which rule found it, for the rules that a summary reports on its own. */
+  rule?: 'open-earth' | 'no-rcd';
 }
 
-const about = (message: string, where: { nodes?: string[]; placements?: string[] }): RuleFinding => ({ message, nodes: where.nodes ?? [], placements: where.placements ?? [] });
+const about = (message: string, where: { nodes?: string[]; placements?: string[] }, rule?: RuleFinding['rule']): RuleFinding => ({
+  message,
+  nodes: where.nodes ?? [],
+  placements: where.placements ?? [],
+  ...(rule ? { rule } : {}),
+});
 
 /**
  * Design rules that a wiring can break without being wrong in itself. They are advice, so the
@@ -66,7 +73,7 @@ function openEarth({ project, netOf, name }: Context): RuleFinding[] {
     if (node.kind !== 'load') return [];
     const earth = freeNodeTerminals(node).find((t) => t.conductor === 'PE' || t.conductor === 'PEN');
     return earth && !netOf.has(`n:${node.id}/${earth.id}`)
-      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: protective earth is not connected`, { nodes: [node.id] })]
+      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: protective earth is not connected`, { nodes: [node.id] }, 'open-earth')]
       : [];
   });
 }
@@ -131,7 +138,7 @@ function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals
       .filter(isPhase)
       .flatMap((t) => netOf.get(`n:${node.id}/${t.id}`) ?? []);
     return fed.some((net) => reachesSource(net, new Set()))
-      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: it is fed without passing an RCD or RCBO`, { nodes: [node.id] })]
+      ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: it is fed without passing an RCD or RCBO`, { nodes: [node.id] }, 'no-rcd')]
       : [];
   });
 }

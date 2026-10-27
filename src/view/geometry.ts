@@ -43,7 +43,7 @@ export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits:
   };
 }
 
-const COMB_HEIGHT = 18;
+export const COMB_HEIGHT = 18;
 export const COMB_OVERHANG = 10;
 const LABEL_GAP = 8;
 

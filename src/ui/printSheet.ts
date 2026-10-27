@@ -1,5 +1,6 @@
 import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts, wireCells, wireList, WIRE_HEADER } from '../electrical/schedule';
 import { bomTotals, buildBom, lineTotal, type BomRow } from '../project/bom';
+import { DEFAULT_PRINT_OPTIONS, drawingMaxHeightMm, type PrintOptions } from '../project/printOptions';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
 import type { Session } from './session';
@@ -56,9 +57,11 @@ function drawingOf(view: View, session: Session, caption: string, idPrefix: stri
   const figure = document.createElement('figure');
   const parsed = new DOMParser().parseFromString(renderToSvg(view, session, LIGHT_THEME, idPrefix), 'image/svg+xml');
   figure.append(document.importNode(parsed.documentElement, true));
-  const text = document.createElement('figcaption');
-  text.textContent = caption;
-  figure.append(text);
+  if (caption) {
+    const text = document.createElement('figcaption');
+    text.textContent = caption;
+    figure.append(text);
+  }
   return figure;
 }
 
@@ -84,14 +87,17 @@ function section(heading: string, content: HTMLElement): HTMLElement[] {
  * Fills the print sheet with the panel, the wiring schematic and the parts list. Page breaks and
  * visibility are the job of the print stylesheet.
  */
-export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { panel: View; schematic: View }): void {
+export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { panel: View; schematic: View }, options: PrintOptions = DEFAULT_PRINT_OPTIONS): void {
   const { panel, schematic } = session.project;
+  const { exportTexts } = session;
   const title = document.createElement('h1');
   title.textContent = panel.title ?? 'Panel';
-  const parts: HTMLElement[] = [title, drawingOf(views.panel, session, 'Panel layout', 'panel-')];
-  if (schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, 'Wiring schematic', 'schematic-'));
+  sheet.style.setProperty('--drawing-max-height', `${drawingMaxHeightMm(options)}mm`);
+  const parts: HTMLElement[] = exportTexts.sheetTitle ? [title] : [];
+  if (options.parts.panel) parts.push(drawingOf(views.panel, session, exportTexts.captions ? 'Panel layout' : '', 'panel-'));
+  if (options.parts.schematic && schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, exportTexts.captions ? 'Wiring schematic' : '', 'schematic-'));
   const rows = buildBom(panel, session.resolve);
-  if (rows.length > 0) {
+  if (options.parts.parts && rows.length > 0) {
     const priced = rows.some((row) => row.def?.price !== undefined);
     const header = priced ? [...BOM_COLUMNS, ...PRICE_COLUMNS] : BOM_COLUMNS;
     const body = rows.map((row) => (priced ? [...bomCells(row), ...priceCells(row)] : bomCells(row)));
@@ -104,10 +110,10 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
     }
   }
   const circuits = circuitSchedule(session.project, session.resolve, session.cableSettings);
-  if (circuits.length > 0) parts.push(...section('Circuits', table(CIRCUIT_HEADER, circuits.map(circuitCells))));
+  if (options.parts.circuits && circuits.length > 0) parts.push(...section('Circuits', table(CIRCUIT_HEADER, circuits.map(circuitCells))));
   const wires = wireList(session.project, session.resolve);
-  if (wires.length > 0) parts.push(...section('Connections', table(WIRE_HEADER, wires.map(wireCells))));
+  if (options.parts.connections && wires.length > 0) parts.push(...section('Connections', table(WIRE_HEADER, wires.map(wireCells))));
   const ferrules = ferruleCounts(session.project);
-  if (ferrules.length > 0) parts.push(...section('Ferrules', table(['Ferrule (mm2)', 'Quantity'], ferrules.map(ferruleCells))));
-  sheet.replaceChildren(...parts);
+  if (options.parts.ferrules && ferrules.length > 0) parts.push(...section('Ferrules', table(['Ferrule (mm2)', 'Quantity'], ferrules.map(ferruleCells))));
+  sheet.replaceChildren(...parts.filter((part) => exportTexts.sheetTitle || part.tagName !== 'H2'));
 }

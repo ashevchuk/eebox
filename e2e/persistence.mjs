@@ -55,6 +55,8 @@ try {
   await browser.goto(page);
   await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the bundled library in the palette');
 
+  await browser.evaluate(`localStorage.setItem('eebox:tour-done', 'yes'); document.getElementById('tour').hidden = true;`);
+
   /* First session: make things */
 
   await step('a project from the examples is opened, renamed, and the autosave keeps the new name', async () => {
@@ -179,6 +181,67 @@ try {
     expectTrue(!(await status()).includes('warning'), 'the file opened with warnings');
   });
 
+  await step('a project saved in the browser is listed after a reload, opens, and is taken away', async () => {
+    const dialogText = () => browser.evaluate(`document.querySelector('dialog[open].projects-dialog')?.innerText ?? ''`);
+    const dialogButton = (text) =>
+      browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === ${JSON.stringify(text)}).click()`);
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].projects-dialog')`, 'the projects dialog');
+    expectTrue((await dialogText()).includes('Nothing is saved here yet'), 'the list is not empty at first');
+    await dialogButton('Save the project');
+    await browser.waitFor(`document.querySelector('.projects-row.current')`, 'the saved project in the list');
+    await dialogButton('Close');
+    await browser.goto(page);
+    await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the page after the reload');
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('.projects-row')`, 'the stored project after the reload');
+    expectTrue((await dialogText()).includes('Persist test'), 'the stored project has lost its title');
+    await dialogButton('Open');
+    await browser.evaluate(`new Promise((r) => setTimeout(r, 300)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click())`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('loaded')`, 'the stored project to load');
+    expectEqual(await inspectorField('Title'), 'Persist test', 'the title of the opened project');
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('.projects-row.current')`, 'the opened project marked as open');
+    await dialogButton('Delete');
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open]')].pop()?.querySelector('.primary')?.textContent === 'Delete'`, 'the question about deleting');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open]')].pop().querySelector('.primary').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].projects-dialog')?.innerText.includes('Nothing is saved here yet')`, 'the list to be empty');
+    await dialogButton('Close');
+  });
+
+  await step('a project that a new panel replaces is kept as an earlier state and comes back from the list', async () => {
+    await browser.evaluate(`document.getElementById('new-panel').click(); new Promise((r) => setTimeout(r, 300)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click())`);
+    await browser.waitFor(`document.querySelector('#inspector .inspector-field input')?.value === ''`, 'the empty panel');
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('.projects-earlier')`, 'the earlier states');
+    await browser.evaluate(`document.querySelector('.projects-row button').click()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('loaded')`, 'the earlier state to load');
+    expectEqual(await inspectorField('Title'), 'Persist test', 'the title of the earlier state');
+  });
+
+  await step('a backup holds the project, the libraries and the settings, and puts them back; garbage is refused', async () => {
+    const text = await downloaded('backup-all');
+    const backup = JSON.parse(text);
+    expectEqual(backup.format, 'eebox-workspace', 'the format of the backup');
+    expectEqual(backup.current.project.panel.title, 'Persist test', 'the project on the screen in the backup');
+    expectTrue(backup.libraries.some((l) => l.id === 'my-modules'), 'My modules is not in the backup');
+    expectTrue(backup.libraries.every((l) => l.id !== 'generic-iec'), 'the bundled library is in the backup');
+    expectTrue('eebox:cable-settings' in backup.settings, 'the cable settings are not in the backup');
+    const restore = (content, name) =>
+      browser.evaluate(`(async () => {
+        const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(content)}], ${JSON.stringify(name)}));
+        const input = document.getElementById('restore-all'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 500));
+        [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Restore')?.click();
+        await new Promise((r) => setTimeout(r, 500));
+      })()`);
+    await restore('{"format":"eebox-project"}', 'wrong.json');
+    expectTrue((await status()).includes('eebox-workspace'), `a wrong file was not refused: ${await status()}`);
+    await restore(text, 'backup.json');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('backup.json loaded')`, 'the backup to load');
+    expectEqual(await inspectorField('Title'), 'Persist test', 'the title after the restore');
+  });
+
   await step('a share link opens the same project in a fresh page', async () => {
     await browser.evaluate(`document.getElementById('share-link').click()`);
     await browser.waitFor(`location.hash.startsWith('#p=')`, 'the link in the address bar');
@@ -190,6 +253,17 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Open shared project').click()`);
     await browser.waitFor(`document.getElementById('status').textContent.includes('Shared project')`, 'the shared project to load');
     expectEqual(await inspectorField('Title'), 'Persist test', 'the title of the shared project');
+  });
+
+  await step('a share link put into the address bar of an open page opens too', async () => {
+    await browser.evaluate(`document.getElementById('share-link').click()`);
+    await browser.waitFor(`location.hash.startsWith('#p=')`, 'the link in the address bar');
+    const hash = await browser.evaluate(`location.hash`);
+    await browser.evaluate(`history.replaceState(null, '', location.pathname); document.getElementById('status').textContent = ''`);
+    await browser.evaluate(`location.hash = ${JSON.stringify(hash)}`);
+    await browser.evaluate(`new Promise((r) => setTimeout(r, 500)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click())`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('Shared project')`, 'the shared project to load');
+    expectEqual(await browser.evaluate(`location.hash`), '', 'the address bar after the link was used');
   });
 
   await step('a PNG of the panel is a real picture with the faces in it', async () => {
@@ -208,9 +282,157 @@ try {
   });
 
   await step('the print sheet holds the faces too', async () => {
-    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click()`);
+    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Print').click())`);
     await browser.waitFor(`document.querySelector('#print-sheet svg')`, 'the drawings of the sheet');
     expectTrue(await browser.evaluate(`document.querySelector('#print-sheet svg').innerHTML.includes('<clipPath')`), 'the faces are not in the printed drawing');
+  });
+
+  await step('the print dialog prints only the parts that are ticked, on the paper that is chosen', async () => {
+    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => {
+      const dialog = document.querySelector('dialog[open].print-dialog');
+      for (const label of dialog.querySelectorAll('label')) {
+        const box = label.querySelector('input');
+        if (box && label.textContent.trim() !== 'Panel layout') { box.checked = false; box.dispatchEvent(new Event('change')); }
+      }
+      const [paper, orientation] = dialog.querySelectorAll('select');
+      paper.value = 'A3'; paper.dispatchEvent(new Event('change'));
+      orientation.value = 'portrait'; orientation.dispatchEvent(new Event('change'));
+      [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Print').click();
+    })`);
+    await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length === 1`, 'one drawing on the sheet');
+    expectEqual(await browser.evaluate(`document.querySelectorAll('#print-sheet h2, #print-sheet table').length`), 0, 'lists on the sheet');
+    expectTrue(await browser.evaluate(`[...document.querySelectorAll('head style')].some((s) => s.textContent.includes('A3 portrait'))`), 'the page rule of the chosen paper');
+  });
+
+  await step('the export dialog turns the text of a print off and on, apart from the screen', async () => {
+    const clickIn = (text) => browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === ${JSON.stringify(text)}).click()`);
+    const printOnce = async () => {
+      await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Print').click())`);
+      await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length >= 1`, 'a drawing on the sheet');
+    };
+    await browser.evaluate(`document.getElementById('export-text').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].export-text-dialog')`, 'the dialog of the text');
+    await clickIn('No text');
+    await clickIn('Apply');
+    await printOnce();
+    expectEqual(await browser.evaluate(`document.querySelectorAll('#print-sheet h1, #print-sheet h2, #print-sheet figcaption').length`), 0, 'headings and captions on the sheet');
+    expectEqual(await browser.evaluate(`document.querySelectorAll('#print-sheet svg text').length`), 0, 'text in the drawings');
+    expectTrue(await browser.evaluate(`document.getElementById('view-text-options').querySelector('input').checked`), 'the screen lost its text with the export');
+    await browser.evaluate(`document.getElementById('export-text').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].export-text-dialog')`, 'the dialog of the text');
+    await clickIn('All text');
+    await clickIn('Apply');
+    await printOnce();
+    expectTrue(await browser.evaluate(`document.querySelectorAll('#print-sheet svg text').length > 0 && document.querySelectorAll('#print-sheet figcaption').length > 0`), 'the text did not come back');
+  });
+
+  await step('a kind of text turned off in the View menu leaves the screen drawing and is kept', async () => {
+    const pixels = () => browser.evaluate(`(() => { const c = document.getElementById('stage'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) n += d[i] + d[i + 1] + d[i + 2]; return n; })()`);
+    const before = await pixels();
+    await browser.evaluate(`document.getElementById('hide-all-text').click()`);
+    await new Promise((r) => setTimeout(r, 300));
+    expectTrue((await pixels()) !== before, 'the drawing did not change when the text was hidden');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#view-text-options input')].every((i) => !i.checked)`), true, 'the boxes of the View menu');
+    await browser.goto(page);
+    await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the page after a reload');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#view-text-options input')].every((i) => !i.checked)`), true, 'the choice after the reload');
+    await browser.evaluate(`document.getElementById('show-all-text').click()`);
+  });
+
+  await step('the side panels are dragged to another width, which is kept after a reload', async () => {
+    const widths = () => browser.evaluate(`({ sidebar: Math.round(document.getElementById('sidebar').getBoundingClientRect().width), inspector: Math.round(document.getElementById('inspector').getBoundingClientRect().width) })`);
+    const drag = async (id, dx) => {
+      const [x, y] = await browser.evaluate(`(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + 200]; })()`);
+      await browser.mouse('mousePressed', x, y);
+      await browser.mouse('mouseMoved', x + dx / 2, y);
+      await browser.mouse('mouseMoved', x + dx, y);
+      await browser.mouse('mouseReleased', x + dx, y);
+    };
+    await browser.evaluate(`document.body.classList.remove('hide-sidebar', 'hide-inspector')`);
+    const before = await widths();
+    await drag('sidebar-resizer', 80);
+    await drag('inspector-resizer', -60);
+    const after = await widths();
+    expectTrue(after.sidebar >= before.sidebar + 70, `the library panel is ${after.sidebar} px, was ${before.sidebar}`);
+    expectTrue(after.inspector >= before.inspector + 50, `the inspector is ${after.inspector} px, was ${before.inspector}`);
+    await browser.goto(page);
+    await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the page after a reload');
+    await browser.evaluate(`document.body.classList.remove('hide-sidebar', 'hide-inspector')`);
+    expectEqual(await widths(), after, 'the widths after the reload');
+    await browser.evaluate(`document.getElementById('sidebar-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); document.getElementById('inspector-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+    expectEqual(await widths(), { sidebar: 240, inspector: 270 }, 'the widths after a double click');
+  });
+
+  await step('a selection is kept as a snippet, survives a reload and is put on an empty panel', async () => {
+    const clickIn = (text) => browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === ${JSON.stringify(text)}).click()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', ctrlKey: true, bubbles: true }))`);
+    await browser.evaluate(`(() => { const b = [...document.querySelectorAll('#snippets button')].find((x) => x.textContent.startsWith('Save selection')); b.focus(); b.click(); })()`);
+    await browser.waitFor(`document.querySelector('dialog[open] input')`, 'the dialog for the name');
+    await browser.evaluate(`document.querySelector('dialog[open] input').value = 'Whole panel'`);
+    await browser.key('Enter', 'Enter', 13, '\r');
+    await browser.waitFor(`document.querySelectorAll('#snippets .snippet').length === 1`, 'the snippet in the list');
+    await new Promise((r) => setTimeout(r, 400));
+    expectEqual(await browser.evaluate(`document.querySelector('dialog[open]') === null`), true, 'a dialog was open again after Enter saved the snippet');
+    await browser.goto(page);
+    await browser.waitFor(`document.querySelectorAll('#snippets .snippet').length === 1`, 'the snippet after a reload');
+    expectTrue((await browser.evaluate(`document.querySelector('#snippets .snippet-name').textContent`)).startsWith('Whole panel'), 'the name of the snippet');
+    await browser.evaluate(`const select = document.getElementById('enclosure'); select.value = [...select.options].find((o) => o.value.endsWith('enc-2x24')).value; select.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('new-panel').click(); new Promise((r) => setTimeout(r, 300)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click())`);
+    await browser.waitFor(`/0 modules/.test(document.getElementById('inspector-content').innerText)`, 'the empty panel');
+    await browser.evaluate(`[...document.querySelectorAll('#snippets button')].find((b) => b.textContent === 'Insert').click()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('put on the panel')`, 'the snippet on the panel');
+    const backup = JSON.parse(await downloaded('backup-all'));
+    expectEqual(backup.snippets.length, 1, 'the snippets in the backup');
+  });
+
+  await step('Ctrl+F finds a module by its label and selects it, F zooms to it, and the minimap draws and moves the view', async () => {
+    const stagePixels = () => browser.evaluate(`(() => { const c = document.getElementById('stage'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) | 0; return h; })()`);
+    const key = (code, ctrl) => browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(code.slice(3).toLowerCase())}, code: ${JSON.stringify(code)}, ctrlKey: ${ctrl}, bubbles: true }))`);
+    await key('KeyF', true);
+    await browser.waitFor(`!document.getElementById('search').hidden`, 'the search box');
+    await browser.evaluate(`const input = document.querySelector('#search input'); input.value = 'p1'; input.dispatchEvent(new Event('input', { bubbles: true }))`);
+    await browser.waitFor(`document.querySelectorAll('#search .search-result').length >= 1`, 'a result');
+    await browser.evaluate(`document.querySelector('#search input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await browser.waitFor(`document.getElementById('search').hidden`, 'the search box to close');
+    const selectedId = () => browser.evaluate(`/\\bp1\\b/.test(document.getElementById('inspector-content').innerText)`);
+    expectTrue(await selectedId(), 'the found module is not selected');
+    await browser.evaluate(`document.getElementById('fit').click()`);
+    await new Promise((r) => setTimeout(r, 300));
+    const before = await stagePixels();
+    await key('KeyF', false);
+    await new Promise((r) => setTimeout(r, 300));
+    expectTrue((await stagePixels()) !== before, 'F did not change the view');
+    expectTrue(await selectedId(), 'F lost the selection');
+
+    const minimap = () => browser.evaluate(`(() => { const c = document.getElementById('minimap'); const r = c.getBoundingClientRect(); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lit = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 120) lit++; return { hidden: c.hidden, lit, x: r.x + r.width * 0.15, y: r.y + r.height * 0.25 }; })()`);
+    const map = await minimap();
+    expectTrue(!map.hidden && map.lit > 20, `the minimap shows nothing (${map.lit} bright pixels)`);
+    const seen = await stagePixels();
+    await browser.mouse('mousePressed', map.x, map.y);
+    await browser.mouse('mouseReleased', map.x, map.y);
+    await new Promise((r) => setTimeout(r, 300));
+    expectTrue((await stagePixels()) !== seen, 'a click on the minimap did not move the view');
+    await browser.evaluate(`document.getElementById('view-minimap').click()`);
+    expectEqual((await minimap()).hidden, true, 'the minimap after it was turned off');
+    await browser.evaluate(`document.getElementById('view-minimap').click()`);
+  });
+
+  await step('the Modules menu packs the selected modules and copies a row', async () => {
+    const placements = () => browser.evaluate(`(() => JSON.parse(localStorage.getItem('eebox:autosave')).project.panel)()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', ctrlKey: true, bubbles: true }))`);
+    await browser.evaluate(`document.getElementById('row-start').click()`);
+    await new Promise((r) => setTimeout(r, 900));
+    const packed = await placements();
+    const first = packed.placements.filter((p) => p.rail === 0).map((p) => p.slot).sort((a, b) => a - b);
+    expectEqual(first[0], 0, 'the first module of the row after To the start');
+    const rowsBefore = packed.railLengthsUnits.length;
+    await browser.evaluate(`document.getElementById('duplicate-row').click()`);
+    await new Promise((r) => setTimeout(r, 900));
+    const copied = await placements();
+    expectEqual(copied.railLengthsUnits.length, rowsBefore + 1, 'the rows after Duplicate row');
+    expectTrue(copied.placements.length > packed.placements.length, 'no modules were copied with the row');
+    await browser.evaluate(`document.getElementById('undo')?.click() ?? [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo').click()`);
   });
 
   await step('the page raised no errors in the second session', async () => {

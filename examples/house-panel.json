@@ -583,17 +583,6 @@
           "stroke": "#1f2937",
           "strokeWidth": 0.3,
           "anchor": "stretch"
-        },
-        {
-          "kind": "rect",
-          "x": 28,
-          "y": 3.5,
-          "width": 14,
-          "height": 7.5,
-          "fill": "#dc2626",
-          "stroke": "#1f2937",
-          "strokeWidth": 0.3,
-          "anchor": "centre"
         }
       ]
     },
@@ -701,7 +690,7 @@
         {
           "kind": "ellipse",
           "cx": 8.75,
-          "cy": 83,
+          "cy": 84,
           "rx": 3.6,
           "ry": 3.6,
           "fill": "#e5e7eb",
@@ -713,9 +702,9 @@
         {
           "kind": "line",
           "x1": 6.35,
-          "y1": 81.8,
+          "y1": 82.8,
           "x2": 11.15,
-          "y2": 84.2,
+          "y2": 85.2,
           "stroke": "#9ca3af",
           "strokeWidth": 0.5,
           "anchor": "tile",
@@ -794,7 +783,7 @@
         {
           "kind": "ellipse",
           "cx": 8.75,
-          "cy": 83,
+          "cy": 84,
           "rx": 3.6,
           "ry": 3.6,
           "fill": "#e5e7eb",
@@ -806,9 +795,9 @@
         {
           "kind": "line",
           "x1": 6.35,
-          "y1": 81.8,
+          "y1": 82.8,
           "x2": 11.15,
-          "y2": 84.2,
+          "y2": 85.2,
           "stroke": "#9ca3af",
           "strokeWidth": 0.5,
           "anchor": "tile",

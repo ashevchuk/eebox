@@ -1,6 +1,7 @@
 import { KIND_LABELS, groupByKind, matchesQuery } from '../library/catalog';
 import type { ModuleRef } from '../layout/placement';
 import type { Library, ModuleDef } from '../library/types';
+import { drawThumbnail } from '../view/render';
 import type { Session } from './session';
 
 export interface PaletteHandlers {
@@ -15,10 +16,16 @@ export interface PaletteHandlers {
   onEditModule(library: Library, def: ModuleDef): void;
   /** Make a copy of a module of the bundled library in the user's own library and design that. */
   onCopyModule(library: Library, def: ModuleDef): void;
+  /** Make a copy of a module of a library the user owns, next to it. */
+  onDuplicateModule(library: Library, def: ModuleDef): void;
+  /** Take a module out of a library the user owns. */
+  onDeleteModule(library: Library, def: ModuleDef): void;
 }
 
 const OPEN_STATE_KEY = 'eebox:palette-open';
 const SMALL_GROUP = 12;
+/** The square a picture of a module is made to fit in. */
+const THUMBNAIL_PX = 34;
 
 function loadOpenState(): Record<string, boolean> {
   try {
@@ -144,19 +151,38 @@ export class PaletteView {
   private item(library: Library, def: ModuleDef): HTMLElement {
     const item = document.createElement('div');
     item.className = 'module';
-    item.textContent = def.name;
+    const thumbnail = document.createElement('canvas');
+    const picture = document.createElement('span');
+    picture.className = 'module-thumbnail';
+    drawThumbnail(thumbnail, def, THUMBNAIL_PX);
+    picture.append(thumbnail);
+    const name = document.createElement('span');
+    name.className = 'module-name';
+    name.textContent = def.name;
     const detail = document.createElement('small');
     detail.textContent = ` ${def.widthUnits}u`;
-    item.append(detail);
+    name.append(detail);
+    item.append(picture, name);
     const ref: ModuleRef = { libraryId: library.id, moduleId: def.id };
     const bundled = this.handlers.isBundled(library);
-    const action = document.createElement('button');
-    action.className = 'module-action';
-    action.textContent = bundled ? 'copy' : 'edit';
-    action.title = bundled ? 'Design a copy of this module in My modules' : 'Open this module in the designer';
-    action.addEventListener('pointerdown', (e) => e.stopPropagation());
-    action.addEventListener('click', () => (bundled ? this.handlers.onCopyModule(library, def) : this.handlers.onEditModule(library, def)));
-    item.append(action);
+    const actions = document.createElement('span');
+    actions.className = 'module-actions';
+    const add = (label: string, title: string, onClick: () => void) => {
+      const action = document.createElement('button');
+      action.className = 'module-action';
+      action.textContent = label;
+      action.title = title;
+      action.addEventListener('pointerdown', (e) => e.stopPropagation());
+      action.addEventListener('click', onClick);
+      actions.append(action);
+    };
+    if (bundled) add('copy', 'Design a copy of this module in My modules', () => this.handlers.onCopyModule(library, def));
+    else {
+      add('edit', 'Open this module in the designer', () => this.handlers.onEditModule(library, def));
+      add('dup', 'Make a copy of this module next to it', () => this.handlers.onDuplicateModule(library, def));
+      add('del', 'Take this module out of the library', () => this.handlers.onDeleteModule(library, def));
+    }
+    item.append(actions);
     item.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       item.setPointerCapture(e.pointerId);

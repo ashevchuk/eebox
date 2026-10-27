@@ -104,7 +104,7 @@ const SKELETON_ROW_PITCH = 130;
 
 export const emptySchematic = (): Schematic => ({ nodes: [], wires: [] });
 
-function nextId(prefix: string, existing: { id: string }[]): string {
+export function nextId(prefix: string, existing: { id: string }[]): string {
   const used = existing
     .map((item) => new RegExp(`^${prefix}(\\d+)$`).exec(item.id))
     .map((m) => (m ? Number(m[1]) : 0));

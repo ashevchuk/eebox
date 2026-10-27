@@ -73,6 +73,7 @@ export class PanelView implements View {
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
         ruler: this.session.ruler.line,
         bare: this.session.bareDrawing,
+        texts: this.session.texts,
         marked: this.session.marksVisible ? markedBy(this.session.findings, 'placements') : new Map(),
       },
       width,

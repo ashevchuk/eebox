@@ -84,6 +84,11 @@ export async function launch({ width = 1516, height = 784 } = {}) {
       throw new Error(`timed out waiting for ${what}`);
     },
     /** `modifiers` is the DevTools bit mask: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift. */
+    /** A real key press, as the browser would get it from the keyboard: it also does what the key does by default. */
+    key: async (key, code, keyCode, text = '') => {
+      await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key, code, windowsVirtualKeyCode: keyCode, text });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
+    },
     mouse: async (type, x, y, modifiers = 0) => send('Input.dispatchMouseEvent', { type, x, y, modifiers, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }),
     media: (media) => send('Emulation.setEmulatedMedia', { media }),
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'),

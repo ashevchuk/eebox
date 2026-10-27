@@ -17,16 +17,43 @@ import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
 import { bomToCsv, buildBom } from './project/bom';
+import { emptyHint } from './ui/help';
+import { openHelpDialog } from './ui/helpDialog';
+import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
+import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
+import { openProjectsDialog } from './ui/projectsDialog';
+import { summaryTable, tablesOf, type Table } from './ui/tables';
+import { applyEdit } from './ui/inspector';
+import { openTablesDialog } from './ui/tablesDialog';
+import { drawHint } from './view/hint';
+import { problemEntries, focusOf, focusOfObjects, objectsOfSelection, type Focus } from './ui/problems';
+import { loadFlag, saveFlag } from './project/flagStorage';
+import { arrangeModules, duplicateRow, type ArrangeHow } from './layout/arrangeModules';
+import { MAX_RAILS } from './layout/limits';
+import { TOUR_DONE_KEY } from './ui/tour';
+import { TourView } from './ui/tourView';
+import { MinimapView } from './ui/minimapView';
+import { overviewOf, type Overview } from './ui/overview';
+import { searchProject } from './ui/search';
+import { SearchView } from './ui/searchView';
+import { ProblemsView } from './ui/problemsView';
+import type { Finding } from './electrical/problems';
 import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { planModuleSwap, planModuleUpdate } from './project/sync';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
+import { loadLengthUnit, saveLengthUnit } from './project/lengthUnitStorage';
+import { EXPORT_TEXT_KEY, SCREEN_TEXT_KEY, loadTextVisibility, saveTextVisibility } from './project/textVisibilityStorage';
+import { makeResizable } from './ui/panelResize';
+import { openExportTextDialog } from './ui/exportTextDialog';
+import { SCREEN_GROUPS, buildTextOptions, setGroups } from './ui/textOptions';
+import type { TextVisibility } from './view/textVisibility';
 import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colourScheme';
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
-import { copyLibrary, newLibrary, uniqueId } from './ui/libraryEditor';
+import { copyLibrary, duplicateModule, newLibrary, removeModule, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
 import { circuitSchedule, ferruleCounts, scheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
 import { LIGHT_THEME, setColourScheme } from './view/theme';
@@ -41,8 +68,14 @@ import { editCableSettings } from './ui/cableSettingsDialog';
 import { chooseColours } from './ui/colourDialog';
 import { initMenus } from './ui/menu';
 import { PaletteView } from './ui/paletteView';
+import { DEFAULT_PRINT_OPTIONS, pageRule, type PrintOptions } from './project/printOptions';
+import { openPrintDialog } from './ui/printDialog';
 import { fillPrintSheet } from './ui/printSheet';
-import { selectedIds, selectedWires } from './ui/selection';
+import { groupSelection, selectedIds, selectedWires } from './ui/selection';
+import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
+import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
+import { SnippetsView } from './ui/snippetsView';
+import { askForText } from './ui/textDialog';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
@@ -97,7 +130,10 @@ function requestRender(): void {
   renderQueued = true;
   requestAnimationFrame(() => {
     renderQueued = false;
-    activeView().draw(ctx, stageWrap.clientWidth, stageWrap.clientHeight, window.devicePixelRatio || 1);
+    const dpr = window.devicePixelRatio || 1;
+    activeView().draw(ctx, stageWrap.clientWidth, stageWrap.clientHeight, dpr);
+    drawHint(ctx, session.marksVisible ? emptyHint(session.project, session.mode) : [], stageWrap.clientWidth, stageWrap.clientHeight, dpr);
+    drawMinimap();
   });
 }
 
@@ -120,6 +156,7 @@ function syncUi(): void {
 session.subscribe(() => {
   syncUi();
   requestRender();
+  problemsView.render();
 });
 
 function resizeCanvas(): void {
@@ -128,6 +165,10 @@ function resizeCanvas(): void {
   canvas.height = Math.round(stageWrap.clientHeight * dpr);
   requestRender();
 }
+
+/** Space left around a thing that is brought to the middle of the drawing. */
+const MINIMAP_KEY = 'eebox:minimap';
+const FOCUS_PADDING_MM = 60;
 
 function fitView(mode: Mode = session.mode): void {
   views[mode].camera.fit(views[mode].fitBounds(), stageWrap.clientWidth, stageWrap.clientHeight);
@@ -211,12 +252,24 @@ window.addEventListener('keydown', (e) => {
   } else if (mod && e.code === 'KeyY') {
     e.preventDefault();
     session.redo();
+  } else if (mod && e.code === 'KeyA' && session.mode === 'schematic') {
+    e.preventDefault();
+    schematicView.selectAll();
   } else if (mod && session.mode === 'panel' && ['KeyC', 'KeyV', 'KeyD', 'KeyA'].includes(e.code)) {
     e.preventDefault();
     if (e.code === 'KeyC') panelView.copySelection();
     else if (e.code === 'KeyV') panelView.paste();
     else if (e.code === 'KeyD') panelView.duplicateSelection();
     else panelView.selectAll();
+  } else if (mod && e.code === 'KeyF') {
+    e.preventDefault();
+    searchView.open();
+  } else if (e.code === 'KeyF' && !mod) {
+    e.preventDefault();
+    zoomToSelection();
+  } else if (e.key === '?' && !mod) {
+    e.preventDefault();
+    openHelpDialog(() => tourView.start());
   } else if (e.code === 'KeyR' && !mod && session.mode === 'panel') {
     session.ruler = { on: !session.ruler.on, line: null };
     session.changed();
@@ -265,6 +318,8 @@ async function newPanel(): Promise<void> {
     return;
   }
   if (!(await confirmDiscard())) return;
+  void keepSnapshot(true);
+  currentProjectId = null;
   session.reset({
     panel: createPanel(enclosure.railLengthsUnits),
     schematic: emptySchematic(),
@@ -281,7 +336,7 @@ const hasWork = (project: Project): boolean =>
 
 async function confirmDiscard(): Promise<boolean> {
   if (!hasWork(session.project)) return true;
-  return confirmDialog('Discard the current panel and schematic?', 'Discard');
+  return confirmDialog('Discard the current panel and schematic? Its last state stays under File > Projects, in Earlier states.', 'Discard');
 }
 
 function describeErrors(source: string, errors: ValidationError[]): string[] {
@@ -291,6 +346,8 @@ function describeErrors(source: string, errors: ValidationError[]): string[] {
 }
 
 function applyLoaded(file: ProjectFile, warnings: string[], source: string): void {
+  void keepSnapshot(true);
+  currentProjectId = null;
   session.load(file);
   fittedModes.clear();
   fitView();
@@ -325,21 +382,269 @@ async function exportPng(): Promise<void> {
   }
 }
 
-function checkProject(): void {
-  const problems = projectWarnings(session.project, session.resolve, session.cableSettings);
-  if (problems.length === 0) {
-    showStatus('Check passed: no problems found.');
-    return;
-  }
-  const shown = problems.slice(0, 6);
-  const hidden = problems.length - shown.length;
-  showStatus([...shown, ...(hidden > 0 ? [`${hidden} more`] : [])].join('\n'), true);
+const projectStore: ProjectStore = typeof indexedDB === 'undefined' ? new MemoryProjectStore() : new IndexedDbProjectStore();
+/** The stored project that the one on the screen was opened from or saved as, until another is loaded. */
+let currentProjectId: string | null = null;
+
+async function saveProjectHere(asNew: boolean): Promise<void> {
+  const stored = await projectStore.list();
+  const id = !asNew && currentProjectId && stored.some((p) => p.id === currentProjectId) ? currentProjectId : newProjectId(stored);
+  const file = session.toFile();
+  await projectStore.put({ id, title: session.project.panel.title ?? '', savedAt: Date.now(), file });
+  currentProjectId = id;
+  showStatus(`Saved in this browser as "${session.project.panel.title || 'Untitled panel'}".`);
 }
 
-function printProject(): void {
+async function openProjectsList(): Promise<void> {
+  await openProjectsDialog({
+    list: () => projectStore.list(),
+    currentId: () => currentProjectId,
+    saveCurrent: () => saveProjectHere(false),
+    saveAsNew: () => saveProjectHere(true),
+    open: async (project) => {
+      const result = parseProjectJson(JSON.stringify(project.file));
+      if (!result.ok) return showStatus(describeErrors(project.title || 'The stored project', result.errors).join('\n'), true);
+      if (!(await confirmDiscard())) return;
+      applyLoaded(result.file, result.warnings, project.title || 'Untitled panel');
+      currentProjectId = project.id;
+    },
+    remove: async (project) => {
+      if (!(await confirmDialog(`Delete "${project.title || 'Untitled panel'}" from this browser?`, 'Delete'))) return false;
+      await projectStore.remove(project.id);
+      if (currentProjectId === project.id) currentProjectId = null;
+      return true;
+    },
+  });
+}
+
+let lastSnapshotJson = '';
+let lastSnapshotAt = 0;
+
+/** Keeps the project on the screen as an earlier state; a failure here must never get in the way of the work. */
+async function keepSnapshot(force: boolean): Promise<void> {
+  if (!hasWork(session.project)) return;
+  const file = session.toFile();
+  const json = JSON.stringify(file);
+  const now = Date.now();
+  if (json === lastSnapshotJson || (!force && now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS)) return;
+  try {
+    const all = await projectStore.list();
+    lastSnapshotJson = json;
+    if (all.some((p) => JSON.stringify(p.file) === json)) return;
+    const snapshot = { id: newSnapshotId(all, now), title: session.project.panel.title ?? '', savedAt: now, file, snapshot: true as const };
+    await projectStore.put(snapshot);
+    lastSnapshotAt = now;
+    for (const old of snapshotsToDrop([...all, snapshot])) await projectStore.remove(old.id);
+  } catch {
+    lastSnapshotJson = '';
+  }
+}
+
+async function backupEverything(): Promise<void> {
+  try {
+    const settings: Record<string, string> = {};
+    for (const key of SETTING_KEYS) {
+      const value = autosaveStore?.getItem(key);
+      if (value !== null && value !== undefined) settings[key] = value;
+    }
+    const workspace = buildWorkspace({
+      savedAt: Date.now(),
+      current: session.toFile(),
+      projects: savedProjects(await projectStore.list()),
+      libraries: (await storage.list()).filter((library) => library.id !== bundledLibraryId),
+      snippets,
+      settings,
+    });
+    downloadBlob(new Blob([workspaceToText(workspace)], { type: 'application/json' }), `eebox-backup-${new Date().toISOString().slice(0, 10)}.json`);
+    showStatus(`Backed up ${workspace.projects.length} project${workspace.projects.length === 1 ? '' : 's'}, ${workspace.libraries.length} librar${workspace.libraries.length === 1 ? 'y' : 'ies'} and the project on the screen.`);
+  } catch (error) {
+    showStatus(`Backup failed: ${(error as Error).message}`, true);
+  }
+}
+
+async function restoreEverything(text: string, name: string): Promise<void> {
+  const parsed = parseWorkspace(text);
+  if (!parsed.ok) return showStatus(describeErrors(name, parsed.errors).join('\n'), true);
+  const { workspace } = parsed;
+  try {
+    const plan = planProjectImport(await projectStore.list(), savedProjects(workspace.projects));
+    const libraries = workspace.libraries.filter((library) => library.id !== bundledLibraryId);
+    const settings = Object.keys(workspace.settings).length;
+    const snippetPlan = planSnippetImport(snippets, workspace.snippets);
+    const lines = [
+      `${plan.added} project${plan.added === 1 ? '' : 's'} added${plan.unchanged > 0 ? ` (${plan.unchanged} already here)` : ''}`,
+      `${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'} put in, replacing any with the same id`,
+      `${snippetPlan.added} snippet${snippetPlan.added === 1 ? '' : 's'} added${snippetPlan.skipped > 0 ? ` (${snippetPlan.skipped} left out: the limit)` : ''}`,
+      `${settings} setting${settings === 1 ? '' : 's'} replaced`,
+      ...(workspace.current ? ['the project on the screen replaced; it is kept under Earlier states'] : []),
+    ];
+    if (!(await confirmDialog(`Restore ${name}?\n\n${lines.join('\n')}.`, 'Restore'))) return;
+    for (const project of plan.put) await projectStore.put(project);
+    for (const library of libraries) await storage.put(library);
+    await refreshLibraries();
+    if (snippetPlan.added > 0) setSnippets([...snippets, ...snippetPlan.put]);
+    if (autosaveStore) {
+      for (const [key, value] of Object.entries(workspace.settings)) autosaveStore.setItem(key, value);
+      applyStoredSettings(autosaveStore);
+    }
+    if (workspace.current) applyLoaded(workspace.current, parsed.warnings, name);
+    else showStatus(`Restored ${name}.`);
+  } catch (error) {
+    showStatus(`Restore failed: ${(error as Error).message}`, true);
+  }
+}
+
+byId('backup-all').addEventListener('click', () => void backupEverything());
+
+let snippets: Snippet[] = [];
+const snippetsView = new SnippetsView(byId('snippets'), {
+  onSaveSelection: () => void saveSelectionAsSnippet(),
+  onInsert: (snippet) => insertSnippetHere(snippet),
+  onRemove: (snippet) => void removeSnippet(snippet),
+});
+snippetsView.render(snippets);
+
+function setSnippets(next: Snippet[]): void {
+  snippets = next;
+  snippetsView.render(snippets);
+  if (autosaveStore && !saveSnippets(autosaveStore, snippets)) showStatus('Snippets are used now but could not be stored.', true);
+}
+
+const SNIPPET_ERRORS = {
+  empty: 'Select the modules to keep first: Shift-click or drag a rubber band over them.',
+  'bad-name': 'A snippet needs a name of 1 to 60 characters.',
+  'too-many': `There can be at most ${MAX_SNIPPETS} snippets; take one away first.`,
+} as const;
+
+async function saveSelectionAsSnippet(): Promise<void> {
+  const { placements, combs } = selectedIds(session.selection);
+  if (placements.length + combs.length === 0) return showStatus(SNIPPET_ERRORS.empty, true);
+  const name = await askForText('Save as a snippet', 'Name', '', 'Save');
+  if (name === null) return;
+  const result = makeSnippet(session.project, session.resolve, { placementIds: placements, combIds: combs }, name, Date.now(), snippets);
+  if (!result.ok) return showStatus(SNIPPET_ERRORS[result.error], true);
+  setSnippets([...snippets, result.snippet]);
+  showStatus(`Snippet "${result.snippet.name}" saved.`);
+}
+
+function insertSnippetHere(snippet: Snippet): void {
+  const { placements } = selectedIds(session.selection);
+  const rail = session.project.panel.placements.find((p) => placements.includes(p.id))?.rail ?? 0;
+  const result = insertSnippet(session.project, session.snapshot, session.resolve, snippet, { rail, slot: 0 });
+  if (!result.ok) return showStatus('There is no room on the rails for this snippet.', true);
+  session.commit(result.project, result.snapshot);
+  session.select(groupSelection(result.placementIds, result.combIds));
+  showStatus(`Snippet "${snippet.name}" put on the panel.`);
+}
+
+async function removeSnippet(snippet: Snippet): Promise<void> {
+  if (await confirmDialog(`Take the snippet "${snippet.name}" away?`, 'Take away')) setSnippets(snippets.filter((s) => s.id !== snippet.id));
+}
+byId<HTMLInputElement>('restore-all').addEventListener('change', async (e) => {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  input.value = '';
+  await restoreEverything(text, file.name);
+});
+
+const problemsView = new ProblemsView(
+  byId('problems'),
+  () => problemEntries(session.findings, projectWarnings(session.project, session.resolve, session.cableSettings)),
+  (finding) => showFinding(finding),
+);
+
+/** Takes the view to what a finding is about, selects it and puts it in the middle of the drawing. */
+/** The largest zoom a jump to a small thing ends at, so a single module is shown among its neighbours. */
+const MAX_FOCUS_SCALE = 2;
+
+/** Takes the view to what a focus is about and selects it; `zoomIn` also zooms to fill the stage with it. */
+function showFocus(focus: Focus, zoomIn: boolean): void {
+  if (focus.mode !== session.mode) setMode(focus.mode);
+  const view = views[focus.mode];
+  const pad = FOCUS_PADDING_MM;
+  const box = { minX: focus.bounds.minX - pad, minY: focus.bounds.minY - pad, maxX: focus.bounds.maxX + pad, maxY: focus.bounds.maxY + pad };
+  const visibleWidth = stageWrap.clientWidth / view.camera.scale;
+  const visibleHeight = stageWrap.clientHeight / view.camera.scale;
+  const bigger = box.maxX - box.minX > visibleWidth * 0.9 || box.maxY - box.minY > visibleHeight * 0.9;
+  if (zoomIn || bigger) {
+    view.camera.fit(box, stageWrap.clientWidth, stageWrap.clientHeight, 0);
+    if (view.camera.scale > MAX_FOCUS_SCALE) view.camera.scale = MAX_FOCUS_SCALE;
+  } else {
+    view.camera.x = (box.minX + box.maxX) / 2;
+    view.camera.y = (box.minY + box.maxY) / 2;
+  }
+  session.select(focus.selection);
+}
+
+function showFinding(finding: Finding): void {
+  const focus = focusOf(session.project, session.resolve, finding, session.mode);
+  if (!focus) return showStatus('That is no longer on the drawing.', true);
+  showFocus(focus, false);
+}
+
+/** Zooms to what is selected in this view; with nothing selected here it shows the whole drawing. */
+function zoomToSelection(): void {
+  const focus = focusOfObjects(session.project, session.resolve, objectsOfSelection(session.selection), session.mode);
+  if (!focus || focus.mode !== session.mode) return fitView();
+  const keep = session.selection;
+  showFocus(focus, true);
+  session.select(keep);
+}
+
+const tourView = new TourView(
+  byId('tour'),
+  (step) => {
+    if (step.mode !== session.mode) setMode(step.mode);
+  },
+  () => {
+    if (autosaveStore) saveFlag(autosaveStore, TOUR_DONE_KEY, true);
+  },
+);
+
+const searchView = new SearchView(
+  byId('search'),
+  (query) => searchProject(session.project, session.resolve, query),
+  (result) => {
+    const focus = focusOfObjects(session.project, session.resolve, result.objects, result.prefer);
+    if (!focus) return showStatus('That is no longer on the drawing.', true);
+    showFocus(focus, true);
+  },
+);
+
+const minimap = new MinimapView(byId<HTMLCanvasElement>('minimap'), () => activeView().camera, () => requestRender());
+let overviewCache: { key: unknown[]; value: Overview } | null = null;
+
+function drawMinimap(): void {
+  if (!minimap.visible) return;
+  const key = [session.project, session.mode, session.libraries, session.snapshot];
+  if (!overviewCache || overviewCache.key.some((part, i) => part !== key[i])) overviewCache = { key, value: overviewOf(session.project, session.resolve, session.mode) };
+  minimap.draw(overviewCache.value, activeView().camera, stageWrap.clientWidth, stageWrap.clientHeight);
+}
+
+function checkProject(): void {
+  problemsView.toggle();
+  if (!problemsView.visible) return;
+  const found = problemEntries(session.findings, projectWarnings(session.project, session.resolve, session.cableSettings));
+  showStatus(found.length === 0 ? 'Check passed: no problems found.' : '');
+}
+
+let printOptions: PrintOptions = DEFAULT_PRINT_OPTIONS;
+
+async function printProject(): Promise<void> {
+  const chosen = await openPrintDialog(printOptions);
+  if (!chosen) return;
+  printOptions = chosen;
   const sheet = byId('print-sheet');
-  fillPrintSheet(sheet, session, views);
-  window.addEventListener('afterprint', () => sheet.replaceChildren(), { once: true });
+  const pageStyle = document.createElement('style');
+  pageStyle.textContent = `@media print { ${pageRule(chosen)} }`;
+  document.head.append(pageStyle);
+  fillPrintSheet(sheet, session, views, chosen);
+  window.addEventListener('afterprint', () => {
+    sheet.replaceChildren();
+    pageStyle.remove();
+  }, { once: true });
   window.print();
 }
 
@@ -483,6 +788,25 @@ function designModuleOf(ref: ModuleRef, placementId?: string): void {
   else showStatus('That module is not in any library, so it cannot be edited.', true);
 }
 
+async function duplicateModuleOf(library: Library, def: ModuleDef): Promise<void> {
+  const copy = duplicateModule(structuredClone(library), def.id);
+  if (!copy) return showStatus('That module is not in the library any more.', true);
+  await storage.put(copy.draft);
+  await refreshLibraries();
+  showStatus(`Made "${def.name} (copy)" next to it in ${library.name}.`);
+}
+
+async function deleteModuleOf(library: Library, def: ModuleDef): Promise<void> {
+  const used = session.project.panel.placements.some((p) => moduleKey(p.module) === moduleKey({ libraryId: library.id, moduleId: def.id }));
+  const next = removeModule(structuredClone(library), def.id);
+  if (!next) return showStatus('That module is not in the library any more.', true);
+  const note = used ? ' The panel uses it and keeps its own copy of its definition.' : '';
+  if (!(await confirmDialog(`Take "${def.name}" out of ${library.name}?${note}`, 'Take out'))) return;
+  await storage.put(next);
+  await refreshLibraries();
+  showStatus(`Took "${def.name}" out of ${library.name}.`);
+}
+
 function openEditor(library: Library, options: EditorOptions): void {
   openLibraryEditor(library, options, {
     libraries: () => session.libraries,
@@ -583,6 +907,8 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
   onEdit: (library) => openEditor(structuredClone(library), { isNew: false, originalId: library.id }),
   onEditModule: (library, def) => designModuleOf({ libraryId: library.id, moduleId: def.id }),
   onCopyModule: (_library, def) => designCopyOf(def),
+  onDuplicateModule: (library, def) => void duplicateModuleOf(library, def),
+  onDeleteModule: (library, def) => void deleteModuleOf(library, def),
   onCopy: (library) => {
     const id = uniqueId(`my-${library.id}`, session.libraries.map((l) => l.id));
     openEditor(copyLibrary(library, id, `My ${library.name}`), { isNew: true, originalId: null });
@@ -592,7 +918,7 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
-const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf);
+const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit));
 
 // Commit a typed value before a click elsewhere changes the selection under it.
 window.addEventListener(
@@ -630,7 +956,7 @@ byId('open-example').addEventListener('click', async () => {
   if (!result.ok) showStatus(describeErrors(example.title, result.errors).join('\n'), true);
   else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, example.title);
 });
-byId('print').addEventListener('click', printProject);
+byId('print').addEventListener('click', () => void printProject());
 byId('new-module').addEventListener('click', designNewModule);
 byId('print-labels').addEventListener('click', printLabels);
 byId('print-full-size').addEventListener('click', printFullSize);
@@ -644,6 +970,41 @@ byId('mode-panel').addEventListener('click', () => setMode('panel'));
 byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
 byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
+byId('zoom-selection').addEventListener('click', zoomToSelection);
+
+const ARRANGE_MESSAGES = {
+  'nothing-to-do': 'Select the modules to line up first, or they already stand so.',
+  'too-few': 'Spreading needs three or more selected modules on a rail.',
+  blocked: 'That would put a module on another one that is not selected.',
+} as const;
+
+function arrangeSelected(how: ArrangeHow): void {
+  const { placements } = selectedIds(session.selection);
+  const result = arrangeModules(session.project.panel, session.widthOf, placements, how);
+  if (!result.ok) return showStatus(ARRANGE_MESSAGES[result.error], true);
+  session.commit({ ...session.project, panel: result.panel });
+}
+
+for (const [id, how] of [['pack-left', 'pack-left'], ['pack-right', 'pack-right'], ['spread-modules', 'spread'], ['row-start', 'row-start'], ['row-end', 'row-end']] as const) {
+  byId(id).addEventListener('click', () => arrangeSelected(how));
+}
+
+byId('duplicate-row').addEventListener('click', () => {
+  const { selection, project } = session;
+  const rail = selection.rail ?? project.panel.placements.find((p) => p.id === (selection.placementId ?? selection.placementIds?.[0]))?.rail;
+  if (rail === undefined) return showStatus('Select a row first: click its rail, or a module on it.', true);
+  const result = duplicateRow(project.panel, rail);
+  if (!result.ok) return showStatus(result.error === 'invalid-value' ? `A panel has at most ${MAX_RAILS} rows.` : 'That row cannot be copied.', true);
+  session.commit({ ...project, panel: result.panel });
+  showStatus(`Row ${rail + 1} copied. Nodes > Sync modules puts the copies on the schematic.`);
+});
+byId('find').addEventListener('click', () => searchView.open());
+byId<HTMLInputElement>('view-minimap').addEventListener('change', (e) => {
+  const shown = (e.target as HTMLInputElement).checked;
+  minimap.visible = shown;
+  if (autosaveStore) saveFlag(autosaveStore, MINIMAP_KEY, shown);
+  requestRender();
+});
 byId('ruler').addEventListener('click', () => {
   session.ruler = { on: !session.ruler.on, line: null };
   session.changed();
@@ -668,6 +1029,63 @@ for (const preset of ['source1', 'source3', 'sourcePen1', 'sourcePen', 'load1', 
   });
 }
 byId('check').addEventListener('click', checkProject);
+byId('help').addEventListener('click', () => openHelpDialog(() => tourView.start()));
+byId('open-projects').addEventListener('click', () => void openProjectsList());
+byId('export-text').addEventListener('click', async () => {
+  const chosen = await openExportTextDialog(session.exportTexts);
+  if (!chosen) return;
+  session.exportTexts = chosen;
+  if (autosaveStore) saveTextVisibility(autosaveStore, EXPORT_TEXT_KEY, chosen);
+});
+
+function setScreenTexts(texts: TextVisibility): void {
+  session.texts = texts;
+  if (autosaveStore) saveTextVisibility(autosaveStore, SCREEN_TEXT_KEY, texts);
+  buildTextOptions(byId('view-text-options'), SCREEN_GROUPS, texts, setScreenTexts);
+  session.changed();
+}
+byId('show-all-text').addEventListener('click', () => setScreenTexts(setGroups(session.texts, SCREEN_GROUPS, true)));
+byId('hide-all-text').addEventListener('click', () => setScreenTexts(setGroups(session.texts, SCREEN_GROUPS, false)));
+buildTextOptions(byId('view-text-options'), SCREEN_GROUPS, session.texts, setScreenTexts);
+const currentTables = () => tablesOf(session.project, session.resolve, session.cableSettings);
+
+/** A typed value in a cell is an edit in the inspector of the object the row stands for. */
+function editTableCell(table: Table, row: number, column: number, raw: string): string | null {
+  const selection = table.selections?.[row];
+  const key = table.columns[column]?.edit;
+  if (!selection || !key) return 'That cell cannot be edited.';
+  const result = applyEdit(
+    {
+      project: session.project,
+      selection,
+      mode: 'schematic',
+      resolve: session.resolve,
+      snapshot: session.snapshot,
+      fromLibraries: session.libraryResolve,
+      cableSettings: session.cableSettings,
+      findings: session.findings,
+      lengthUnit: session.lengthUnit,
+    },
+    key,
+    raw,
+  );
+  if (!result.ok) return result.message || 'That value is not accepted.';
+  session.commit(result.project, result.snapshot);
+  return null;
+}
+
+byId('view-checks').addEventListener('click', () => {
+  const checks = () => [summaryTable(session.project, session.resolve, session.cableSettings)];
+  openTablesDialog(checks(), { edit: () => 'That cell cannot be edited.', tables: checks });
+});
+byId('view-tables').addEventListener('click', () => openTablesDialog(currentTables(), { edit: editTableCell, tables: currentTables }));
+byId('arrange-nodes').addEventListener('click', () => {
+  schematicView.arrangeAll();
+  fitView('schematic');
+});
+for (const how of ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const) byId(`align-${how}`).addEventListener('click', () => schematicView.alignSelected(how));
+byId('distribute-horizontally').addEventListener('click', () => schematicView.distributeSelected('horizontal'));
+byId('distribute-vertically').addEventListener('click', () => schematicView.distributeSelected('vertical'));
 byId('bundle-mode').addEventListener('click', () => {
   schematicView.bundleMode = !schematicView.bundleMode;
   syncUi();
@@ -719,6 +1137,10 @@ for (const name of ['sidebar', 'inspector'] as const) {
 }
 showPanels();
 
+const widthOf = (name: 'sidebar' | 'inspector') => (document.body.classList.contains(`hide-${name}`) || (name === 'sidebar' && session.mode === 'schematic') ? 0 : byId(name).getBoundingClientRect().width);
+makeResizable({ handle: byId('sidebar-resizer'), panel: byId('sidebar'), side: 'left', cssVariable: '--sidebar-width', storageKey: 'eebox:width-sidebar', defaultPx: 240, otherWidth: () => widthOf('inspector') });
+makeResizable({ handle: byId('inspector-resizer'), panel: byId('inspector'), side: 'right', cssVariable: '--inspector-width', storageKey: 'eebox:width-inspector', defaultPx: 270, otherWidth: () => widthOf('sidebar') });
+
 const autosaveStore: KeyValueStore | null = (() => {
   try {
     return window.localStorage;
@@ -738,6 +1160,7 @@ function startAutosave(store: KeyValueStore): void {
     timer = window.setTimeout(() => {
       lastSaved = session.revision;
       if (!saveAutosave(store, session.toFile())) showStatus('Autosave failed: browser storage is unavailable or full.', true);
+      void keepSnapshot(false);
     }, AUTOSAVE_DELAY_MS);
   });
 }
@@ -765,17 +1188,32 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
   await newPanel();
 }
 
+/** Takes the settings kept in the browser into use; also after a backup has put new ones there. */
+function applyStoredSettings(store: KeyValueStore): void {
+  const { settings, problem } = loadCableSettings(store);
+  session.cableSettings = settings;
+  if (problem) showStatus(problem, true);
+  session.lengthUnit = loadLengthUnit(store);
+  session.exportTexts = loadTextVisibility(store, EXPORT_TEXT_KEY);
+  session.texts = loadTextVisibility(store, SCREEN_TEXT_KEY);
+  buildTextOptions(byId('view-text-options'), SCREEN_GROUPS, session.texts, setScreenTexts);
+  const stored = loadSnippets(store);
+  snippets = stored.snippets;
+  snippetsView.render(snippets);
+  if (stored.problem) showStatus(stored.problem, true);
+  const minimapShown = loadFlag(store, MINIMAP_KEY, true);
+  minimap.visible = minimapShown;
+  byId<HTMLInputElement>('view-minimap').checked = minimapShown;
+  const colours = loadColourChoice(store);
+  colourChoice = colours.choice;
+  setColourScheme(coloursOf(colours.choice));
+  if (colours.problem) showStatus(colours.problem, true);
+  session.changed();
+}
+
 async function init(): Promise<void> {
   const stored = autosaveStore ? loadAutosave(autosaveStore) : null;
-  if (autosaveStore) {
-    const { settings, problem } = loadCableSettings(autosaveStore);
-    session.cableSettings = settings;
-    if (problem) showStatus(problem, true);
-    const colours = loadColourChoice(autosaveStore);
-    colourChoice = colours.choice;
-    setColourScheme(coloursOf(colours.choice));
-    if (colours.problem) showStatus(colours.problem, true);
-  }
+  if (autosaveStore) applyStoredSettings(autosaveStore);
   try {
     await seedBundledLibrary(storage, genericIecText);
     await refreshLibraries();
@@ -786,6 +1224,7 @@ async function init(): Promise<void> {
   const fontProblem = await loadFonts();
   if (fontProblem) showStatus(fontProblem, true);
   await restoreInitialProject(stored);
+  if (autosaveStore && !loadFlag(autosaveStore, TOUR_DONE_KEY, false) && !hasWork(session.project)) tourView.start();
   if (autosaveStore) startAutosave(autosaveStore);
 }
 

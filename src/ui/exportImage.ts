@@ -27,11 +27,13 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
   const savedRuler = session.ruler;
   const savedHover = session.hoverWireId;
   const savedMarks = session.marksVisible;
+  const savedTexts = session.texts;
   camera.fit(area ?? view.fitBounds(), width, height, 0);
   session.selection = {};
   session.ruler = { on: false, line: null };
   session.hoverWireId = null;
   session.marksVisible = false;
+  session.texts = session.exportTexts;
   try {
     view.draw(ctx, width, height, 1);
   } finally {
@@ -40,6 +42,7 @@ function drawFramed(view: View, session: Session, ctx: CanvasRenderingContext2D,
     session.ruler = savedRuler;
     session.hoverWireId = savedHover;
     session.marksVisible = savedMarks;
+    session.texts = savedTexts;
   }
 }
 

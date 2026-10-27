@@ -102,6 +102,11 @@ export function duplicateModule(draft: Library, id: string): { draft: Library; i
   return { draft: { ...draft, modules }, id: copyId };
 }
 
+/** The library without a module; `null` when there is no such module. */
+export function removeModule(draft: Library, id: string): Library | null {
+  return draft.modules.some((m) => m.id === id) ? { ...draft, modules: draft.modules.filter((m) => m.id !== id) } : null;
+}
+
 export function addEnclosure(draft: Library): { draft: Library; id: string } {
   const id = uniqueId('new-enclosure', draft.enclosures.map((e) => e.id));
   const enclosure: EnclosureDef = { id, name: 'New enclosure', railLengthsUnits: [12] };

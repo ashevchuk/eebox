@@ -194,6 +194,27 @@ export function boundsWithRoutes(bounds: Bounds, routes: Map<string, Point[]>): 
   };
 }
 
+/** Height of the box behind a wire label, and the padding it leaves around the text. */
+export const WIRE_LABEL_HEIGHT = 14;
+export const WIRE_LABEL_PADDING = 8;
+const WIRE_LABEL_CHARACTER_MM = 5.5;
+
+/** The box of a wire label centred at `at`; the width is an upper estimate, since no canvas measures it here. */
+export function wireLabelBox(text: string, at: Point): Bounds {
+  const half = (text.length * WIRE_LABEL_CHARACTER_MM + WIRE_LABEL_PADDING) / 2;
+  return { minX: at.x - half, minY: at.y - WIRE_LABEL_HEIGHT / 2, maxX: at.x + half, maxY: at.y + WIRE_LABEL_HEIGHT / 2 };
+}
+
+/** The bounds, grown to take in the given label boxes. */
+export function boundsWithBoxes(bounds: Bounds, boxes: readonly Bounds[]): Bounds {
+  return {
+    minX: Math.min(bounds.minX, ...boxes.map((b) => b.minX)),
+    minY: Math.min(bounds.minY, ...boxes.map((b) => b.minY)),
+    maxX: Math.max(bounds.maxX, ...boxes.map((b) => b.maxX)),
+    maxY: Math.max(bounds.maxY, ...boxes.map((b) => b.maxY)),
+  };
+}
+
 export function schematicBounds(layout: Layout): Bounds {
   if (layout.size === 0) return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
   const rects = [...layout.values()].map((n) => n.rect);

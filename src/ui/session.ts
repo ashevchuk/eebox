@@ -10,12 +10,16 @@ import { findFindings, type Finding } from '../electrical/problems';
 import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
 import { History } from '../view/history';
+import type { LengthUnit } from '../project/lengthUnitStorage';
+import { ALL_TEXT, type TextVisibility } from '../view/textVisibility';
 
 export type Mode = 'panel' | 'schematic';
 
 export interface Selection {
   placementId?: string;
   nodeId?: string;
+  /** Set instead of `nodeId` when several nodes of the schematic are selected together. */
+  nodeIds?: string[];
   wireId?: string;
   /** Set instead of `wireId` when several wires are selected together. */
   wireIds?: string[];
@@ -44,6 +48,12 @@ export class Session {
   libraries: Library[] = [];
   /** The cable table and voltage drop norms; the user can replace them. */
   cableSettings: CableSettings = DEFAULT_CABLE_SETTINGS;
+  /** How the inspector shows and takes positions and widths; the project keeps module units. */
+  lengthUnit: LengthUnit = 'units';
+  /** The kinds of text the drawings show on the screen. */
+  texts: TextVisibility = ALL_TEXT;
+  /** The kinds of text that PNG, SVG and print show, whatever the screen shows. */
+  exportTexts: TextVisibility = ALL_TEXT;
   mode: Mode = 'panel';
   selection: Selection = {};
   /** Whether the drawings mark the faults and the advice; off while exporting, so a drawing for others is not full of red. */

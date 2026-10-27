@@ -12,6 +12,7 @@ import {
   type PathCommand,
 } from './art';
 import { ANCHOR_ATTRIBUTE, BASELINE_BELOW_MIDDLE, PERIOD_ATTRIBUTE, isAnchor, isPeriod } from './svgExport';
+import { ellipseCommands, rectCommands } from './pathShapes';
 import { validateArt, type ValidationError } from './validate';
 import { parseXml, type XmlElement } from './xml';
 
@@ -340,8 +341,6 @@ export function parsePathData(d: string): PathCommand[] | undefined {
 
 const SKIPPED_SILENTLY = new Set(['title', 'desc', 'metadata', 'namedview', 'defs']);
 const NOT_DRAWN = new Set(['image', 'use', 'style', 'script', 'foreignObject', 'symbol', 'clipPath', 'mask', 'pattern', 'marker', 'filter', 'switch', 'a']);
-const ROUND_CORNER = 0.5522847498;
-
 interface Context {
   matrix: Matrix;
   style: Style;
@@ -426,36 +425,8 @@ export function importSvg(text: string, options: SvgImportOptions): SvgImport {
     shapes.push(finish({ kind: 'path', d: formatPath(mapped), ...paints(ctx.style, lengthScale(ctx.matrix)) }));
   }
 
-  const rectPath = (x: number, y: number, w: number, h: number, rx: number, ry: number): PathCommand[] => {
-    if (rx <= 0 || ry <= 0) return [{ op: 'M', x, y }, { op: 'L', x: x + w, y }, { op: 'L', x: x + w, y: y + h }, { op: 'L', x, y: y + h }, { op: 'Z' }];
-    const kx = rx * ROUND_CORNER;
-    const ky = ry * ROUND_CORNER;
-    return [
-      { op: 'M', x: x + rx, y },
-      { op: 'L', x: x + w - rx, y },
-      { op: 'C', x1: x + w - rx + kx, y1: y, x2: x + w, y2: y + ry - ky, x: x + w, y: y + ry },
-      { op: 'L', x: x + w, y: y + h - ry },
-      { op: 'C', x1: x + w, y1: y + h - ry + ky, x2: x + w - rx + kx, y2: y + h, x: x + w - rx, y: y + h },
-      { op: 'L', x: x + rx, y: y + h },
-      { op: 'C', x1: x + rx - kx, y1: y + h, x2: x, y2: y + h - ry + ky, x, y: y + h - ry },
-      { op: 'L', x, y: y + ry },
-      { op: 'C', x1: x, y1: y + ry - ky, x2: x + rx - kx, y2: y, x: x + rx, y },
-      { op: 'Z' },
-    ];
-  };
-
-  const ellipsePath = (cx: number, cy: number, rx: number, ry: number): PathCommand[] => {
-    const kx = rx * ROUND_CORNER;
-    const ky = ry * ROUND_CORNER;
-    return [
-      { op: 'M', x: cx + rx, y: cy },
-      { op: 'C', x1: cx + rx, y1: cy + ky, x2: cx + kx, y2: cy + ry, x: cx, y: cy + ry },
-      { op: 'C', x1: cx - kx, y1: cy + ry, x2: cx - rx, y2: cy + ky, x: cx - rx, y: cy },
-      { op: 'C', x1: cx - rx, y1: cy - ky, x2: cx - kx, y2: cy - ry, x: cx, y: cy - ry },
-      { op: 'C', x1: cx + kx, y1: cy - ry, x2: cx + rx, y2: cy - ky, x: cx + rx, y: cy },
-      { op: 'Z' },
-    ];
-  };
+  const rectPath = rectCommands;
+  const ellipsePath = ellipseCommands;
 
   function draw(element: XmlElement, parent: Context): void {
     if (SKIPPED_SILENTLY.has(element.name)) return;

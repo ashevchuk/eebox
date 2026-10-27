@@ -8,7 +8,8 @@ import { MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from 
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
-import { FRAME_PADDING, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
+import { ALL_TEXT, type TextVisibility } from './textVisibility';
+import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
 
 export interface Ghost {
   module: ModuleDef;
@@ -38,6 +39,8 @@ export interface Scene {
   ruler?: RulerLine | null;
   /** Draws only the rails and what stands on them, without the frame and its title, as a full-size print needs. */
   bare?: boolean;
+  /** The kinds of text to draw; all of them when absent. */
+  texts?: TextVisibility;
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -83,7 +86,7 @@ const NAME_BOTTOM_MM = 20;
 const NAME_MAX_LINES = 3;
 const NAME_LINE_SPACING_MM = 7.5;
 
-function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void {
+function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts: TextVisibility): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(r.x, r.y, r.width, r.height);
@@ -92,11 +95,11 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const rating = def.ratedCurrentA === undefined ? '' : `${def.curve ?? ''}${def.ratedCurrentA}`;
-  if (rating && r.width >= MIN_RATING_WIDTH_MM) {
+  if (texts.ratings && rating && r.width >= MIN_RATING_WIDTH_MM) {
     ctx.font = `bold 8px ${FONT_FAMILY}`;
     ctx.fillText(rating, r.x + r.width / 2, r.y + 22);
   }
-  if (r.width >= MIN_NAME_WIDTH_MM) {
+  if (texts.moduleNames && r.width >= MIN_NAME_WIDTH_MM) {
     const room = r.height - NAME_TOP_MM - NAME_BOTTOM_MM;
     ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
     ctx.rotate(-Math.PI / 2);
@@ -141,15 +144,15 @@ function drawUpwardsLabel(
   ctx.restore();
 }
 
-function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene): void {
+function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisibility): void {
   const { panel } = scene;
   panel.railLabels.forEach((label, rail) => {
-    if (!label) return;
+    if (!label || !texts.rowLabels) return;
     const r = railRect(panel, rail);
     drawUpwardsLabel(ctx, label, FRAME_PADDING / 2, r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
   });
   for (const placement of panel.placements) {
-    if (!placement.label) continue;
+    if (!placement.label || !texts.moduleLabels) continue;
     const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
     drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail), 'right', theme().label);
   }
@@ -158,7 +161,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene): void {
   ctx.textAlign = 'left';
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);
-    if (!comb.label || !def?.comb) continue;
+    if (!comb.label || !texts.combLabels || !def?.comb) continue;
     const r = combRect(panel, comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
     ctx.textBaseline = def.comb.side === 'top' ? 'bottom' : 'top';
     ctx.fillText(fitText(ctx, comb.label, r.width), r.x + 2, def.comb.side === 'top' ? r.y - 3 : r.y + r.height + 3);
@@ -190,7 +193,11 @@ function drawComb(
   color: string,
 ): void {
   if (!def.comb) return;
-  const r = combRect(panel, rail, slot, widthUnits, def.comb.side);
+  drawCombStrip(ctx, def, combRect(panel, rail, slot, widthUnits, def.comb.side), widthUnits, color);
+}
+
+function drawCombStrip(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, color: string): void {
+  if (!def.comb) return;
   fillRect(ctx, r, color);
   ctx.strokeStyle = '#78350f';
   ctx.lineWidth = 0.6;
@@ -208,20 +215,46 @@ function drawModule(
   rail: number,
   slot: number,
   widthUnits: number,
+  texts: TextVisibility,
 ): void {
   const r = moduleRect(panel, rail, slot, widthUnits);
   if (!def) {
     fillRect(ctx, r, COLORS.missing);
     return;
   }
+  drawFace(ctx, def, r, widthUnits, true, texts);
+}
+
+/** The face of a module in a box: body, band, art, outline, and the name and terminals unless `detailed` is off. */
+function drawFace(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, detailed: boolean, texts: TextVisibility = ALL_TEXT): void {
   fillRect(ctx, r, COLORS.body);
   fillRect(ctx, { ...r, height: 14 }, LEVER_COLORS[def.kind]);
-  if (def.art) drawArt(ctx, def.art, r, def.widthUnits, widthUnits);
+  if (def.art) drawArt(ctx, def.art, r, def.widthUnits, widthUnits, texts.faceText);
   ctx.strokeStyle = '#6b7280';
   ctx.lineWidth = 0.6;
   ctx.strokeRect(r.x, r.y, r.width, r.height);
-  drawLabel(ctx, def, r);
+  if (detailed) drawLabel(ctx, def, r, texts);
   drawTerminals(ctx, def, r, widthUnits);
+}
+
+/** A picture of a module for a list, as large as fits in a square of `sizePx`; the name is left out, it is too small to read. */
+export function drawThumbnail(canvas: HTMLCanvasElement, def: ModuleDef, sizePx: number): void {
+  const widthMm = def.widthUnits * MODULE_UNIT_MM;
+  const heightMm = def.comb ? COMB_HEIGHT : MODULE_HEIGHT;
+  const scale = Math.min(sizePx / widthMm, sizePx / heightMm);
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(widthMm * scale));
+  const height = Math.max(1, Math.round(heightMm * scale));
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(scale * ratio, 0, 0, scale * ratio, 0, 0);
+  const box = { x: 0, y: 0, width: widthMm, height: heightMm };
+  if (def.comb) drawCombStrip(ctx, def, box, def.widthUnits, LEVER_COLORS.comb);
+  else drawFace(ctx, def, box, def.widthUnits, false);
 }
 
 const RULER_COLOR = '#f5c518';
@@ -279,12 +312,13 @@ export function render(
 
   const { panel } = scene;
   const frame = frameRect(panel);
+  const texts = scene.texts ?? ALL_TEXT;
   if (!scene.bare) {
     fillRect(ctx, frame, theme().frameFill);
     ctx.strokeStyle = theme().frame;
     ctx.lineWidth = 2;
     ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
-    if (panel.title) {
+    if (panel.title && texts.title) {
       ctx.font = `bold 14px ${FONT_FAMILY}`;
       ctx.fillStyle = theme().label;
       ctx.textAlign = 'left';
@@ -312,7 +346,7 @@ export function render(
   const movingId = (kind: 'placement' | 'comb') => (scene.moving?.kind === kind ? scene.moving.id : null);
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
-    drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement));
+    drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement), texts);
     const mark = scene.marked?.get(placement.id);
     if (mark) {
       const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
@@ -340,7 +374,7 @@ export function render(
     }
   }
   ctx.globalAlpha = 1;
-  drawLabels(ctx, scene);
+  drawLabels(ctx, scene, texts);
 
   if (scene.ghost) {
     const { module, widthUnits, rail, slot, valid } = scene.ghost;

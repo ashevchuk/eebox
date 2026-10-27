@@ -1,6 +1,7 @@
 import { FieldsView } from './fieldsView';
 import type { ModuleRef } from '../layout/placement';
-import { applyAction, applyEdit, EDIT_MODULE_ACTION, inspect, type InspectContext } from './inspector';
+import { applyAction, applyEdit, EDIT_MODULE_ACTION, LENGTH_UNIT_FIELD, inspect, type InspectContext } from './inspector';
+import type { LengthUnit } from '../project/lengthUnitStorage';
 import type { Session } from './session';
 
 /** Shows what `inspect` describes for the selection and sends every edit through `applyEdit`. */
@@ -13,6 +14,8 @@ export class InspectorView {
     private readonly confirm: (message: string) => Promise<boolean>,
     /** Opens the designer on the module of a placed copy; the model cannot do that by itself. */
     private readonly onEditModule: (module: ModuleRef, placementId: string) => void = () => {},
+    /** Called when the unit of lengths is picked, so the choice can be kept. */
+    private readonly onLengthUnit: (unit: LengthUnit) => void = () => {},
   ) {
     this.fields = new FieldsView(container, {
       onEdit: (key, raw) => void this.edit(key, raw),
@@ -29,7 +32,7 @@ export class InspectorView {
 
   private context(): InspectContext {
     const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = this.session;
-    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings, findings: this.session.findings };
+    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings, findings: this.session.findings, lengthUnit: this.session.lengthUnit };
   }
 
   /** `force` also rewrites the field being typed in, to revert an edit that was refused. */
@@ -64,6 +67,12 @@ export class InspectorView {
   }
 
   private async edit(key: string, raw: string | string[]): Promise<void> {
+    if (key === LENGTH_UNIT_FIELD) {
+      this.session.lengthUnit = raw === 'mm' ? 'mm' : 'units';
+      this.onLengthUnit(this.session.lengthUnit);
+      this.refresh(true);
+      return;
+    }
     let result = applyEdit(this.context(), key, raw);
     if (!result.ok && result.needsConfirm) {
       if (!(await this.confirm(result.needsConfirm.message))) {

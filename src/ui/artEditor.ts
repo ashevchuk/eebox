@@ -13,6 +13,7 @@ import {
   type ArtShape,
   type PlacedFrom,
 } from '../library/art';
+import { ellipseCommands, rectCommands } from '../library/pathShapes';
 import type { Library, ModuleDef } from '../library/types';
 import { validateArt, type ValidationError } from '../library/validate';
 import type { InspectorField } from './inspector';
@@ -284,13 +285,22 @@ export function polylineThrough(points: Array<[number, number]>): ArtShape | und
   return points.length >= 2 && points.length <= MAX_ART_POINTS ? { kind: 'polyline', points, stroke: DEFAULT_INK, strokeWidth: 0.5 } : undefined;
 }
 
-/* Turning and flipping */
+/* Turning, flipping, aligning */
 
 const tidy = (value: number): number => Math.round(value * 1000) / 1000;
 
 export type Flip = 'horizontal' | 'vertical';
 
-/** Takes every point of a shape through a function; a rectangle or an ellipse is not made of points and is handled by the callers. */
+/** The middle of the box a group of shapes covers. */
+export function groupCentre(shapes: readonly ArtShape[]): Point {
+  const boxes = shapes.map(boundsOf);
+  return {
+    x: (Math.min(...boxes.map((b) => b.x1)) + Math.max(...boxes.map((b) => b.x2))) / 2,
+    y: (Math.min(...boxes.map((b) => b.y1)) + Math.max(...boxes.map((b) => b.y2))) / 2,
+  };
+}
+
+/** Takes every point of a shape through a function; a rectangle, an ellipse or a text is a position and sizes, not points, and is handled by the callers. */
 function throughPoints(shape: ArtShape, map: (x: number, y: number) => [number, number]): ArtShape {
   const round = (x: number, y: number): [number, number] => {
     const [mx, my] = map(x, y);
@@ -313,34 +323,137 @@ function throughPoints(shape: ArtShape, map: (x: number, y: number) => [number, 
   }
 }
 
-/** The shape turned clockwise by quarter turns about the middle of its box; a text is turned about its own point. */
-export function turnShape(shape: ArtShape, quarters: 1 | 2 | 3): ArtShape {
+/** The shape turned clockwise by quarter turns about a point, which is the middle of its own box when none is given (a text then stays where it is). */
+export function turnShape(shape: ArtShape, quarters: 1 | 2 | 3, about?: Point): ArtShape {
+  const c = about ?? (shape.kind === 'text' ? { x: shape.x, y: shape.y } : groupCentre([shape]));
+  const turn = (x: number, y: number): [number, number] =>
+    quarters === 1 ? [c.x - (y - c.y), c.y + (x - c.x)] : quarters === 2 ? [2 * c.x - x, 2 * c.y - y] : [c.x + (y - c.y), c.y - (x - c.x)];
   if (shape.kind === 'text') {
-    const total = (((shape.rotation ?? 0) + 90 * quarters) % 360 + 360) % 360;
+    const total = ((((shape.rotation ?? 0) + 90 * quarters) % 360) + 360) % 360;
     const { rotation: _previous, ...rest } = shape;
-    return total === 0 ? rest : { ...rest, rotation: total > 180 ? total - 360 : total };
+    const [x, y] = turn(shape.x, shape.y);
+    const moved = { ...rest, x: tidy(x), y: tidy(y) };
+    return total === 0 ? moved : { ...moved, rotation: total > 180 ? total - 360 : total };
   }
-  const box = boundsOf(shape);
-  const [cx, cy] = [(box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2];
-  if (shape.kind === 'rect') {
-    return quarters === 2 ? shape : { ...shape, x: tidy(cx - shape.height / 2), y: tidy(cy - shape.width / 2), width: shape.height, height: shape.width };
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+    if (quarters === 2 && about === undefined) return shape;
+    const own = groupCentre([shape]);
+    const [cx, cy] = turn(own.x, own.y);
+    const swap = quarters !== 2;
+    if (shape.kind === 'rect') {
+      const [w, h] = swap ? [shape.height, shape.width] : [shape.width, shape.height];
+      return { ...shape, x: tidy(cx - w / 2), y: tidy(cy - h / 2), width: w, height: h };
+    }
+    return { ...shape, cx: tidy(cx), cy: tidy(cy), ...(swap ? { rx: shape.ry, ry: shape.rx } : {}) };
   }
-  if (shape.kind === 'ellipse') return quarters === 2 ? shape : { ...shape, rx: shape.ry, ry: shape.rx };
-  return throughPoints(shape, (x, y) => {
-    const [dx, dy] = [x - cx, y - cy];
-    if (quarters === 1) return [cx - dy, cy + dx];
-    if (quarters === 2) return [cx - dx, cy - dy];
-    return [cx + dy, cy - dx];
+  return throughPoints(shape, turn);
+}
+
+/**
+ * The shape reflected about the middle of its box, or about a point; nothing when it cannot be: a lone
+ * text is turned, not mirrored. In a group a text keeps its letters and takes only its place.
+ */
+export function flipShape(shape: ArtShape, flip: Flip, about?: Point): ArtShape | undefined {
+  if (shape.kind === 'text' && about === undefined) return undefined;
+  const c = about ?? groupCentre([shape]);
+  const reflect = (x: number, y: number): [number, number] => (flip === 'horizontal' ? [2 * c.x - x, y] : [x, 2 * c.y - y]);
+  if (shape.kind === 'text') {
+    const [x, y] = reflect(shape.x, shape.y);
+    return { ...shape, x: tidy(x), y: tidy(y) };
+  }
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+    if (about === undefined) return shape;
+    const own = groupCentre([shape]);
+    const [cx, cy] = reflect(own.x, own.y);
+    return shape.kind === 'rect' ? { ...shape, x: tidy(cx - shape.width / 2), y: tidy(cy - shape.height / 2) } : { ...shape, cx: tidy(cx), cy: tidy(cy) };
+  }
+  return throughPoints(shape, reflect);
+}
+
+/** A group turned together about the middle of the box it covers. */
+export function turnShapes(shapes: readonly ArtShape[], quarters: 1 | 2 | 3): ArtShape[] {
+  const about = groupCentre(shapes);
+  return shapes.map((shape) => turnShape(shape, quarters, about));
+}
+
+/** A group reflected together about the middle of the box it covers. */
+export function flipShapes(shapes: readonly ArtShape[], flip: Flip): ArtShape[] {
+  const about = groupCentre(shapes);
+  return shapes.map((shape) => flipShape(shape, flip, about) ?? shape);
+}
+
+/** The shape turned by any angle, clockwise, about a point or the middle of its box; a rectangle or an ellipse becomes the path of its outline to be turned. */
+export function rotateShapeBy(shape: ArtShape, degrees: number, about?: Point): ArtShape {
+  if (degrees % 360 === 0) return shape;
+  const c = about ?? (shape.kind === 'text' ? { x: shape.x, y: shape.y } : groupCentre([shape]));
+  const rotate = (x: number, y: number): [number, number] => turnAbout(x, y, c.x, c.y, degrees);
+  if (shape.kind === 'text') {
+    const total = ((((shape.rotation ?? 0) + degrees) % 360) + 360) % 360;
+    const { rotation: _previous, ...rest } = shape;
+    const [x, y] = rotate(shape.x, shape.y);
+    const moved = { ...rest, x: tidy(x), y: tidy(y) };
+    return Math.abs(total) < 1e-9 ? moved : { ...moved, rotation: tidy(total > 180 ? total - 360 : total) };
+  }
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+    const commands = shape.kind === 'rect' ? rectCommands(shape.x, shape.y, shape.width, shape.height) : ellipseCommands(shape.cx, shape.cy, shape.rx, shape.ry);
+    const geometry = ['kind', 'x', 'y', 'width', 'height', 'cx', 'cy', 'rx', 'ry'];
+    const base = Object.fromEntries(Object.entries(shape).filter(([key]) => !geometry.includes(key)));
+    return { ...base, kind: 'path', d: formatPath(mapPathPoints(commands, (x, y) => rotate(x, y).map(tidy) as [number, number])) } as ArtShape;
+  }
+  return throughPoints(shape, rotate);
+}
+
+export type Align = 'left' | 'centre' | 'right' | 'top' | 'middle' | 'bottom';
+
+/** Shapes lined up on an edge or a middle of the box they cover, or of a box that is given, such as the face. */
+export function alignShapes(shapes: readonly ArtShape[], how: Align, within?: Box): ArtShape[] {
+  const boxes = shapes.map(boundsOf);
+  const area: Box = within ?? {
+    x1: Math.min(...boxes.map((b) => b.x1)),
+    y1: Math.min(...boxes.map((b) => b.y1)),
+    x2: Math.max(...boxes.map((b) => b.x2)),
+    y2: Math.max(...boxes.map((b) => b.y2)),
+  };
+  return shapes.map((shape, i) => {
+    const b = boxes[i]!;
+    const dx = how === 'left' ? area.x1 - b.x1 : how === 'right' ? area.x2 - b.x2 : how === 'centre' ? (area.x1 + area.x2) / 2 - (b.x1 + b.x2) / 2 : 0;
+    const dy = how === 'top' ? area.y1 - b.y1 : how === 'bottom' ? area.y2 - b.y2 : how === 'middle' ? (area.y1 + area.y2) / 2 - (b.y1 + b.y2) / 2 : 0;
+    return dx === 0 && dy === 0 ? shape : translate(shape, tidy(dx), tidy(dy));
   });
 }
 
-/** The shape reflected about the middle of its box, or nothing when it cannot be: a text is turned, not mirrored. */
-export function flipShape(shape: ArtShape, flip: Flip): ArtShape | undefined {
-  if (shape.kind === 'text') return undefined;
-  if (shape.kind === 'rect' || shape.kind === 'ellipse') return shape;
-  const box = boundsOf(shape);
-  const [cx, cy] = [(box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2];
-  return throughPoints(shape, (x, y) => (flip === 'horizontal' ? [2 * cx - x, y] : [x, 2 * cy - y]));
+/** Three shapes or more spread so that the gaps between their boxes are equal, the outer two staying where they are. */
+export function distributeShapes(shapes: readonly ArtShape[], axis: Flip): ArtShape[] {
+  if (shapes.length < 3) return [...shapes];
+  const horizontal = axis === 'horizontal';
+  const span = (s: ArtShape): [number, number] => {
+    const b = boundsOf(s);
+    return horizontal ? [b.x1, b.x2] : [b.y1, b.y2];
+  };
+  const order = shapes.map((_, i) => i).sort((a, b) => span(shapes[a]!)[0] + span(shapes[a]!)[1] - (span(shapes[b]!)[0] + span(shapes[b]!)[1]));
+  const first = span(shapes[order[0]!]!);
+  const last = span(shapes[order[order.length - 1]!]!);
+  const total = order.reduce((sum, i) => sum + (span(shapes[i]!)[1] - span(shapes[i]!)[0]), 0);
+  const gap = (last[1] - first[0] - total) / (order.length - 1);
+  const result = [...shapes];
+  let edge = first[0];
+  for (const i of order) {
+    const [from, to] = span(shapes[i]!);
+    const delta = tidy(edge - from);
+    result[i] = delta === 0 ? shapes[i]! : translate(shapes[i]!, horizontal ? delta : 0, horizontal ? 0 : delta);
+    edge += to - from + gap;
+  }
+  return result;
+}
+
+/** The indexes of the shapes whose boxes touch a rectangle, for a selection made by dragging over them. */
+export function shapesInBox(placed: readonly PlacedFrom[], box: Box): number[] {
+  const found = new Set<number>();
+  for (const { index, shape } of placed) {
+    const b = boundsOf(shape);
+    if (b.x2 >= box.x1 && b.x1 <= box.x2 && b.y2 >= box.y1 && b.y1 <= box.y2) found.add(index);
+  }
+  return [...found].sort((a, b) => a - b);
 }
 
 /* The drawing in a library draft */
@@ -395,6 +508,53 @@ export function replaceShape(draft: Library, moduleId: string, index: number, sh
   const problem = firstProblem([shape]);
   if (problem) return fail(problem.replace(/^art\[0\]/, 'shape'));
   return { ok: true, draft: withArt(draft, moduleId, art.map((s, i) => (i === index ? shape : s))), index };
+}
+
+/** Replaces several shapes at once, by index, if the result is one the library accepts. */
+export function replaceShapes(draft: Library, moduleId: string, changes: ReadonlyMap<number, ArtShape>): ArtResult {
+  const art = artOf(draft, moduleId);
+  if ([...changes.keys()].some((i) => !art[i])) return fail('That shape does not exist.');
+  const next = art.map((s, i) => changes.get(i) ?? s);
+  const problem = firstProblem(next);
+  if (problem) return fail(problem);
+  return { ok: true, draft: withArt(draft, moduleId, next), index: Math.min(...changes.keys()) };
+}
+
+/** Removes several shapes at once; what is left is selected from the first of the places they were. */
+export function removeShapes(draft: Library, moduleId: string, indices: readonly number[]): ArtResult {
+  const art = artOf(draft, moduleId);
+  if (indices.length === 0 || indices.some((i) => !art[i])) return fail('That shape does not exist.');
+  const next = art.filter((_, i) => !indices.includes(i));
+  return { ok: true, draft: withArt(draft, moduleId, next), index: Math.min(Math.min(...indices), next.length - 1) };
+}
+
+/** Copies of several shapes, a little aside, put on top of the drawing; the first of them is selected. */
+export function duplicateShapes(draft: Library, moduleId: string, indices: readonly number[]): ArtResult {
+  const art = artOf(draft, moduleId);
+  if (indices.length === 0 || indices.some((i) => !art[i])) return fail('That shape does not exist.');
+  const copies = [...indices].sort((a, b) => a - b).map((i) => translate(art[i]!, 2, 2));
+  return addShapes(draft, moduleId, copies);
+}
+
+/* What was copied, kept for the whole page so a drawing can be taken from one module to another */
+
+const clipboard: { shapes: ArtShape[]; pastes: number } = { shapes: [], pastes: 0 };
+
+/** Remembers shapes to be pasted; they are copied, so later edits do not change them. */
+export function copyShapes(shapes: readonly ArtShape[]): number {
+  clipboard.shapes = structuredClone([...shapes]);
+  clipboard.pastes = 0;
+  return clipboard.shapes.length;
+}
+
+export const copiedShapeCount = (): number => clipboard.shapes.length;
+
+/** Puts what was copied on top of a drawing, each paste a little further from the place it was copied from. */
+export function pasteShapes(draft: Library, moduleId: string): ArtResult {
+  if (clipboard.shapes.length === 0) return fail('Nothing is copied.');
+  clipboard.pastes += 1;
+  const offset = 2 * clipboard.pastes;
+  return addShapes(draft, moduleId, clipboard.shapes.map((s) => translate(structuredClone(s), offset, offset)));
 }
 
 export function removeShape(draft: Library, moduleId: string, index: number): ArtResult {

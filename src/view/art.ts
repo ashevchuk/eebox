@@ -5,7 +5,7 @@ import type { Rect } from './geometry';
 const CANVAS_ALIGN: Record<TextAlign, CanvasTextAlign> = { left: 'left', centre: 'center', right: 'right' };
 
 /** Draws the art of a module on its face, clipped to the face, for a copy `widthUnits` wide of a module made for `baseUnits`. */
-export function drawArt(ctx: CanvasRenderingContext2D, art: readonly ArtShape[], face: Rect, baseUnits: number, widthUnits: number): void {
+export function drawArt(ctx: CanvasRenderingContext2D, art: readonly ArtShape[], face: Rect, baseUnits: number, widthUnits: number, showText = true): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(face.x, face.y, face.width, face.height);
@@ -50,6 +50,7 @@ export function drawArt(ctx: CanvasRenderingContext2D, art: readonly ArtShape[],
         paint(ctx, shape);
         break;
       case 'text':
+        if (!showText) break;
         ctx.font = `${shape.bold ? 'bold ' : ''}${shape.size}px ${FONT_FAMILY}`;
         ctx.textAlign = CANVAS_ALIGN[shape.align ?? 'left'];
         ctx.textBaseline = 'middle';

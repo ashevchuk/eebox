@@ -39,6 +39,19 @@ try {
   await browser.goto(pathToFileURL(page).href);
   await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the bundled library in the palette');
 
+  await step('a first visit starts the tour, which walks through its steps and is not shown again once it is skipped', async () => {
+    await browser.waitFor(`!document.getElementById('tour').hidden`, 'the tour on a first visit');
+    const first = await browser.evaluate(`document.querySelector('#tour strong').textContent`);
+    expectTrue(first.startsWith('1 of'), `the tour starts at ${first}`);
+    await browser.evaluate(`[...document.querySelectorAll('#tour button')].find((b) => b.textContent === 'Next').click()`);
+    expectTrue(await browser.evaluate(`document.getElementById('sidebar').classList.contains('tour-target')`), 'the second step does not point at the library');
+    await browser.evaluate(`[...document.querySelectorAll('#tour button')].find((b) => b.textContent === 'Back').click()`);
+    expectTrue((await browser.evaluate(`document.querySelector('#tour strong').textContent`)).startsWith('1 of'), 'Back did not go back');
+    await browser.evaluate(`[...document.querySelectorAll('#tour button')].find((b) => b.textContent === 'Skip').click()`);
+    expectEqual(await browser.evaluate(`document.getElementById('tour').hidden && !document.querySelector('.tour-target')`), true, 'the tour and its pointer after Skip');
+    expectEqual(await browser.evaluate(`localStorage.getItem('eebox:tour-done')`), 'yes', 'the tour is remembered');
+  });
+
   await step('the bundled library is in the palette and the page has no errors yet', async () => {
     expectTrue(await browser.evaluate(`document.querySelector('#palette .library-title')?.textContent.includes('Generic IEC')`), 'the bundled library is missing');
     expectEqual(browser.problems, [], 'errors in the page');
@@ -47,6 +60,40 @@ try {
   await step('the bundled font is loaded, so drawings look the same on every machine', async () => {
     await browser.waitFor(`[...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'eebox-sans' && f.status === 'loaded').length === 2`, 'both weights of the bundled font');
     expectTrue(await browser.evaluate(`document.fonts.check('bold 8px "eebox-sans"') && document.fonts.check('8px "eebox-sans"')`), 'the font to be usable');
+  });
+
+  await step('every module of the palette has a picture of its face, and none of them is larger than its box', async () => {
+    const drawn = await browser.evaluate(`(() => {
+      const canvases = [...document.querySelectorAll('#palette .module-thumbnail canvas')];
+      const painted = canvases.filter((c) => c.width > 0 && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0));
+      const oversize = canvases.filter((c) => c.getBoundingClientRect().width > 36 || c.getBoundingClientRect().height > 36);
+      return { canvases: canvases.length, painted: painted.length, oversize: oversize.length };
+    })()`);
+    expectTrue(drawn.canvases > 0, 'no pictures in the palette');
+    expectEqual(drawn.painted, drawn.canvases, 'the pictures with something on them: all, the combs too');
+    expectEqual(drawn.oversize, 0, 'pictures that stick out of their box and cover what lies beside them');
+  });
+
+  await step('the list of keys opens from its button and from the question mark, and closes', async () => {
+    await browser.evaluate(`document.getElementById('help').click()`);
+    await browser.waitFor(`document.querySelector('dialog.help-dialog[open]')`, 'the list of keys');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('dialog.help-dialog h3')].map((h) => h.textContent)`), ['Everywhere', 'Panel', 'Schematic', 'Module designer, Face'], 'the groups of keys');
+    expectTrue(await browser.evaluate(`document.querySelectorAll('dialog.help-dialog kbd').length > 15`), 'the keys');
+    await browser.evaluate(`[...document.querySelectorAll('dialog.help-dialog button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.help-dialog')`, 'the list to close');
+    await browser.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: '?', code: 'Slash', shiftKey: true, bubbles: true }))`);
+    await browser.waitFor(`document.querySelector('dialog.help-dialog[open]')`, 'the list from the key');
+    await browser.evaluate(`document.querySelector('dialog.help-dialog').close()`);
+  });
+
+  await step('an empty panel says what to do, in the middle of the drawing', async () => {
+    const lit = () => browser.evaluate(`(() => {
+      const c = document.getElementById('stage'); const w = c.width, h = c.height; const ctx = c.getContext('2d');
+      const data = ctx.getImageData(Math.round(w / 2 - 120), Math.round(h / 2 - 30), 240, 60).data;
+      let bright = 0; for (let i = 0; i < data.length; i += 4) if (data[i] > 150 && data[i + 1] > 150 && data[i + 2] > 150) bright++;
+      return bright;
+    })()`);
+    expectTrue((await lit()) > 100, 'no words in the middle of the empty panel');
   });
 
   await step('menus open, show their items and close on Escape', async () => {
@@ -215,7 +262,7 @@ try {
   });
 
   await step('the print sheet holds the drawings and tables, and prints on a white ground', async () => {
-    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click()`);
+    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Print').click())`);
     await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length === 2`, 'two drawings on the print sheet');
     expectEqual(await browser.evaluate(`[...document.querySelectorAll('#print-sheet h2')].map((h) => h.textContent)`), ['Parts list', 'Circuits', 'Connections', 'Ferrules'], 'sections');
     await browser.media('print');
@@ -496,6 +543,228 @@ try {
     expectEqual((await found('swap test')).length, 1, 'the modules called Swap test in the palette');
     expectEqual((await found('b6 (copy)')).length, 0, 'the copies of the bundled module that the second edit would have made');
     await found('');
+  });
+
+  await step('a module of My modules is copied and taken out from the palette', async () => {
+    const found = (query) => browser.evaluate(`(async () => {
+      const search = document.getElementById('palette-search'); search.value = ${JSON.stringify(query)}; search.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      return [...document.querySelectorAll('#palette .module')].map((m) => m.querySelector('.module-name').firstChild.textContent);
+    })()`);
+    const press = (name, label) => browser.evaluate(`[...document.querySelectorAll('#palette .module')].find((m) => m.querySelector('.module-name').firstChild.textContent === ${JSON.stringify(name)}).querySelector('.module-action[title^="${label}"]').click()`);
+    expectEqual(await found('swap test'), ['Swap test'], 'the module before it is copied');
+    await press('Swap test', 'Make a copy');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('(copy)')`, 'the copy to be made');
+    expectEqual(await found('swap test'), ['Swap test', 'Swap test (copy)'], 'the modules after the copy');
+    await press('Swap test (copy)', 'Take this module out');
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open] button')].some((b) => b.textContent === 'Take out')`, 'the question');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Take out').click()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('Took')`, 'the module to be taken out');
+    expectEqual(await found('swap test'), ['Swap test'], 'the modules after it is taken out');
+    await found('');
+  });
+
+  await step('Check lists what is wrong, and a click on an item shows it on the drawing', async () => {
+    const project = JSON.parse(example);
+    const kitchen = project.project.schematic.nodes.find((n) => n.label === 'Kitchen sockets').id;
+    project.project.schematic.wires = project.project.schematic.wires.filter((w) => !((w.a.node === kitchen && w.a.terminal === 'top:PE') || (w.b.node === kitchen && w.b.terminal === 'top:PE')));
+    await browser.evaluate(`(async () => {
+      const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(JSON.stringify(project))}], 'earth.json'));
+      const input = document.getElementById('open-project'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click();
+    })()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('earth.json loaded')`, 'the project to load');
+    await clickButton('Panel');
+    await browser.evaluate(`[...document.querySelectorAll('#problems button')].find((b) => b.textContent === 'Close')?.click()`);
+    await clickButton('Check');
+    await browser.waitFor(`!document.getElementById('problems').hidden`, 'the list of problems');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#problems .problem')].map((b) => b.querySelector('.problem-badge').textContent)`), ['Advice'], 'the kinds of what was found');
+    expectTrue(await browser.evaluate(`document.querySelector('#problems .problem').textContent.includes('protective earth is not connected')`), 'the words of the advice');
+    await browser.evaluate(`document.querySelector('#problems .problem').click()`);
+    await browser.waitFor(`document.body.dataset.mode === 'schematic'`, 'the schematic to be shown');
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('Kitchen sockets')`, 'the node to be selected');
+    await browser.evaluate(`[...document.querySelectorAll('#problems button')].find((b) => b.textContent === 'Close').click()`);
+    expectTrue(await browser.evaluate(`document.getElementById('problems').hidden`), 'the list to close');
+    await clickButton('Panel');
+  });
+
+  await step('the face editor selects several shapes, aligns them, turns one by an angle, zooms and carries a drawing to another module', async () => {
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the earlier designer to close');
+    const open = async () => {
+      await browser.evaluate(`document.getElementById('new-module').click()`);
+      await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].some((b) => b.textContent === 'Face')`, 'the designer');
+      await browser.evaluate(`(() => {
+        const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.innerText.startsWith('Width') && !r.innerText.startsWith('Width, mm'));
+        const i = row.querySelector('input'); i.value = '3'; i.dispatchEvent(new Event('change', { bubbles: true }));
+        [...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click();
+      })()`);
+      await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face');
+    };
+    const key = (code, extra = {}) => browser.evaluate(`document.querySelector('.designer-dialog[open]').dispatchEvent(new KeyboardEvent('keydown', Object.assign({ code: ${JSON.stringify(code)}, key: ${JSON.stringify(code.startsWith('Key') ? code.slice(3).toLowerCase() : code)}, bubbles: true }, ${JSON.stringify(extra)})))`);
+    const at = (x, y) => browser.evaluate(`(() => {
+      const svg = document.querySelector('.designer-dialog[open] .face-stage svg'); const r = svg.getBoundingClientRect();
+      const k = r.width / svg.width.baseVal.value; const scale = (svg.width.baseVal.value - 24) / 52.5;
+      return [r.left + (12 + ${x} * scale) * k, r.top + (12 + ${y} * scale) * k];
+    })()`);
+    const drag = async (from, to) => {
+      const [x1, y1] = await at(...from); const [x2, y2] = await at(...to);
+      await browser.mouse('mouseMoved', x1, y1); await browser.mouse('mousePressed', x1, y1);
+      await browser.mouse('mouseMoved', (x1 + x2) / 2, (y1 + y2) / 2); await browser.mouse('mouseMoved', x2, y2); await browser.mouse('mouseReleased', x2, y2);
+    };
+    const tool = (name) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === ${JSON.stringify(name)}).click()`);
+    const press = (label) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-side button, .designer-dialog[open] .inspector-actions button')].find((b) => b.textContent === ${JSON.stringify(label)}).click()`);
+    const layers = () => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-layer')].map((b) => b.textContent)`);
+    const selected = () => browser.evaluate(`document.querySelectorAll('.designer-dialog[open] .face-layer.selected').length`);
+    const exported = () => browser.evaluate(`(async () => {
+      let blob = null; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
+      const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () {};
+      [...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Export SVG').click();
+      await new Promise((r) => setTimeout(r, 300));
+      HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create;
+      return blob ? await blob.text() : '';
+    })()`);
+
+    await open();
+    for (const [from, to] of [[[3, 20], [10, 26]], [[20, 35], [30, 41]], [[38, 50], [46, 58]]]) {
+      await tool('Rectangle');
+      await drag(from, to);
+    }
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'three rectangles');
+
+    await key('KeyA', { ctrlKey: true });
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer.selected').length === 3`, 'all the shapes to be selected');
+    await press('Left');
+    await browser.waitFor(`(() => { const xs = [...document.querySelectorAll('.designer-dialog[open] .face-layer')].length; return xs === 3; })()`, 'the shapes to stay');
+    const xs = (await exported()).match(/<rect x="([\d.]+)"/g).map((m) => m.match(/"([\d.]+)"/)[1]);
+    expectEqual(new Set(xs).size, 1, 'the x of the three rectangles after Align left');
+    await press('Spread down');
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'the shapes after spreading');
+
+    await key('Escape');
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer.selected').length === 0`, 'the selection to be cleared');
+    await drag([0, 15], [20, 45]);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer.selected').length === 2`, 'a rubber band to pick up the two shapes inside');
+    await press('Copy');
+    await browser.waitFor(`document.getElementById('status').textContent.length >= 0 && [...document.querySelectorAll('.designer-dialog[open] .editor-status')].some((s) => s.textContent.includes('copied'))`, 'the copy to be reported');
+
+    const [wide] = await browser.evaluate(`[document.querySelector('.designer-dialog[open] .face-stage svg').getBoundingClientRect().width]`);
+    await tool('Zoom +');
+    const [wider] = await browser.evaluate(`[document.querySelector('.designer-dialog[open] .face-stage svg').getBoundingClientRect().width]`);
+    expectTrue(wider > wide * 1.2, 'the face to be larger after Zoom +');
+    await tool('Fit');
+
+    await browser.evaluate(`document.querySelectorAll('.designer-dialog[open] .face-layer')[0].click()`);
+    await browser.evaluate(`(() => { const i = document.querySelector('.designer-dialog[open] .face-angle'); i.value = '30'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await press('Turn by °');
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .face-layer')][0].textContent.startsWith('1. path')`, 'the rectangle to become a path when turned by an angle');
+
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open] button')].some((b) => b.textContent === 'Discard')`, 'the question about the unsaved module');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
+
+    await open();
+    await key('KeyV', { ctrlKey: true });
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 2`, 'the two copied shapes to be pasted on another module');
+    expectEqual((await layers()).length, 2, 'the shapes of the other module');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open] button')].some((b) => b.textContent === 'Discard')`, 'the question about the second module');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close again');
+  });
+
+  await step('the nodes of a schematic are arranged by their distance from the source, then selected together and lined up', async () => {
+    await browser.evaluate(`(async () => {
+      const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(example)}], 'arrange.json'));
+      const input = document.getElementById('open-project'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click();
+    })()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('arrange.json loaded')`, 'the project to load');
+    await clickButton('Schematic');
+    const nodes = () => browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.nodes.map((n) => ({ id: n.id, kind: n.kind, x: n.x, y: n.y }))`);
+    const menu = async (id) => {
+      await clickButton('Nodes');
+      await browser.evaluate(`document.getElementById(${JSON.stringify(id)}).click()`);
+    };
+    await menu('arrange-nodes');
+    await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.nodes.every((n) => n.x % 10 === 0 && n.y % 10 === 0)`, 'the autosave to hold the arranged nodes');
+    const arranged = await nodes();
+    const source = arranged.find((n) => n.kind === 'source');
+    expectTrue(arranged.filter((n) => n.kind === 'load').every((n) => n.y > source.y), 'the loads are not below the source');
+    expectTrue(new Set(arranged.map((n) => n.y)).size >= 3, 'the nodes are not in rows');
+
+    await browser.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', ctrlKey: true, bubbles: true }))`);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('nodes selected')`, 'all the nodes to be selected');
+    await menu('align-left');
+    await browser.waitFor(`new Set(JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.nodes.map((n) => n.x)).size === 1`, 'the nodes to be lined up on the left');
+    await browser.evaluate(`document.getElementById('undo').click()`);
+    await browser.waitFor(`new Set(JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.nodes.map((n) => n.x)).size > 1`, 'the lining up to be undone');
+    await clickButton('Panel');
+  });
+
+  await step('the tables of the project open in a dialog, one tab for each, and a click on a heading sorts', async () => {
+    await clickButton('Export');
+    await browser.evaluate(`document.getElementById('view-tables').click()`);
+    await browser.waitFor(`document.querySelector('dialog.tables-dialog[open]')`, 'the tables');
+    expectTrue(await browser.evaluate(`document.querySelector('dialog.tables-dialog[open]').getBoundingClientRect().width > 600`), 'the tables dialog is squeezed to the width of a small dialog');
+    const tabs = await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].map((b) => b.textContent.replace(/ \\(\\d+\\)$/, ''))`);
+    expectEqual(tabs, ['Parts', 'Circuits', 'Wires', 'Ferrules'], 'the tabs');
+    expectTrue(await browser.evaluate(`document.querySelectorAll('.tables-body tbody tr').length > 3`), 'no parts in the first table');
+    await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].find((b) => b.textContent.startsWith('Wires')).click()`);
+    const firstWire = () => browser.evaluate(`document.querySelector('.tables-body tbody tr td').textContent`);
+    const before = await firstWire();
+    await browser.evaluate(`document.querySelector('.tables-body th').click()`);
+    await browser.evaluate(`document.querySelector('.tables-body th').click()`);
+    const after = await firstWire();
+    expectTrue(before !== after, 'sorting the wires downwards did not change the first row');
+    await browser.evaluate(`document.querySelector('dialog.tables-dialog button.primary').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.tables-dialog')`, 'the tables to close');
+  });
+
+  await step('a cell of the wires table can be typed over, a wrong value is refused, and Undo takes the edit back', async () => {
+    const openWires = async () => {
+      await clickButton('Export');
+      await browser.evaluate(`document.getElementById('view-tables').click()`);
+      await browser.waitFor(`document.querySelector('dialog.tables-dialog[open]')`, 'the tables');
+      await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].find((b) => b.textContent.startsWith('Wires')).click()`);
+    };
+    const type = (selector, value, key) =>
+      browser.evaluate(`(() => { const input = document.querySelector(${JSON.stringify(selector)}); input.value = ${JSON.stringify(value)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true })); })()`);
+    const labelInput = `.tables-body input.table-edit[data-shown="0"][data-column="1"]`;
+    await openWires();
+    expectTrue(await browser.evaluate(`document.querySelectorAll('.tables-body input.table-edit').length > 4`), 'no cell of the wires table is editable');
+    await type(labelInput, 'E2E label', 'Enter');
+    await browser.waitFor(`document.querySelector(${JSON.stringify(labelInput)})?.value === 'E2E label'`, 'the label to stay in the cell after the edit');
+    await browser.evaluate(`document.querySelector('dialog.tables-dialog button.primary').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.tables-dialog')`, 'the tables to close');
+    await openWires();
+    expectEqual(await browser.evaluate(`document.querySelector(${JSON.stringify(labelInput)}).value`), 'E2E label', 'the label after the dialog was opened again');
+    await type(`.tables-body input.table-edit[data-shown="0"][data-column="5"]`, 'abc', 'Enter');
+    await browser.waitFor(`!document.querySelector('.tables-problem').hidden`, 'the refusal under the table');
+    expectTrue((await browser.evaluate(`document.querySelector('.tables-problem').textContent`)).length > 0, 'the refusal has no words');
+    await browser.evaluate(`document.querySelector('dialog.tables-dialog button.primary').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.tables-dialog')`, 'the tables to close');
+    await browser.evaluate(`document.getElementById('undo').click()`);
+    await openWires();
+    expectEqual(await browser.evaluate(`document.querySelector(${JSON.stringify(labelInput)}).value`), '', 'the label after Undo');
+    await browser.evaluate(`document.querySelector('dialog.tables-dialog button.primary').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.tables-dialog')`, 'the tables to close');
+  });
+
+  await step('the calculation summary lists each circuit with a mark and a reason for every check', async () => {
+    await clickButton('Export');
+    await browser.evaluate(`document.getElementById('view-checks').click()`);
+    await browser.waitFor(`document.querySelector('dialog.tables-dialog[open] .tables-body table')`, 'the summary');
+    const headings = await browser.evaluate(`[...document.querySelectorAll('.tables-body th')].map((th) => th.textContent.replace(/[ ▴▾✎]+$/, ''))`);
+    expectEqual(headings, ['Load', 'Current, A', 'Cable', 'Voltage drop', 'Breaker', 'RCD', 'Earth', 'Result'], 'the columns of the summary');
+    const marked = await browser.evaluate(`document.querySelectorAll('.tables-body td[class*="mark-"]').length`);
+    expectTrue(marked >= 6, `only ${marked} cells carry a mark`);
+    expectTrue(await browser.evaluate(`[...document.querySelectorAll('.tables-body td[title]')].every((td) => td.title.length > 0)`), 'a cell has an empty reason');
+    expectTrue((await browser.evaluate(`document.querySelector('.tables-note')?.textContent ?? ''`)).includes('circuit'), 'no count of the circuits');
+    await browser.evaluate(`document.querySelector('dialog.tables-dialog button.primary').click()`);
+    await browser.waitFor(`!document.querySelector('dialog.tables-dialog')`, 'the summary to close');
   });
 
   await step('the library editor opens a module in the designer and takes the changes back unsaved', async () => {
