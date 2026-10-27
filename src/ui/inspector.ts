@@ -26,6 +26,7 @@ import {
   type ModuleRef,
   type Placement,
 } from '../layout/placement';
+import { EARTHING_SYSTEMS, isEarthingSystem, EARTHING_SYSTEM_IDS, type EarthingSystemId } from '../electrical/earthing';
 import { CABLE_TABLE_NOTE, CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
 import {
   CIRCUIT_KINDS,
@@ -49,6 +50,7 @@ import {
   renameNode,
   setNodeConductors,
   setNodeLoad,
+  setSourceEarthing,
   setSourceOff,
   setSourceProtection,
   setWireRoute,
@@ -174,6 +176,7 @@ const integer = (key: string, label: string, value: number, min: number, max: nu
 const decimal = (key: string, label: string, value: number, min: number, max: number, hint?: string): InspectorField => ({
   key, label, kind: 'number', value, min, max, ...(hint ? { hint } : {}),
 });
+const NO_EARTHING = 'not stated';
 const readonly = (key: string, label: string, value: string | number): InspectorField => ({
   key, label, kind: 'readonly', value,
 });
@@ -186,6 +189,7 @@ function loadFields(project: Project, resolve: Resolve, node: SchematicNode, set
   if (node.kind === 'source') {
     return [
       { key: 'supply', label: 'Supply', kind: 'select', value: node.off ? 'off' : 'on', options: ['on', 'off'], hint: 'off to see what loses power' },
+      { key: 'earthing', label: 'Earthing', kind: 'select', value: node.earthing ?? NO_EARTHING, options: [NO_EARTHING, ...EARTHING_SYSTEM_IDS], hint: node.earthing ? EARTHING_SYSTEMS[node.earthing].description : 'the system the checks assume; none for unknown' },
       { key: 'shortCircuitKA', label: 'Short-circuit', kind: 'number', value: node.shortCircuitKA ?? '', hint: 'kA at the panel; empty for unknown' },
       { key: 'loopImpedanceMOhm', label: 'Loop impedance', kind: 'number', value: node.loopImpedanceMOhm ?? '', hint: 'mOhm phase to neutral; empty for unknown' },
     ];
@@ -456,6 +460,7 @@ const ERROR_TEXT: Record<string, string> = {
   'not-a-source': 'Only a source can be switched off.',
   'invalid-load': 'The load data is out of range.',
   'invalid-section': 'That cross-section is not in the table.',
+  'invalid-earthing': 'That is not an earthing system.',
 };
 
 function describeError(error: { kind: string; with?: string } | string): string {
@@ -688,6 +693,11 @@ export function applyEdit(
         if (value !== undefined && !Number.isFinite(value)) return fail(NOT_A_DECIMAL);
         const result = setSourceProtection(schematic, node.id, key, value);
         return result.ok ? withSchematic(result.schematic) : fail('Enter a value above 0 within the allowed range.');
+      }
+      if (key === 'earthing' && node.kind === 'source') {
+        if (text !== NO_EARTHING && !isEarthingSystem(text)) return fail(describeError('invalid-earthing'));
+        const result = setSourceEarthing(schematic, node.id, text === NO_EARTHING ? undefined : (text as EarthingSystemId));
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
       }
       if (key === 'supply' && node.kind === 'source') {
         const result = setSourceOff(schematic, node.id, text === 'off');

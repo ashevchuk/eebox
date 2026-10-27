@@ -15,6 +15,7 @@ export const NET_PROBLEM_TEXT = {
   'mixed-phases': 'different phases joined',
   'mixed-polarity': 'DC plus and minus joined',
   'mixed-families': 'phase, neutral, earth or control conductors joined',
+  'second-split': 'neutral and protective earth joined at more than one point',
 } as const;
 
 /**

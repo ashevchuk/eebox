@@ -1,6 +1,6 @@
 import type { ModuleRef } from '../layout/placement';
 import { LAYOUT_EPSILON_UNITS } from '../layout/units';
-import { familyOf, type Conductor, type ModuleDef } from '../library/types';
+import { COMBINED_FAMILIES, familiesMayShareNet, familyOf, type Conductor, type ConductorFamily, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { freeNodeTerminals } from './nodeTerminals';
 import { terminalsOf, type Terminal } from './terminals';
@@ -24,7 +24,7 @@ export interface CombContact {
   terminalId: string;
 }
 
-export type NetProblem = { kind: 'mixed-families' | 'mixed-phases' | 'mixed-polarity'; net: Net };
+export type NetProblem = { kind: 'mixed-families' | 'mixed-phases' | 'mixed-polarity' | 'second-split'; net: Net };
 
 class UnionFind {
   private readonly parent = new Map<string, string>();
@@ -133,13 +133,29 @@ export function buildNets(project: Project, resolve: Resolve): Net[] {
     .sort((a, b) => a.terminals[0]!.key.localeCompare(b.terminals[0]!.key));
 }
 
+/**
+ * The owners that join a combined conductor to its parts, such as a PEN terminal block that gives N and PE.
+ * One such point is where the conductor is split; a second one would carry current in parallel through the earth.
+ */
+function splittersIn(net: Net): string[] {
+  const byOwner = new Map<string, Set<ConductorFamily>>();
+  for (const t of net.terminals) {
+    const key = `${t.owner.kind}:${t.owner.id}`;
+    byOwner.set(key, (byOwner.get(key) ?? new Set()).add(familyOf(t.terminal.conductor)));
+  }
+  return [...byOwner].filter(([, families]) => [...families].some((f) => COMBINED_FAMILIES[f]?.some((part) => families.has(part)))).map(([key]) => key);
+}
+
 /** A net that joins different families is a short circuit; so are two different fixed phases or DC plus and minus. */
 export function findNetProblems(nets: Net[]): NetProblem[] {
   const problems: NetProblem[] = [];
   for (const net of nets) {
     const conductors = net.terminals.map((t) => t.terminal.conductor);
-    if (new Set(conductors.filter((c) => c !== 'C').map(familyOf)).size > 1) {
+    const families = new Set(conductors.filter((c) => c !== 'C').map(familyOf));
+    if (!familiesMayShareNet(families)) {
       problems.push({ kind: 'mixed-families', net });
+    } else if (splittersIn(net).length > 1) {
+      problems.push({ kind: 'second-split', net });
     } else if (new Set(conductors.filter((c) => c === 'L1' || c === 'L2' || c === 'L3')).size > 1) {
       problems.push({ kind: 'mixed-phases', net });
     } else if (conductors.includes('DCP') && conductors.includes('DCN')) {

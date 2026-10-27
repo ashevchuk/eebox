@@ -22,14 +22,22 @@ export type ModuleKind = (typeof MODULE_KINDS)[number];
  * `L` is a phase that is decided by what feeds it; `L1`..`L3` are fixed phases. `C` is a control or
  * signal conductor, such as a relay contact; `DCP` and `DCN` are the plus and minus of a DC supply.
  */
-export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'C', 'DCP', 'DCN'] as const;
+export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'PEN', 'C', 'DCP', 'DCN'] as const;
 export type Conductor = (typeof CONDUCTORS)[number];
-export type ConductorFamily = 'phase' | 'N' | 'PE' | 'control';
+export type ConductorFamily = 'phase' | 'N' | 'PE' | 'PEN' | 'control';
+
+/** A family that is several in one conductor: a PEN conductor is a neutral and a protective earth at once. */
+export const COMBINED_FAMILIES: Partial<Record<ConductorFamily, readonly ConductorFamily[]>> = { PEN: ['N', 'PE'] };
+
+/** Whether conductors of these families may be one net: a single family, or a combined one with the families it is made of, such as PEN with N and PE. */
+export function familiesMayShareNet(families: ReadonlySet<ConductorFamily>): boolean {
+  return families.size <= 1 || [...families].some((family) => [...families].every((other) => other === family || COMBINED_FAMILIES[family]?.includes(other)));
+}
 
 const CONTROL_CONDUCTORS: readonly Conductor[] = ['C', 'DCP', 'DCN'];
 
 export const familyOf = (conductor: Conductor): ConductorFamily =>
-  conductor === 'N' || conductor === 'PE' ? conductor : CONTROL_CONDUCTORS.includes(conductor) ? 'control' : 'phase';
+  conductor === 'N' || conductor === 'PE' || conductor === 'PEN' ? conductor : CONTROL_CONDUCTORS.includes(conductor) ? 'control' : 'phase';
 
 /**
  * Whether a wire may join two conductors: those of one family, or any pair when one is `C`, the

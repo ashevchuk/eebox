@@ -1,0 +1,521 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "railLengthsUnits": [
+        24,
+        24
+      ],
+      "railPitchesMm": [
+        150
+      ],
+      "railLabels": [
+        "Incoming",
+        "Final circuits"
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "main-switch-3p-63"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "Main switch"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pen-split-12"
+          },
+          "rail": 0,
+          "slot": 5,
+          "label": "PEN split"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-c10-30"
+          },
+          "rail": 1,
+          "slot": 0,
+          "label": "Lights"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-c16-30"
+          },
+          "rail": 1,
+          "slot": 3,
+          "label": "Sockets"
+        },
+        {
+          "id": "p5",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcbo-1pn-c16-30"
+          },
+          "rail": 1,
+          "slot": 6,
+          "label": "Boiler"
+        }
+      ],
+      "combs": [],
+      "shelf": [],
+      "title": "TN-C-S entry"
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "main-switch-3p-63",
+          "x": 0,
+          "y": 130,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "pen-split-12",
+          "x": 200,
+          "y": 130,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "rcbo-1pn-c10-30",
+          "x": 0,
+          "y": 260,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "rcbo-1pn-c16-30",
+          "x": 200,
+          "y": 260,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "module",
+          "label": "rcbo-1pn-c16-30",
+          "x": 400,
+          "y": 260,
+          "placementId": "p5",
+          "id": "n5"
+        },
+        {
+          "kind": "source",
+          "label": "Mains, PEN",
+          "x": 560,
+          "y": -120,
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "PEN"
+          ],
+          "earthing": "TN-C-S",
+          "id": "n6"
+        },
+        {
+          "kind": "load",
+          "label": "Earth electrode",
+          "x": 1000,
+          "y": -120,
+          "conductors": [
+            "PEN"
+          ],
+          "id": "n7"
+        },
+        {
+          "kind": "load",
+          "label": "Lights",
+          "x": 200,
+          "y": 900,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n8",
+          "load": {
+            "powerW": 500,
+            "crossSectionMm2": 1.5
+          }
+        },
+        {
+          "kind": "load",
+          "label": "Sockets",
+          "x": 460,
+          "y": 900,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n9",
+          "load": {
+            "powerW": 2500,
+            "crossSectionMm2": 2.5
+          }
+        },
+        {
+          "kind": "load",
+          "label": "Boiler",
+          "x": 720,
+          "y": 900,
+          "conductors": [
+            "L",
+            "N",
+            "PE"
+          ],
+          "id": "n10",
+          "load": {
+            "powerW": 2000,
+            "crossSectionMm2": 2.5
+          }
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1"
+          },
+          "crossSectionMm2": 10
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2"
+          },
+          "crossSectionMm2": 10
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3"
+          },
+          "crossSectionMm2": 10
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:PEN"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:PEN1"
+          },
+          "crossSectionMm2": 10
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:PEN"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:PEN"
+          },
+          "crossSectionMm2": 10
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L"
+          },
+          "crossSectionMm2": 4
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L"
+          },
+          "crossSectionMm2": 4
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L"
+          },
+          "crossSectionMm2": 4
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N1"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PE1"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N2"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w15",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w16",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PE2"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w17",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N3"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w18",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w19",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w20",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:PE3"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:PE"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/main-switch-3p-63": {
+      "id": "main-switch-3p-63",
+      "kind": "switch",
+      "name": "Main switch 3P 63A",
+      "widthUnits": 3,
+      "poles": 3,
+      "ratedCurrentA": 63
+    },
+    "generic-iec/pen-split-12": {
+      "id": "pen-split-12",
+      "kind": "busbar",
+      "name": "PEN splitting block",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 6,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "PEN1",
+          "conductor": "PEN",
+          "side": "top",
+          "net": "PEN",
+          "unit": 1
+        },
+        {
+          "name": "PEN2",
+          "conductor": "PEN",
+          "side": "top",
+          "net": "PEN",
+          "unit": 4
+        },
+        {
+          "name": "N1",
+          "conductor": "N",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 0
+        },
+        {
+          "name": "N2",
+          "conductor": "N",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 1
+        },
+        {
+          "name": "N3",
+          "conductor": "N",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 2
+        },
+        {
+          "name": "PE1",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 3
+        },
+        {
+          "name": "PE2",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 4
+        },
+        {
+          "name": "PE3",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PEN",
+          "unit": 5
+        }
+      ]
+    },
+    "generic-iec/rcbo-1pn-c10-30": {
+      "id": "rcbo-1pn-c10-30",
+      "kind": "rcbo",
+      "name": "RCBO 1P+N C10 30mA",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 10,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "residualCurrentMa": 30
+    },
+    "generic-iec/rcbo-1pn-c16-30": {
+      "id": "rcbo-1pn-c16-30",
+      "kind": "rcbo",
+      "name": "RCBO 1P+N C16 30mA",
+      "widthUnits": 2,
+      "poles": 2,
+      "ratedCurrentA": 16,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "residualCurrentMa": 30
+    }
+  }
+}

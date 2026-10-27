@@ -138,7 +138,7 @@ function contactors(): ModuleDef[] {
 }
 
 function bars(): ModuleDef[] {
-  const bar = (id: string, name: string, conductor: 'N' | 'PE', top: string, bottom: string): ModuleDef => ({
+  const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): ModuleDef => ({
     id,
     kind: 'busbar',
     name,
@@ -153,6 +153,21 @@ function bars(): ModuleDef[] {
   return [
     bar('n-bar-12', 'Neutral bar 12 terminals', 'N', 'N', 'Nb'),
     bar('pe-bar-12', 'Earth bar 12 terminals', 'PE', 'PE', 'PEb'),
+    bar('pen-bar-12', 'PEN bar 12 terminals', 'PEN', 'PEN', 'PENb'),
+    {
+      id: 'pen-split-12',
+      kind: 'busbar',
+      name: 'PEN splitting block',
+      widthUnits: 6,
+      poles: 1,
+      resizable: { minUnits: 6, maxUnits: 24 },
+      terminals: [
+        { name: 'PEN1', conductor: 'PEN', side: 'top', net: 'PEN', unit: 1 },
+        { name: 'PEN2', conductor: 'PEN', side: 'top', net: 'PEN', unit: 4 },
+        ...[0, 1, 2].map((unit, i): TerminalDef => ({ name: `N${i + 1}`, conductor: 'N', side: 'bottom', net: 'PEN', unit })),
+        ...[3, 4, 5].map((unit, i): TerminalDef => ({ name: `PE${i + 1}`, conductor: 'PE', side: 'bottom', net: 'PEN', unit })),
+      ],
+    },
   ];
 }
 
@@ -473,7 +488,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '6';
+export const GENERIC_LIBRARY_VERSION = '7';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

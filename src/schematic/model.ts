@@ -1,4 +1,5 @@
 import { CROSS_SECTIONS_MM2 } from '../electrical/cables';
+import { isEarthingSystem, type EarthingSystemId } from '../electrical/earthing';
 import { loadSpecProblem, type LoadSpec } from '../electrical/loads';
 import { freeNodeTerminals } from '../electrical/nodeTerminals';
 import type { Terminal } from '../electrical/terminals';
@@ -22,6 +23,8 @@ export interface SchematicNode {
   load?: LoadSpec;
   /** A `source` node that is switched off, to see what loses power; only on source nodes. */
   off?: boolean;
+  /** How the supply is earthed, which the earthing checks read; only on source nodes. */
+  earthing?: EarthingSystemId;
   /** Prospective short-circuit current at the source, in kA; only on source nodes. */
   shortCircuitKA?: number;
   /** Phase-to-neutral loop impedance at the source, in milliohms; only on source nodes. */
@@ -85,7 +88,8 @@ export type SchematicError =
   | { kind: 'invalid-load' }
   | { kind: 'invalid-section' }
   | { kind: 'invalid-route' }
-  | { kind: 'invalid-conductors' };
+  | { kind: 'invalid-conductors' }
+  | { kind: 'invalid-earthing' };
 
 export type SchematicResult =
   | { ok: true; schematic: Schematic }
@@ -300,6 +304,17 @@ export function setSourceOff(schematic: Schematic, id: string, off: boolean): Sc
   if (node.kind !== 'source') return failure('not-a-source');
   const { off: _previous, ...rest } = node;
   const updated: SchematicNode = off ? { ...rest, off: true } : rest;
+  return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
+}
+
+/** Sets how a source is earthed, or clears it with `undefined`. */
+export function setSourceEarthing(schematic: Schematic, id: string, earthing: EarthingSystemId | undefined): SchematicResult {
+  const node = schematic.nodes.find((n) => n.id === id);
+  if (!node) return failure('unknown-node');
+  if (node.kind !== 'source') return failure('not-a-source');
+  if (earthing !== undefined && !isEarthingSystem(earthing)) return failure('invalid-earthing');
+  const { earthing: _previous, ...rest } = node;
+  const updated: SchematicNode = earthing === undefined ? rest : { ...rest, earthing };
   return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
 }
 

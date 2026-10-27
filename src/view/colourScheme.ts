@@ -16,6 +16,8 @@ const BASE: Pick<ColourScheme, 'L' | 'C' | 'DCP' | 'DCN'> = {
   DCN: { color: '#22d3ee' },
 };
 const GREEN_YELLOW: ConductorColour = { color: '#2f9e44', stripe: '#f2d21b' };
+/** Blue like the neutral it is, striped green-yellow like the earth it is. */
+const PEN_COLOUR: ConductorColour = { color: '#2f7de1', stripe: '#2f9e44' };
 
 /** Harmonised colours of the European Union: brown, black and grey phases, blue neutral. */
 export const EU_SCHEME: ColourScheme = {
@@ -25,6 +27,7 @@ export const EU_SCHEME: ColourScheme = {
   L3: { color: '#8b9099' },
   N: { color: '#2f7de1' },
   PE: GREEN_YELLOW,
+  PEN: PEN_COLOUR,
 };
 
 /** The older Ukrainian and Soviet marking of the phases A, B and C: yellow, green and red. */
@@ -35,6 +38,7 @@ export const PUE_SCHEME: ColourScheme = {
   L3: { color: '#ff0000' },
   N: { color: '#0057ff' },
   PE: GREEN_YELLOW,
+  PEN: PEN_COLOUR,
 };
 
 /** Hues chosen to be told apart on a screen, not to follow a standard. */
@@ -45,6 +49,7 @@ export const CONTRAST_SCHEME: ColourScheme = {
   L3: { color: '#8b5cf6' },
   N: { color: '#3b82f6' },
   PE: { color: '#22c55e', stripe: '#facc15' },
+  PEN: { color: '#3b82f6', stripe: '#22c55e' },
   C: { color: '#94a3b8' },
   DCP: { color: '#ec4899' },
   DCN: { color: '#22d3ee' },

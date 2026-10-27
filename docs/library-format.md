@@ -51,7 +51,7 @@ Without `terminals`, each pole yields a terminal on the top and the bottom side:
 | Field | Notes |
 | --- | --- |
 | `name` | identifier; unique per side |
-| `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `C`, `DCP` or `DCN`; `L` is a phase decided by what feeds it |
+| `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `PEN`, `C`, `DCP` or `DCN`; `L` is a phase decided by what feeds it, `PEN` is a neutral and a protective earth in one conductor |
 | `side` | `top` or `bottom` |
 | `net` | terminals of one module that share a net are connected inside it (a terminal bar); without a net a terminal is isolated |
 | `unit` | position of the terminal's centre along the module, in module units from the left edge; decimals are allowed. `0` is the centre of the first unit and `0.5` the border between the first and the second. It has to lie inside the module and `0.15` of a unit from either edge (a quarter of the width on a module narrower than 0.6 units, so a 5.2 mm clamp can hold terminals), so `-0.35` to `width - 0.65`; not combined with `count`. On a resizable module a negative value counts from the right edge (`-1` is the centre of the last unit), and any position must exist at the narrowest width |
@@ -66,6 +66,12 @@ family (`DCP`, `DCN`), so that 24 V never shares a net with mains conductors. Th
 the terminal of a contact: it takes a wire of any family, because a contact switches whatever it is
 given, and it does not count when Check looks for nets that mix families. A net that joins `DCP`
 and `DCN` is reported by Check as a short circuit.
+
+`PEN` is a family of its own: a wire joins `PEN` to `PEN` only. A module that splits a PEN conductor
+lists a `PEN` terminal and `N` and `PE` terminals with the same `net`, which is how `N` and `PE` come
+out of one `PEN`; the bundled `PEN splitting block` is an example. A net may hold `PEN` together with
+`N` and `PE`, but `N` and `PE` joined without a `PEN` are reported by Check as a short circuit, and so
+is a second module that splits the same `PEN` net.
 
 A device with two supplies, such as a changeover switch, lists both inputs as separate terminals on
 the top side and gives them no `net`, because nothing joins them inside the module.

@@ -302,7 +302,7 @@ try {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('open-example').click()`);
     await browser.waitFor(`document.querySelector('.examples-dialog[open]')`, 'the examples dialog');
-    expectEqual(await browser.evaluate(`[...document.querySelectorAll('.example-item strong')].map((s) => s.textContent)`), ['Studio flat', 'House panel', 'Workshop with a backup input', 'Automatic backup with a transfer controller'], 'examples listed');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('.example-item strong')].map((s) => s.textContent)`), ['Studio flat', 'House panel', 'Workshop with a backup input', 'Automatic backup with a transfer controller', 'TN-C-S entry with a PEN conductor'], 'examples listed');
     await browser.evaluate(`[...document.querySelectorAll('.example-item')].find((b) => b.textContent.startsWith('Workshop')).click()`);
     await browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 300)); [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click(); })()`);
     await browser.waitFor(`document.getElementById('status').textContent.includes('Workshop with a backup input loaded')`, 'the example to load');
@@ -356,7 +356,7 @@ try {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('colour-scheme').click()`);
     await browser.waitFor(`document.querySelector('dialog[open] .colours-table')`, 'the colours dialog');
-    expectEqual(await browser.evaluate(`document.querySelectorAll('dialog[open] .colours-table tbody tr').length`), 9, 'one row for each conductor');
+    expectEqual(await browser.evaluate(`document.querySelectorAll('dialog[open] .colours-table tbody tr').length`), 10, 'one row for each conductor');
     await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'pue'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click()`);
     await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:colour-scheme') ?? '{}').scheme === 'pue'`, 'the chosen scheme to be stored');

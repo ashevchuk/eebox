@@ -5,6 +5,7 @@ import { formatAmps, loadReports, type LoadReport } from './loads';
 import { netContextOf, PASSIVE_KINDS, type NetContext, type Resolve } from './context';
 import type { Net, NetTerminal } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
+import { earthingFindings } from './earthingRules';
 import { protectionWarnings } from './protection';
 import type { Terminal } from './terminals';
 
@@ -51,6 +52,7 @@ export function findRuleFindings(project: Project, resolve: Resolve, settings: C
   const moduleNodeOf = (placementId: string) => project.schematic.nodes.filter((n) => n.placementId === placementId).map((n) => n.id);
   return [
     ...openEarth(context),
+    ...earthingFindings(project, resolve, (id) => context.name({ kind: 'node', id })),
     ...unfedModules(context),
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
@@ -62,7 +64,7 @@ export function findRuleFindings(project: Project, resolve: Resolve, settings: C
 function openEarth({ project, netOf, name }: Context): RuleFinding[] {
   return project.schematic.nodes.flatMap((node) => {
     if (node.kind !== 'load') return [];
-    const earth = freeNodeTerminals(node).find((t) => t.conductor === 'PE');
+    const earth = freeNodeTerminals(node).find((t) => t.conductor === 'PE' || t.conductor === 'PEN');
     return earth && !netOf.has(`n:${node.id}/${earth.id}`)
       ? [about(`${name({ kind: 'node', id: node.id })} [${node.id}]: protective earth is not connected`, { nodes: [node.id] })]
       : [];

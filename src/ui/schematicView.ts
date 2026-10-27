@@ -88,6 +88,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-load': 'The load data is out of range.',
   'invalid-section': 'That cross-section is not in the table.',
   'invalid-route': 'That route cannot be used.',
+  'invalid-earthing': 'That is not an earthing system.',
 };
 const COLORS = {
   selection: '#f5c518',
@@ -510,9 +511,9 @@ export class SchematicView implements View {
   }
 
   addFreeNode(preset: FreeNodePreset): void {
-    const { kind, label, conductors } = FREE_NODE_PRESETS[preset];
+    const { kind, label, conductors, ...rest } = FREE_NODE_PRESETS[preset];
     const project = this.session.project;
-    const prototype = { kind, label, conductors: [...conductors] };
+    const prototype = { kind, label, conductors: [...conductors], ...rest };
     const { layout } = this.frame();
     const spot = freeSpot(layout, prototype, this.startForNew(kind, layout));
     const { schematic, node } = addNode(project.schematic, { ...prototype, ...spot });

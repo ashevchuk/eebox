@@ -1,6 +1,6 @@
 import type { Placement } from '../layout/placement';
 import { evaluateExpression, parseExpression } from '../library/logicExpression';
-import { familyOf, type Conductor, type ModuleDef } from '../library/types';
+import { familiesMayShareNet, familyOf, type Conductor, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { Components, netContextOf, PASSIVE_KINDS, type Resolve } from './context';
 import { buildNets, terminalKey } from './nets';
@@ -88,11 +88,13 @@ export function conflictingConductors(conductors: Iterable<Conductor>): boolean 
   }
   const phases = [...fixed].filter((c) => familyOf(c) === 'phase');
   const others = [...fixed].filter((c) => familyOf(c) !== 'phase');
-  return phases.length > 1 || others.length > 1 || (others.length === 1 && (phases.length > 0 || anyPhase));
+  const families = new Set(others.map(familyOf));
+  const twoOfOneFamily = families.size < others.length;
+  return phases.length > 1 || twoOfOneFamily || !familiesMayShareNet(families) || (others.length > 0 && (phases.length > 0 || anyPhase));
 }
 
 const MAX_LOGIC_PASSES = 20;
-const isMains = (conductor: Conductor) => ['phase', 'N', 'PE'].includes(familyOf(conductor));
+const isMains = (conductor: Conductor) => ['phase', 'N', 'PE', 'PEN'].includes(familyOf(conductor));
 
 /**
  * Which phase terminals carry voltage, given the position of every switching device and which

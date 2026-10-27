@@ -2,6 +2,7 @@ import houseText from '../examples/house-panel.json?raw';
 import studioText from '../examples/studio-flat.json?raw';
 import workshopText from '../examples/workshop-backup.json?raw';
 import autoBackupText from '../examples/workshop-auto-backup.json?raw';
+import tncsText from '../examples/tn-c-s.json?raw';
 
 export interface Example {
   id: string;
@@ -35,5 +36,11 @@ export const EXAMPLES: readonly Example[] = [
     title: 'Automatic backup with a transfer controller',
     description: 'Three phase: a transfer controller watches mains and generator and closes one of two contactors. Switch Mains off in the inspector to see the generator take over.',
     text: autoBackupText,
+  },
+  {
+    id: 'tn-c-s',
+    title: 'TN-C-S entry with a PEN conductor',
+    description: 'Three phase from a PEN supply: the PEN conductor is split into N and PE in one block, an earth electrode is bonded to the PEN, and three RCBO circuits follow.',
+    text: tncsText,
   },
 ];

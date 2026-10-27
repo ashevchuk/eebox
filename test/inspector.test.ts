@@ -141,7 +141,7 @@ describe('inspect: what is shown', () => {
     expect(field(ctx({ nodeId: 'n4' }, 'schematic'), 'conductors')).toMatchObject({
       kind: 'choices',
       value: ['L1', 'L2', 'L3', 'N', 'PE'],
-      options: ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'C', 'DCP', 'DCN'],
+      options: ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'PEN', 'C', 'DCP', 'DCN'],
     });
     const orphaned: Project = { ...build(), panel: { ...build().panel, placements: [] } };
     expect(keysOf(ctx({ nodeId: 'n1' }, 'schematic', orphaned))).toEqual(

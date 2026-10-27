@@ -1,6 +1,7 @@
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import { CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
+import { EARTHING_SYSTEM_IDS } from '../electrical/earthing';
 import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
@@ -180,6 +181,7 @@ const NODE_SPEC: FieldSpec = {
   conductors: { required: false, check: conductorsCheck },
   load: { required: false, check: objectCheck },
   off: { required: false, check: (v) => (v === true ? null : 'must be true when present') },
+  earthing: { required: false, check: oneOf(EARTHING_SYSTEM_IDS) },
   shortCircuitKA: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_SHORT_CIRCUIT_KA ? null : `must be above 0 and at most ${MAX_SHORT_CIRCUIT_KA}`) },
   loopImpedanceMOhm: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_LOOP_IMPEDANCE_MOHM ? null : `must be above 0 and at most ${MAX_LOOP_IMPEDANCE_MOHM}`) },
 };
@@ -211,6 +213,7 @@ function checkNodeShape(node: Record<string, unknown>, path: string, errors: Val
     errors.push({ path: `${path}.conductors`, message: 'is required for source and load nodes' });
   }
   if (node.off !== undefined && node.kind !== 'source') errors.push({ path: `${path}.off`, message: 'is only allowed on a source node' });
+  if (node.earthing !== undefined && node.kind !== 'source') errors.push({ path: `${path}.earthing`, message: 'is only allowed on a source node' });
   for (const key of ['shortCircuitKA', 'loopImpedanceMOhm']) {
     if (node[key] !== undefined && node.kind !== 'source') errors.push({ path: `${path}.${key}`, message: 'is only allowed on a source node' });
   }

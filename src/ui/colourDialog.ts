@@ -27,6 +27,7 @@ const MEANING: Record<Conductor, string> = {
   L3: 'phase 3 (C)',
   N: 'neutral',
   PE: 'protective earth',
+  PEN: 'neutral and protective earth in one',
   C: 'contact, signal',
   DCP: 'DC plus',
   DCN: 'DC minus',
