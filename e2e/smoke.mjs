@@ -271,8 +271,9 @@ try {
   });
 
   await step('the designer builds a distribution block of one input and six outputs, with a variant for each conductor', async () => {
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the first designer to close');
     await browser.evaluate(`document.getElementById('new-module').click()`);
-    await browser.waitFor(`document.querySelector('.designer-dialog[open]')`, 'the designer');
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-toolbar button')].some((b) => b.textContent === 'Block…')`, 'the designer');
     await browser.evaluate(`(() => {
       const field = (t) => [...document.querySelectorAll('.designer-fields .inspector-field')].find((r) => r.innerText.startsWith(t)).querySelector('input,select');
       for (const [label, value] of [['Name', 'Block 125'], ['Kind', 'terminal'], ['Width', '2']]) { const f = field(label); f.value = value; f.dispatchEvent(new Event('change', { bubbles: true })); }
