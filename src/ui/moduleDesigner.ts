@@ -239,6 +239,7 @@ export const TERMINAL_PRESETS: readonly TerminalPreset[] = [
   preset('supply1', 'Supply L, N', ['L', 'N'], (taken) => suffixed(['L', 'N'], taken)),
   preset('supply3', 'Supply L1, L2, L3, N', ['L1', 'L2', 'L3', 'N'], (taken) => suffixed(['L1', 'L2', 'L3', 'N'], taken)),
   preset('earth', 'Earth (PE)', ['PE'], (taken) => suffixed(['PE'], taken)),
+  preset('pen', 'PEN (neutral and earth in one)', ['PEN'], (taken) => suffixed(['PEN'], taken)),
   preset('dc', 'DC supply (24V, 0V)', ['DCP', 'DCN'], (taken) => suffixed(['24V', '0V'], taken)),
   preset('sensor', 'Sensor input (S1, S2)', ['C', 'C'], (taken) => suffixed(['S1', 'S2'], taken)),
   {

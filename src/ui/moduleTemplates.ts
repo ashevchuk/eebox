@@ -37,4 +37,5 @@ export const MODULE_TEMPLATES: readonly ModuleTemplate[] = [
   fromBundled('pilot-light-230', 'indicator', 'Pilot light'),
   fromBundled('psu-24v-1a', 'power-supply', 'Power supply, 24 V DC'),
   fromBundled('changeover-2p-63', 'changeover', 'Changeover switch for a backup input'),
+  fromBundled('pen-split-12', 'pen-splitter', 'PEN splitting block'),
 ];

@@ -299,6 +299,25 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click()`);
   });
 
+  await step('the earthing system chosen for a source gives it the conductors of that system', async () => {
+    await clickButton('Schematic');
+    await clickButton('Nodes');
+    await browser.evaluate(`document.getElementById('add-source3').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('#inspector .inspector-field')].some((r) => r.querySelector('label').textContent === 'Earthing')`, 'the earthing field');
+    const choose = (system) => browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label').textContent === 'Earthing');
+      const select = row.querySelector('select'); select.value = ${JSON.stringify(system)}; select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    const ticked = () => browser.evaluate(`[...[...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label').textContent === 'Conductors').querySelectorAll('input:checked')].map((b) => b.parentElement.textContent.trim())`);
+    await choose('TN-C-S');
+    await browser.waitFor(`[...document.querySelectorAll('#inspector input:checked')].some((b) => b.parentElement.textContent.trim() === 'PEN')`, 'the PEN conductor to be ticked');
+    expectEqual(await ticked(), ['L1', 'L2', 'L3', 'PEN'], 'the conductors of TN-C-S');
+    await choose('TT');
+    await browser.waitFor(`![...document.querySelectorAll('#inspector input:checked')].some((b) => b.parentElement.textContent.trim() === 'PEN')`, 'the PEN conductor to be unticked');
+    expectEqual(await ticked(), ['L1', 'L2', 'L3', 'N', 'PE'], 'the conductors of TT');
+    await clickButton('Panel');
+  });
+
   await step('an example is chosen from the File menu and loads without problems', async () => {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('open-example').click()`);

@@ -26,7 +26,7 @@ import {
   type ModuleRef,
   type Placement,
 } from '../layout/placement';
-import { EARTHING_SYSTEMS, isEarthingSystem, EARTHING_SYSTEM_IDS, type EarthingSystemId } from '../electrical/earthing';
+import { EARTHING_SYSTEMS, conductorsForSystem, isEarthingSystem, EARTHING_SYSTEM_IDS, type EarthingSystemId } from '../electrical/earthing';
 import { CABLE_TABLE_NOTE, CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
 import {
   CIRCUIT_KINDS,
@@ -43,7 +43,7 @@ import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrica
 import { mmFromUnits } from '../layout/units';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
-import { CONDUCTORS, type Conductor, type ModuleDef } from '../library/types';
+import { CONDUCTORS, familyOf, type Conductor, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import {
   moveNode,
@@ -189,7 +189,7 @@ function loadFields(project: Project, resolve: Resolve, node: SchematicNode, set
   if (node.kind === 'source') {
     return [
       { key: 'supply', label: 'Supply', kind: 'select', value: node.off ? 'off' : 'on', options: ['on', 'off'], hint: 'off to see what loses power' },
-      { key: 'earthing', label: 'Earthing', kind: 'select', value: node.earthing ?? NO_EARTHING, options: [NO_EARTHING, ...EARTHING_SYSTEM_IDS], hint: node.earthing ? EARTHING_SYSTEMS[node.earthing].description : 'the system the checks assume; none for unknown' },
+      { key: 'earthing', label: 'Earthing', kind: 'select', value: node.earthing ?? NO_EARTHING, options: [NO_EARTHING, ...EARTHING_SYSTEM_IDS], hint: node.earthing ? EARTHING_SYSTEMS[node.earthing].description : 'choosing one gives the source the conductors of that system' },
       { key: 'shortCircuitKA', label: 'Short-circuit', kind: 'number', value: node.shortCircuitKA ?? '', hint: 'kA at the panel; empty for unknown' },
       { key: 'loopImpedanceMOhm', label: 'Loop impedance', kind: 'number', value: node.loopImpedanceMOhm ?? '', hint: 'mOhm phase to neutral; empty for unknown' },
     ];
@@ -696,7 +696,21 @@ export function applyEdit(
       }
       if (key === 'earthing' && node.kind === 'source') {
         if (text !== NO_EARTHING && !isEarthingSystem(text)) return fail(describeError('invalid-earthing'));
-        const result = setSourceEarthing(schematic, node.id, text === NO_EARTHING ? undefined : (text as EarthingSystemId));
+        const system = text === NO_EARTHING ? undefined : (text as EarthingSystemId);
+        let next = schematic;
+        if (system) {
+          const conductors = conductorsForSystem(system, node.conductors ?? []);
+          const same = conductors.length === node.conductors?.length && conductors.every((c) => node.conductors?.includes(c));
+          const changed = same ? undefined : setNodeConductors(schematic, node.id, conductors);
+          if (changed && !changed.ok) return fail(describeError(changed.error));
+          if (changed?.ok) {
+            if (changed.droppedWires > 0 && !options.confirmed) {
+              return { ok: false, message: '', needsConfirm: { message: `${system} gives the source ${conductors.filter((c) => familyOf(c) !== 'phase').join(', ')}; this removes ${plural(changed.droppedWires, 'wire')} from conductors that go away. Continue?` } };
+            }
+            next = changed.schematic;
+          }
+        }
+        const result = setSourceEarthing(next, node.id, system);
         return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
       }
       if (key === 'supply' && node.kind === 'source') {

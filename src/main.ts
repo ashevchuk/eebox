@@ -630,7 +630,7 @@ byId('export-bom').addEventListener('click', exportBom);
 byId('export-circuits').addEventListener('click', exportCircuits);
 byId('export-wires').addEventListener('click', exportWires);
 byId('export-wire-labels').addEventListener('click', exportWireLabels);
-for (const preset of ['source1', 'source3', 'sourcePen', 'load1', 'load3', 'earthElectrode'] as const) {
+for (const preset of ['source1', 'source3', 'sourcePen1', 'sourcePen', 'load1', 'load3', 'earthElectrode'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => {
     schematicView.addFreeNode(preset);
     fitView('schematic');

@@ -53,6 +53,13 @@ export const isEarthingSystem = (value: unknown): value is EarthingSystemId =>
 /** Smallest copper cross-section of a PEN conductor, from IEC 60364-5-54 (not checked against the text of the standard). */
 export const PEN_MIN_SECTION_MM2 = 10;
 
+/** The conductors a source has under a system: its phases and control conductors, those the system gives, and the optional ones it already has. */
+export function conductorsForSystem(system: EarthingSystemId, current: readonly Conductor[]): Conductor[] {
+  const { required, optional } = EARTHING_SYSTEMS[system] as EarthingSystem;
+  const kept = current.filter((c) => familyOf(c) === 'phase' || familyOf(c) === 'control');
+  return [...kept, ...required, ...optional.filter((c) => current.includes(c))];
+}
+
 /** What is wrong with the conductors of a source for its earthing system, or null when they fit. */
 export function earthingProblem(system: EarthingSystemId, conductors: readonly Conductor[]): string | null {
   const { label, required, optional } = EARTHING_SYSTEMS[system] as EarthingSystem;

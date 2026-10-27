@@ -732,6 +732,7 @@ export class SchematicView implements View {
     }
     ctx.fillText(label, r.x + r.width / 2 + 3, r.y + r.height / 2);
     ctx.font = '8px sans-serif';
+    if (node.earthing) ctx.fillText(node.earthing, r.x + r.width / 2 + 3, r.y + 8);
     for (const { terminal, point } of layout.ports) {
       const custom = placement?.terminalLabels?.[terminal.id];
       ctx.fillText(custom ? fitToWidth(ctx, custom, TERMINAL_LABEL_WIDTH) : terminal.name, point.x, point.y + (terminal.side === 'top' ? 9 : -9));
