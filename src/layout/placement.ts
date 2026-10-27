@@ -1,3 +1,4 @@
+import type { Annotation } from './annotations';
 import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
 import { LAYOUT_EPSILON_UNITS } from './units';
@@ -43,6 +44,8 @@ export interface Panel {
   title?: string;
   /** Which version this is and what the people it was passed to decided; only when something is stated. */
   info?: ProjectInfo;
+  /** Notes written on the front view; only when there are some. */
+  annotations?: Annotation[];
   /** Snapshot of the enclosure rails, so later library edits cannot move placed modules. */
   railLengthsUnits: number[];
   /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */

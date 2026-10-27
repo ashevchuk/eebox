@@ -8,7 +8,10 @@ import { MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from 
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
-import { stampOf } from '../layout/info';
+import type { Annotation } from '../layout/annotations';
+import { stampParts } from '../layout/info';
+import { t } from '../i18n';
+import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
 import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
 
@@ -40,6 +43,10 @@ export interface Scene {
   ruler?: RulerLine | null;
   /** Draws only the rails and what stands on them, without the frame and its title, as a full-size print needs. */
   bare?: boolean;
+  /** The notes to draw when they are not those of the panel, such as while one is dragged. */
+  annotations?: readonly Annotation[];
+  /** The note that is selected, if the selection is a note. */
+  selectedAnnotationId?: string | null;
   /** The kinds of text to draw; all of them when absent. */
   texts?: TextVisibility;
 }
@@ -320,7 +327,7 @@ export function render(
     ctx.lineWidth = 2;
     ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
     if (texts.title) {
-      const stamp = stampOf(panel.info);
+      const stamp = stampParts(panel.info).map(t).join(' · ');
       ctx.fillStyle = theme().label;
       ctx.textBaseline = 'middle';
       let stampWidth = 0;
@@ -386,6 +393,7 @@ export function render(
   }
   ctx.globalAlpha = 1;
   drawLabels(ctx, scene, texts);
+  drawAnnotations(ctx, scene.annotations ?? panel.annotations, scene.selectedAnnotationId ?? null, texts.annotations);
 
   if (scene.ghost) {
     const { module, widthUnits, rail, slot, valid } = scene.ghost;

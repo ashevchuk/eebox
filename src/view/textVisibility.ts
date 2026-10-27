@@ -2,7 +2,9 @@ export const PANEL_TEXTS = ['title', 'rowLabels', 'moduleLabels', 'combLabels', 
 export const SCHEMATIC_TEXTS = ['nodeLabels', 'terminalNames', 'earthing', 'wireLabels', 'currents'] as const;
 /** Text of the print sheet around the drawings; it has no place on the screen. */
 export const SHEET_TEXTS = ['sheetTitle', 'captions'] as const;
-export const TEXT_KINDS = [...PANEL_TEXTS, ...SCHEMATIC_TEXTS, ...SHEET_TEXTS] as const;
+/** Notes written on a drawing by hand, whichever drawing it is. */
+export const GENERAL_TEXTS = ['annotations'] as const;
+export const TEXT_KINDS = [...PANEL_TEXTS, ...SCHEMATIC_TEXTS, ...GENERAL_TEXTS, ...SHEET_TEXTS] as const;
 export type TextKind = (typeof TEXT_KINDS)[number];
 
 /** Which kinds of text a drawing shows. */
@@ -21,6 +23,7 @@ export const TEXT_NAMES: Record<TextKind, string> = {
   earthing: 'Earthing system on sources',
   wireLabels: 'Wire labels',
   currents: 'Currents on wires',
+  annotations: 'Notes written on the drawings',
   sheetTitle: 'Title and headings of the lists',
   captions: 'Captions under the drawings',
 };

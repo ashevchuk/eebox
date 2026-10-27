@@ -10,6 +10,7 @@ import { findFindings, type Finding } from '../electrical/problems';
 import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
 import { History } from '../view/history';
+import type { Annotation } from '../layout/annotations';
 import type { LengthUnit } from '../project/lengthUnitStorage';
 import { ALL_TEXT, type TextVisibility } from '../view/textVisibility';
 
@@ -24,6 +25,8 @@ export interface Selection {
   /** Set instead of `wireId` when several wires are selected together. */
   wireIds?: string[];
   combId?: string;
+  /** A note written on the drawing of the view that is on. */
+  annotationId?: string;
   /** Set instead of `placementId` and `combId` when several items are selected together. */
   placementIds?: string[];
   combIds?: string[];
@@ -55,6 +58,10 @@ export class Session {
   /** The kinds of text that PNG, SVG and print show, whatever the screen shows. */
   exportTexts: TextVisibility = ALL_TEXT;
   mode: Mode = 'panel';
+  /** The tool that puts a note on the drawing is on: the next press and drag on the drawing writes one. */
+  noteTool = false;
+  /** The notes of the view that is on while one is being dragged, before the drag is committed. */
+  annotationDraft: { mode: Mode; list: Annotation[] } | null = null;
   selection: Selection = {};
   /** Whether the drawings mark the faults and the advice; off while exporting, so a drawing for others is not full of red. */
   marksVisible = true;
@@ -111,6 +118,12 @@ export class Session {
   readonly widthOf = this.lookups.widthOf;
   readonly resizeOf = this.lookups.resizeOf;
   readonly combLookup = this.lookups.combLookup;
+
+  /** The notes a drawing shows: those being dragged, or those of the project. */
+  notesOf(mode: Mode): Annotation[] | undefined {
+    if (this.annotationDraft?.mode === mode) return this.annotationDraft.list;
+    return mode === 'panel' ? this.project.panel.annotations : this.project.schematic.annotations;
+  }
 
   subscribe(listener: () => void): void {
     this.listeners.add(listener);

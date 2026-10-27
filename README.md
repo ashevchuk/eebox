@@ -52,6 +52,12 @@ A transfer controller and two contactors switch a workshop to the generator when
   When a file comes back, *File > Compare with a file...* (or *Compare* on a project of the list) shows what differs from the project on the screen: the information, rows, modules, combs, schematic nodes, loads and wires, each with where it was and where it is now.
 
   ![What a reviewed file changed](docs/images/compare.png)
+- **Notes on the drawings.** *Note* in the toolbar writes a note on the front view or the schematic: press where it points and drag to where the note goes (an arrow is drawn), or just click for a note without an arrow, then type the text. A note is moved by its plate, its arrow by the head, edited with a double click and removed with Delete. Notes go into the PNG, SVG and print, and *Text in exports* can leave them out; the comparison of two projects lists them.
+- **Keyboard.** With something selected, the arrow keys move it (modules a unit along the rail or between rails, Alt for a quarter of a unit; nodes 10 mm, Shift for 50 mm), Tab and Shift+Tab go to the next or previous module or node, Enter goes to its fields in the inspector and Escape lets go.
+- **Wiring helpers.** *Nodes > Feed the others from the first* wires the outputs of the node that was selected first to the inputs of the others, and *Chain the selected nodes* wires each selected node to the next one down.
+- **Small windows and touch.** Below 1000 px the library and the inspector are drawers over the drawing, one at a time; two fingers zoom and move the drawing on a touch screen, and a trackpad pinch zooms.
+- **Several tabs.** The autosave is one entry for the whole site, so a second tab that writes it is noticed: this tab stops saving and asks which version stands, the other tab's or its own.
+- **Ukrainian and English.** *View > Language* switches the interface; it starts in the language the browser asks for. The text of the page, the dialogs, the inspector and the common messages are translated; the text of files that are refused for being wrong, the names of the modules of a library and everything you write yourself stay as they are.
 - **Snippets.** *Save selection as snippet...* keeps the selected modules with the wires between them under a name; *Insert* puts them on the panel at the nearest free place, with new ids and new nodes on the schematic, and takes the module definitions along if the project does not know them.
 - **Finding and moving about.** *Ctrl+F* (or *Find*) looks for a module, comb, source, load or wire by label, name, article number or id and takes you to it; *F* (or *Zoom to selection*) zooms to what is selected, and shows everything when nothing is; a minimap in the corner shows where the view is and moves it on a click or drag (*View > Minimap*).
 - **Arranging modules.** The *Modules* menu packs the selected modules to the left or right, spreads them with equal gaps, puts them at the start or end of the row, and copies a whole row with its modules, combs and label.
@@ -109,6 +115,7 @@ Pushes to `main` run the tests and deploy `dist-file/` to GitHub Pages.
 - Currents assume 230 V single-phase and balanced 400 V three-phase loads. Wires behind a phase bar, and wires in a loop, show no current.
 - The checks are advice, not a design verification.
 - A project keeps its own copy of the modules it uses, so a changed library reaches it only through *Update modules from libraries*.
+- The Ukrainian translation covers the interface and the common messages; some technical messages, such as why a file was refused, are English in both languages.
 
 ## License
 

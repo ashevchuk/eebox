@@ -85,11 +85,18 @@ export async function launch({ width = 1516, height = 784 } = {}) {
     },
     /** `modifiers` is the DevTools bit mask: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift. */
     /** A real key press, as the browser would get it from the keyboard: it also does what the key does by default. */
-    key: async (key, code, keyCode, text = '') => {
-      await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key, code, windowsVirtualKeyCode: keyCode, text });
-      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
+    key: async (key, code, keyCode, text = '', modifiers = 0) => {
+      await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key, code, windowsVirtualKeyCode: keyCode, text, modifiers });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode, modifiers });
     },
     mouse: async (type, x, y, modifiers = 0) => send('Input.dispatchMouseEvent', { type, x, y, modifiers, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }),
+    /** Makes the page believe the window has this size, as a small screen would; `touch` also emulates a touch screen. */
+    resize: (width, height, touch = false) =>
+      width === 0 ? send('Emulation.clearDeviceMetricsOverride') : send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch }),
+    /** Turns a touch screen on or off; fingers are then put down with `touch`. */
+    touchScreen: (enabled) => send('Emulation.setTouchEmulationEnabled', { enabled, maxTouchPoints: 5 }),
+    /** `type` is touchStart, touchMove or touchEnd; `points` are the fingers that are down, with an id each. */
+    touch: (type, points) => send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: p.id })) }),
     media: (media) => send('Emulation.setEmulatedMedia', { media }),
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'),
     pdf: async () => Buffer.from((await send('Page.printToPDF', { preferCSSPageSize: true, printBackground: true })).data, 'base64'),

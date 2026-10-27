@@ -142,6 +142,11 @@
       body[data-mode='schematic'] .panel-only,
       body[data-mode='schematic'] #sidebar, body[data-mode='schematic'] #sidebar-resizer { display: none; }
       body.hide-sidebar #sidebar, body.hide-inspector #inspector, body.hide-sidebar #sidebar-resizer, body.hide-inspector #inspector-resizer { display: none; }
+      body.narrow #sidebar, body.narrow #inspector { position: absolute; top: 0; bottom: 0; z-index: 20; max-width: 88vw; box-shadow: 0 0 24px rgba(0, 0, 0, 0.6); }
+      body.narrow #sidebar { left: 0; }
+      body.narrow #inspector { right: 0; }
+      body.narrow .resizer { display: none; }
+      body.narrow #minimap { width: 120px; height: 78px; right: 8px; bottom: 8px; }
       .resizer { flex: 0 0 5px; margin: 0 -2px; z-index: 1; cursor: col-resize; background: transparent; touch-action: none; }
       .resizer:hover, .resizer:focus-visible, .resizer.dragging { background: var(--accent); outline: none; }
       #inspector {
@@ -193,7 +198,7 @@
       }
       #status:empty { display: none; }
       #status.error { color: var(--error); border-color: var(--error); }
-      main { flex: 1; display: flex; min-height: 0; }
+      main { flex: 1; display: flex; min-height: 0; position: relative; }
       #sidebar {
         width: var(--sidebar-width, 240px);
         flex: 0 0 auto;
@@ -388,6 +393,9 @@
       #minimap[hidden] { display: none; }
       #search { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 6; padding: 8px; }
       #search[hidden] { display: none; }
+      #conflict { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); background: var(--panel); border: 1px solid #f59e0b; border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 8; padding: 10px 14px; }
+      #conflict[hidden] { display: none; }
+      #conflict p { margin: 0 0 8px; white-space: normal; }
       #tour { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); z-index: 7; padding: 10px 14px; }
       #tour[hidden] { display: none; }
       #tour p { margin: 6px 0 10px; white-space: normal; }
@@ -469,6 +477,8 @@
           <hr />
           <div class="text-options"><label class="text-option"><input id="view-minimap" type="checkbox" checked /> Minimap</label></div>
           <hr />
+          <div class="text-options"><label class="text-option">Language <select id="language" translate="no"></select></label></div>
+          <hr />
           <button class="menu-item" role="menuitem" id="show-all-text">Show all text</button>
           <button class="menu-item" role="menuitem" id="hide-all-text">Hide all text</button>
         </div>
@@ -519,6 +529,8 @@
           <button class="menu-item" role="menuitem" id="route-automatically" title="Take the hand-drawn routes off all wires and let the program route them">Route all wires automatically</button>
           <button class="menu-item" role="menuitem" id="remove-orphans" title="Remove nodes of modules that are gone from the panel, when they have no wires">Remove orphans</button>
           <hr />
+          <button class="menu-item" role="menuitem" id="feed-from-first" title="The node you Ctrl+clicked first feeds the other selected nodes: its outputs are wired to their inputs">Feed the others from the first</button>
+          <button class="menu-item" role="menuitem" id="chain-selected" title="Wire the selected nodes one to the next, from the top down: each output to the next input">Chain the selected nodes</button>
           <button class="menu-item" role="menuitem" id="arrange-nodes" title="Put every node in a row by its distance from a source, the loads at the bottom">Arrange nodes</button>
           <button class="menu-item" role="menuitem" id="align-left" title="Line the selected nodes up on their left edge">Align left</button>
           <button class="menu-item" role="menuitem" id="align-centre" title="Line the selected nodes up on their middle, one above another">Align centre</button>
@@ -538,6 +550,7 @@
         <button id="fit">Fit</button>
         <button id="zoom-selection" title="Zoom to what is selected; shows everything when nothing is (F)">Zoom to selection</button>
         <button id="find" title="Find a module, node or wire by its label (Ctrl+F)">Find</button>
+        <button id="note-tool" title="Write a note on the drawing: press where it points and drag to where the note goes, or just click; Esc cancels">Note</button>
         <button id="ruler" class="panel-only" title="Measure on the panel: drag from point to point; ends snap to edges (R)">Ruler</button>
       </div>
       <span class="toolbar-separator"></span>
@@ -563,7 +576,7 @@
         <div id="palette"></div>
       </aside>
       <div id="sidebar-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" tabindex="0" title="Drag to resize, double-click to reset"></div>
-      <div id="stage-wrap"><canvas id="stage"></canvas><canvas id="minimap" title="Click or drag to move the view"></canvas><div id="search" hidden></div><div id="tour" hidden></div><div id="problems" hidden></div></div>
+      <div id="stage-wrap"><canvas id="stage"></canvas><canvas id="minimap" title="Click or drag to move the view"></canvas><div id="search" hidden></div><div id="tour" hidden></div><div id="conflict" role="alert" hidden></div><div id="problems" hidden></div></div>
       <div id="inspector-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the inspector" tabindex="0" title="Drag to resize, double-click to reset"></div>
       <aside id="inspector"><div id="inspector-content"></div></aside>
     </main>

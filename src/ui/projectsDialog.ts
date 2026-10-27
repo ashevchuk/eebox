@@ -1,4 +1,4 @@
-import { stampOf } from '../layout/info';
+import { stampParts } from '../layout/info';
 import { newestFirst, savedProjects, snapshotsOf, type StoredProject } from '../project/projectStore';
 
 export interface ProjectsHost {
@@ -18,10 +18,17 @@ export interface ProjectsHost {
   importFiles(files: File[]): Promise<string>;
 }
 
-const counts = (p: StoredProject): string => {
+const countParts = (p: StoredProject): string[] => {
   const { placements } = p.file.project.panel;
   const { wires, nodes } = p.file.project.schematic;
-  return `${placements.length} module${placements.length === 1 ? '' : 's'}, ${nodes.length} node${nodes.length === 1 ? '' : 's'}, ${wires.length} wire${wires.length === 1 ? '' : 's'}`;
+  return [`${placements.length} module${placements.length === 1 ? '' : 's'}`, `${nodes.length} node${nodes.length === 1 ? '' : 's'}`, `${wires.length} wire${wires.length === 1 ? '' : 's'}`];
+};
+
+/** The words under a project's name, as text nodes of their own, so that each can be put into another language. */
+const detailOf = (p: StoredProject, current: boolean): string[] => {
+  const [modules, nodes, wires] = countParts(p);
+  const stamp = stampParts(p.file.project.panel.info).flatMap((part) => [' · ', part]);
+  return [new Date(p.savedAt).toLocaleString(), ' · ', modules!, ', ', nodes!, ', ', wires!, ...stamp, ...(current ? [' · ', 'open now'] : [])];
 };
 
 /** The projects kept in this browser: save the one on the screen, open another, take one away. */
@@ -83,8 +90,7 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
     const heading = document.createElement('strong');
     heading.textContent = project.title || 'Untitled panel';
     const detail = document.createElement('small');
-    const stamp = stampOf(project.file.project.panel.info);
-    detail.textContent = `${new Date(project.savedAt).toLocaleString()} · ${counts(project)}${stamp ? ` · ${stamp}` : ''}${project.id === current ? ' · open now' : ''}`;
+    detail.append(...detailOf(project, project.id === current));
     name.append(heading, detail);
     const open = document.createElement('button');
     open.textContent = 'Open';

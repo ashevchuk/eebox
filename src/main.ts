@@ -15,7 +15,8 @@ import { describeDiff } from './library/compare';
 import { libraryFromCsv } from './library/csvImport';
 import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
-import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
+import { AUTOSAVE_KEY, loadAutosave, saveAutosave, serializeAutosave, type KeyValueStore } from './project/autosave';
+import { TabGuard } from './project/tabGuard';
 import { bomToCsv, buildBom } from './project/bom';
 import { emptyHint } from './ui/help';
 import { openHelpDialog } from './ui/helpDialog';
@@ -30,6 +31,8 @@ import { problemEntries, focusOf, focusOfObjects, objectsOfSelection, type Focus
 import { loadFlag, saveFlag } from './project/flagStorage';
 import { arrangeModules, duplicateRow, type ArrangeHow } from './layout/arrangeModules';
 import { MAX_RAILS } from './layout/limits';
+import { LANGUAGES, LANGUAGE_NAMES, startLanguage, t, type Language } from './i18n';
+import { loadLanguage, saveLanguage } from './i18n/language';
 import { TOUR_DONE_KEY } from './ui/tour';
 import { TourView } from './ui/tourView';
 import { canonicalJson } from './project/canonical';
@@ -75,7 +78,10 @@ import { PaletteView } from './ui/paletteView';
 import { DEFAULT_PRINT_OPTIONS, pageRule, type PrintOptions } from './project/printOptions';
 import { openPrintDialog } from './ui/printDialog';
 import { fillPrintSheet } from './ui/printSheet';
-import { groupSelection, selectedIds, selectedWires } from './ui/selection';
+import { MAX_ANNOTATIONS, MAX_NOTE_CHARS, addAnnotation, hitAnnotation, moveAnnotation, removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from './layout/annotations';
+import { centreOf, pinchStep, type Pair } from './view/pinch';
+import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, type Arrow } from './ui/keyboardMoves';
+import { groupSelection, selectedIds, selectedNodes, selectedWires } from './ui/selection';
 import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
@@ -136,7 +142,8 @@ function requestRender(): void {
     renderQueued = false;
     const dpr = window.devicePixelRatio || 1;
     activeView().draw(ctx, stageWrap.clientWidth, stageWrap.clientHeight, dpr);
-    drawHint(ctx, session.marksVisible ? emptyHint(session.project, session.mode) : [], stageWrap.clientWidth, stageWrap.clientHeight, dpr);
+    drawHint(ctx, session.marksVisible ? emptyHint(session.project, session.mode).map(t) : [], stageWrap.clientWidth, stageWrap.clientHeight, dpr);
+    drawNotePreview(ctx, dpr);
     drawMinimap();
   });
 }
@@ -201,17 +208,175 @@ function isOverCanvas(e: PointerEvent): boolean {
   return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 }
 
+/** Fingers on the canvas; two of them zoom and move the view, and the drawing is left alone meanwhile. */
+const touches = new Map<number, Point>();
+let pinchPair: Pair | null = null;
+let pinchLocked = false;
+
+function currentPair(): Pair | null {
+  const [a, b] = [...touches.values()];
+  return a && b ? { a, b } : null;
+}
+
+/* Notes written on the drawing: one is made by pressing where it points and dragging to where it goes. */
+const NOTE_DRAG_MIN_PX = 6;
+const NOTE_HIT_PX = 8;
+let noteGesture: { from: Point; to: Point } | null = null;
+let noteDrag: { id: string; part: 'head' | 'body'; last: Point } | null = null;
+
+const NOTE_ERRORS = {
+  'too-many': `A drawing can have at most ${MAX_ANNOTATIONS} notes.`,
+  'bad-text': `A note is 1 to ${MAX_NOTE_CHARS} characters on one line.`,
+  'unknown-note': 'That note is gone.',
+  'out-of-range': 'That is too far from the drawing.',
+} as const;
+
+const noteButton = byId('note-tool');
+
+function setNoteTool(on: boolean): void {
+  session.noteTool = on;
+  noteButton.classList.toggle('active', on);
+  canvas.style.cursor = on ? 'crosshair' : '';
+  if (!on) noteGesture = null;
+  requestRender();
+}
+
+function setNotes(list: readonly Annotation[]): void {
+  const { project } = session;
+  session.commit(session.mode === 'panel' ? { ...project, panel: withNotes(project.panel, list) } : { ...project, schematic: withNotes(project.schematic, list) });
+}
+
+const projectNotes = (): readonly Annotation[] => (session.mode === 'panel' ? session.project.panel.annotations : session.project.schematic.annotations) ?? [];
+
+async function finishNote(gesture: { from: Point; to: Point }): Promise<void> {
+  const scale = activeView().camera.scale;
+  const dragged = Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * scale >= NOTE_DRAG_MIN_PX;
+  setNoteTool(false);
+  const text = await askForText('Note on the drawing', 'Text', '', 'Add');
+  if (text === null) return;
+  const result = addAnnotation(projectNotes(), dragged ? { at: gesture.to, target: gesture.from, text } : { at: gesture.from, text });
+  if (!result.ok) return showStatus(NOTE_ERRORS[result.error], true);
+  setNotes(result.list);
+  session.select({ annotationId: result.id });
+}
+
+async function editNoteText(id: string): Promise<void> {
+  const note = projectNotes().find((n) => n.id === id);
+  if (!note) return;
+  const text = await askForText('Note on the drawing', 'Text', note.text, 'Change');
+  if (text === null) return;
+  const result = setAnnotationText(projectNotes(), id, text);
+  if (result.ok) setNotes(result.list);
+  else showStatus(NOTE_ERRORS[result.error], true);
+}
+
+function removeSelectedNote(): boolean {
+  const id = session.selection.annotationId;
+  if (!id) return false;
+  setNotes(removeAnnotation(projectNotes(), id));
+  session.select({});
+  return true;
+}
+
+/** The note being made, over the drawing: where the arrow points, and where the text will go. */
+function drawNotePreview(context: CanvasRenderingContext2D, dpr: number): void {
+  if (!noteGesture) return;
+  const camera = activeView().camera;
+  context.save();
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.translate(stageWrap.clientWidth / 2 - camera.x * camera.scale, stageWrap.clientHeight / 2 - camera.y * camera.scale);
+  context.scale(camera.scale, camera.scale);
+  context.strokeStyle = '#f5c518';
+  context.fillStyle = '#f5c518';
+  context.lineWidth = 2 / camera.scale;
+  context.setLineDash([6 / camera.scale, 4 / camera.scale]);
+  context.beginPath();
+  context.moveTo(noteGesture.from.x, noteGesture.from.y);
+  context.lineTo(noteGesture.to.x, noteGesture.to.y);
+  context.stroke();
+  context.setLineDash([]);
+  context.beginPath();
+  context.arc(noteGesture.from.x, noteGesture.from.y, 4 / camera.scale, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size >= 2) {
+      activeView().cancel?.();
+      panFrom = null;
+      pinchLocked = true;
+      pinchPair = currentPair();
+      return;
+    }
+    if (pinchLocked) return;
+  }
   if (e.button === 1 || (e.button === 0 && spaceHeld)) {
     panFrom = { x: e.clientX, y: e.clientY };
     return;
   }
   if (e.button !== 0) return;
+  if (!(session.mode === 'panel' && session.ruler.on)) {
+    const world = worldPoint(e);
+    if (session.noteTool) {
+      noteGesture = { from: world, to: world };
+      return;
+    }
+    const hit = hitAnnotation(projectNotes(), world, NOTE_HIT_PX / activeView().camera.scale);
+    if (hit) {
+      session.select({ annotationId: hit.id });
+      noteDrag = { id: hit.id, part: hit.part, last: world };
+      session.annotationDraft = { mode: session.mode, list: [...projectNotes()] };
+      return;
+    }
+  }
   if (!activeView().pointerDown(e, worldPoint(e))) panFrom = { x: e.clientX, y: e.clientY };
 });
 
+canvas.addEventListener('dblclick', (e) => {
+  const hit = hitAnnotation(projectNotes(), worldPoint(e), NOTE_HIT_PX / activeView().camera.scale);
+  if (hit) void editNoteText(hit.id);
+});
+
 window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const next = currentPair();
+    if (next && pinchPair) {
+      const step = pinchStep(pinchPair, next);
+      if (step) {
+        const rect = canvas.getBoundingClientRect();
+        const camera = activeView().camera;
+        camera.pan(step.pan.x, step.pan.y);
+        const centre = centreOf(next);
+        camera.zoomAt({ x: centre.x - rect.left, y: centre.y - rect.top }, step.factor, stageWrap.clientWidth, stageWrap.clientHeight);
+        pinchPair = next;
+        requestRender();
+      }
+    }
+    if (pinchLocked) return;
+  }
+  if (noteGesture) {
+    noteGesture.to = worldPoint(e);
+    requestRender();
+    return;
+  }
+  if (noteDrag && session.annotationDraft) {
+    const world = worldPoint(e);
+    const [dx, dy] = [world.x - noteDrag.last.x, world.y - noteDrag.last.y];
+    const { list } = session.annotationDraft;
+    const note = list.find((n) => n.id === noteDrag!.id);
+    const result = noteDrag.part === 'head' && note?.target ? setAnnotationTarget(list, noteDrag.id, { x: note.target.x + dx, y: note.target.y + dy }) : moveAnnotation(list, noteDrag.id, dx, dy);
+    if (result.ok) {
+      session.annotationDraft = { mode: session.annotationDraft.mode, list: result.list };
+      noteDrag.last = world;
+      requestRender();
+    }
+    return;
+  }
   if (panFrom) {
     activeView().camera.pan(e.clientX - panFrom.x, e.clientY - panFrom.y);
     panFrom = { x: e.clientX, y: e.clientY };
@@ -219,12 +384,42 @@ window.addEventListener('pointermove', (e) => {
   }
   const world = worldPoint(e);
   activeView().pointerMove(e, world, isOverCanvas(e));
-  if (isOverCanvas(e) && !(session.mode === 'panel' && session.ruler.on)) canvas.style.cursor = activeView().cursorAt?.(world) ?? '';
+  if (isOverCanvas(e) && !session.noteTool && !(session.mode === 'panel' && session.ruler.on)) canvas.style.cursor = activeView().cursorAt?.(world) ?? '';
 });
 
+function endTouch(e: PointerEvent): boolean {
+  if (e.pointerType !== 'touch') return false;
+  touches.delete(e.pointerId);
+  pinchPair = touches.size >= 2 ? currentPair() : null;
+  const wasPinching = pinchLocked;
+  // Fingers left on the screen after a pinch must not drag something along the way out.
+  if (touches.size === 0) pinchLocked = false;
+  return wasPinching;
+}
+
 window.addEventListener('pointerup', (e) => {
+  if (endTouch(e)) return;
+  if (noteGesture) {
+    const gesture = noteGesture;
+    noteGesture = null;
+    gesture.to = worldPoint(e);
+    void finishNote(gesture);
+    return;
+  }
+  if (noteDrag) {
+    const draft = session.annotationDraft;
+    noteDrag = null;
+    session.annotationDraft = null;
+    if (draft && canonicalJson(draft.list) !== canonicalJson(projectNotes())) setNotes(draft.list);
+    else session.changed();
+    return;
+  }
   panFrom = null;
   activeView().pointerUp(e, worldPoint(e));
+});
+
+window.addEventListener('pointercancel', (e) => {
+  endTouch(e);
 });
 
 canvas.addEventListener(
@@ -234,7 +429,8 @@ canvas.addEventListener(
     const rect = canvas.getBoundingClientRect();
     activeView().camera.zoomAt(
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
-      Math.exp(-e.deltaY * 0.0015),
+      // A pinch on a trackpad arrives as a wheel with Ctrl held, and in much smaller steps than a mouse wheel.
+      Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)),
       stageWrap.clientWidth,
       stageWrap.clientHeight,
     );
@@ -282,10 +478,40 @@ window.addEventListener('keydown', (e) => {
   } else if (e.code === 'Escape' && session.ruler.on) {
     session.ruler = { on: false, line: null };
     session.changed();
+  } else if (e.code === 'Escape' && (session.noteTool || noteGesture)) {
+    setNoteTool(false);
+  } else if (e.code === 'Escape' && (hasSelection() || session.selection.annotationId) && !modalOpen()) {
+    session.select({});
+  } else if (!mod && ARROWS.includes(e.code) && hasSelection() && !modalOpen()) {
+    e.preventDefault();
+    if (session.mode === 'panel') {
+      const step = panelStep(e.code as Arrow, e.altKey);
+      panelView.nudgeSelection(step.rail, step.slot);
+    } else {
+      const step = nodeStep(e.code as Arrow, e.shiftKey);
+      schematicView.nudgeSelected(step.dx, step.dy);
+    }
+  } else if (e.code === 'Tab' && !mod && hasSelection() && !modalOpen()) {
+    // With something selected Tab walks through the drawing; Escape lets go, and Tab goes through the buttons again.
+    const next = session.mode === 'panel' ? nextModuleId(session.project.panel, selectedIds(session.selection).placements, e.shiftKey) : nextNodeId(session.project.schematic, selectedNodes(session.selection), e.shiftKey);
+    if (!next) return;
+    e.preventDefault();
+    if (session.mode === 'panel') session.select({ placementId: next });
+    else schematicView.selectNodeById(next);
+    requestRender();
+  } else if (e.code === 'Enter' && !mod && hasSelection() && !modalOpen()) {
+    byId('inspector-content').querySelector<HTMLElement>('input, select, textarea')?.focus();
   } else if (e.code === 'Delete' || e.code === 'Backspace') {
-    activeView().deleteSelection();
+    if (!removeSelectedNote()) activeView().deleteSelection();
   }
 });
+
+const modalOpen = (): boolean => document.querySelector('dialog[open]') !== null;
+
+/** Something the arrow keys, Tab and Enter act on: a module or comb on the panel, a node on the schematic. */
+function hasSelection(): boolean {
+  return session.mode === 'panel' ? selectedIds(session.selection).placements.length + selectedIds(session.selection).combs.length > 0 : selectedNodes(session.selection).length > 0;
+}
 
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') spaceHeld = false;
@@ -1014,6 +1240,9 @@ byId('mode-schematic').addEventListener('click', () => setMode('schematic'));
 byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
 byId('zoom-selection').addEventListener('click', zoomToSelection);
+noteButton.addEventListener('click', () => setNoteTool(!session.noteTool));
+byId('feed-from-first').addEventListener('click', () => schematicView.feedFromFirst());
+byId('chain-selected').addEventListener('click', () => schematicView.chainSelected());
 
 const ARRANGE_MESSAGES = {
   'nothing-to-do': 'Select the modules to line up first, or they already stand so.',
@@ -1142,10 +1371,17 @@ window.addEventListener('hashchange', () => void openSharedHash());
 /** The panels beside the drawing can be hidden, and start hidden in a narrow window; the choice is kept. */
 const PANEL_KEYS = { sidebar: 'eebox:hide-sidebar', inspector: 'eebox:hide-inspector' } as const;
 const NARROW_WINDOW_PX = 1100;
+const NARROW_PX = 1000;
 
 const chosenHidden: Partial<Record<keyof typeof PANEL_KEYS, boolean>> = {};
 
+/** Below this width the panels are drawers over the drawing, closed until asked for; nothing is kept of how they were left. */
+const NARROW_QUERY = `(max-width: ${NARROW_PX - 1}px)`;
+const narrowWindow = window.matchMedia(NARROW_QUERY);
+const drawerOpen: Record<keyof typeof PANEL_KEYS, boolean> = { sidebar: false, inspector: false };
+
 function panelHidden(name: keyof typeof PANEL_KEYS): boolean {
+  if (narrowWindow.matches) return !drawerOpen[name];
   const chosen = chosenHidden[name];
   if (chosen !== undefined) return chosen;
   let stored: string | null = null;
@@ -1158,6 +1394,7 @@ function panelHidden(name: keyof typeof PANEL_KEYS): boolean {
 }
 
 function showPanels(): void {
+  document.body.classList.toggle('narrow', narrowWindow.matches);
   for (const name of ['sidebar', 'inspector'] as const) {
     document.body.classList.toggle(`hide-${name}`, panelHidden(name));
     byId(`toggle-${name}`).classList.toggle('active', !panelHidden(name));
@@ -1166,6 +1403,13 @@ function showPanels(): void {
 
 for (const name of ['sidebar', 'inspector'] as const) {
   byId(`toggle-${name}`).addEventListener('click', () => {
+    if (narrowWindow.matches) {
+      const open = !drawerOpen[name];
+      drawerOpen.sidebar = drawerOpen.inspector = false;
+      drawerOpen[name] = open;
+      showPanels();
+      return;
+    }
     chosenHidden[name] = !panelHidden(name);
     try {
       window.localStorage.setItem(PANEL_KEYS[name], chosenHidden[name] ? 'yes' : 'no');
@@ -1175,6 +1419,10 @@ for (const name of ['sidebar', 'inspector'] as const) {
     showPanels();
   });
 }
+narrowWindow.addEventListener('change', () => {
+  drawerOpen.sidebar = drawerOpen.inspector = false;
+  showPanels();
+});
 showPanels();
 
 const widthOf = (name: 'sidebar' | 'inspector') => (document.body.classList.contains(`hide-${name}`) || (name === 'sidebar' && session.mode === 'schematic') ? 0 : byId(name).getBoundingClientRect().width);
@@ -1191,18 +1439,57 @@ const autosaveStore: KeyValueStore | null = (() => {
 const AUTOSAVE_DELAY_MS = 500;
 
 /** Only started after the initial project is restored, so the empty startup state cannot overwrite a saved one. */
+const tabGuard = new TabGuard();
+
 function startAutosave(store: KeyValueStore): void {
   let lastSaved: object | null = null;
   let timer: number | undefined;
+  const save = () => {
+    lastSaved = session.revision;
+    const file = session.toFile();
+    tabGuard.wrote(serializeAutosave(file));
+    if (!saveAutosave(store, file)) showStatus('Autosave failed: browser storage is unavailable or full.', true);
+    void keepSnapshot(false);
+  };
   session.subscribe(() => {
     if (session.revision === lastSaved) return;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      lastSaved = session.revision;
-      if (!saveAutosave(store, session.toFile())) showStatus('Autosave failed: browser storage is unavailable or full.', true);
-      void keepSnapshot(false);
+      if (tabGuard.conflict) return;
+      save();
     }, AUTOSAVE_DELAY_MS);
   });
+  window.addEventListener('storage', (e) => {
+    if (tabGuard.seen(e.key, e.newValue)) showConflict(store, save);
+  });
+}
+
+/** Another tab wrote the autosave: say so, and let the person choose which version stands. */
+function showConflict(store: KeyValueStore, save: () => void): void {
+  const banner = byId('conflict');
+  const note = Object.assign(document.createElement('p'), { textContent: 'This project was changed in another tab of this browser. Until you choose, this tab does not save, so that neither version is overwritten.' });
+  const done = () => {
+    tabGuard.resolve();
+    banner.hidden = true;
+  };
+  const keep = Object.assign(document.createElement('button'), { textContent: 'Keep this tab\'s version' });
+  keep.addEventListener('click', () => {
+    done();
+    save();
+  });
+  const load = Object.assign(document.createElement('button'), { textContent: 'Load the other tab\'s version', className: 'primary' });
+  load.addEventListener('click', () => {
+    const other = loadAutosave(store);
+    done();
+    if (other?.ok) {
+      applyLoaded(other.file, other.warnings, 'The other tab');
+      tabGuard.wrote(store.getItem(AUTOSAVE_KEY));
+    } else showStatus('The other tab\'s version could not be read; this tab keeps its own.', true);
+  });
+  const actions = Object.assign(document.createElement('div'), { className: 'tour-actions' });
+  actions.append(keep, load);
+  banner.replaceChildren(note, actions);
+  banner.hidden = false;
 }
 
 async function restoreInitialProject(stored: ProjectParseResult | null): Promise<void> {
@@ -1268,4 +1555,18 @@ async function init(): Promise<void> {
   if (autosaveStore) startAutosave(autosaveStore);
 }
 
+/** The language of the page: what was chosen, else what the browser asks for. Changing it reloads the page, which keeps its project. */
+function setUpLanguage(): void {
+  const language = loadLanguage(autosaveStore, navigator.languages);
+  startLanguage(language);
+  const select = byId<HTMLSelectElement>('language');
+  select.replaceChildren(...LANGUAGES.map((code) => Object.assign(new Option(LANGUAGE_NAMES[code], code), { selected: code === language })));
+  select.addEventListener('change', () => {
+    if (autosaveStore) saveLanguage(autosaveStore, select.value as Language);
+    // The autosave waits a moment after a change; the page is reloaded after it.
+    window.setTimeout(() => location.reload(), AUTOSAVE_DELAY_MS + 100);
+  });
+}
+
+setUpLanguage();
 void init();

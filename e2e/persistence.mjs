@@ -553,6 +553,192 @@ try {
     await browser.evaluate(`document.getElementById('undo')?.click() ?? [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo').click()`);
   });
 
+  await step('another tab writing the autosave stops this tab from saving until a version is chosen', async () => {
+    const other = (title) => browser.evaluate(`(() => { const file = JSON.parse(localStorage.getItem('eebox:autosave')); file.project.panel.title = ${JSON.stringify(title)}; const text = JSON.stringify(file); localStorage.setItem('eebox:autosave', text); window.dispatchEvent(new StorageEvent('storage', { key: 'eebox:autosave', newValue: text })); return text; })()`);
+    const stored = () => browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.title`);
+    const setTitle = (text) =>
+      browser.evaluate(`(() => { const input = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Title').querySelector('input'); input.value = ${JSON.stringify(text)}; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    const choose = (text) => browser.evaluate(`[...document.querySelectorAll('#conflict button')].find((b) => b.textContent.includes(${JSON.stringify(text)})).click()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await browser.mouse('mousePressed', 260, 120);
+    await browser.mouse('mouseReleased', 260, 120);
+    await other('Written by the other tab');
+    await browser.waitFor(`!document.getElementById('conflict').hidden`, 'the notice of the conflict');
+    await setTitle('Changed in this tab');
+    await new Promise((r) => setTimeout(r, 1300));
+    expectEqual(await stored(), 'Written by the other tab', 'the autosave while the conflict stands');
+    await choose('Keep this tab');
+    await browser.waitFor(`document.getElementById('conflict').hidden`, 'the notice to go');
+    await new Promise((r) => setTimeout(r, 600));
+    expectEqual(await stored(), 'Changed in this tab', 'the autosave after this tab\'s version was kept');
+    await other('Chosen from the other tab');
+    await browser.waitFor(`!document.getElementById('conflict').hidden`, 'the notice for the second conflict');
+    await choose('Load the other tab');
+    await browser.waitFor(`document.getElementById('conflict').hidden`, 'the notice to go');
+    expectEqual(await inspectorField('Title'), 'Chosen from the other tab', 'the title after the other tab\'s version was loaded');
+    await setTitle('Persist test');
+    await new Promise((r) => setTimeout(r, 900));
+    expectEqual(await stored(), 'Persist test', 'saving after the conflict is over');
+  });
+
+  await step('the arrow keys move the selected module, Tab walks to the next one and Escape lets go', async () => {
+    const panel = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); const f = JSON.parse(localStorage.getItem('eebox:autosave')); return { placements: f.project.panel.placements, lengths: f.project.panel.railLengthsUnits, modules: f.modules }; })()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await browser.mouse('mousePressed', 260, 120);
+    await browser.mouse('mouseReleased', 260, 120);
+    const before = await panel();
+    const width = (p) => p.widthUnits ?? before.modules[`${p.module.libraryId}/${p.module.moduleId}`].widthUnits;
+    const free = (p) => {
+      const to = p.slot + 1;
+      return to + width(p) <= before.lengths[p.rail] && before.placements.every((o) => o.id === p.id || o.rail !== p.rail || o.slot >= to + width(p) || o.slot + width(o) <= to);
+    };
+    const mover = before.placements.find(free);
+    expectTrue(mover, 'no module has room to move a unit to the right in this project');
+    await browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true }))`);
+    await browser.evaluate(`(() => { const i = document.querySelector('#search input'); i.value = ${JSON.stringify(mover.id)}; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
+    await browser.waitFor(`new RegExp('\\\\b' + ${JSON.stringify(mover.id)} + '\\\\b').test(document.getElementById('inspector-content').innerText)`, 'the module to be selected');
+    const slotOf = async () => (await panel()).placements.find((p) => p.id === mover.id).slot;
+    await browser.key('ArrowRight', 'ArrowRight', 39);
+    expectEqual(await slotOf(), mover.slot + 1, 'the position after the right arrow');
+    await browser.key('ArrowLeft', 'ArrowLeft', 37, '', 1);
+    expectEqual(await slotOf(), mover.slot + 0.75, 'the position after Alt and the left arrow');
+    await browser.key('ArrowLeft', 'ArrowLeft', 37, '', 1);
+    await browser.key('ArrowLeft', 'ArrowLeft', 37, '', 1);
+    await browser.key('ArrowLeft', 'ArrowLeft', 37, '', 1);
+    expectEqual(await slotOf(), mover.slot, 'the position after four quarter steps back');
+    await browser.key('Tab', 'Tab', 9);
+    const next = await browser.evaluate(`document.getElementById('inspector-content').innerText.match(/\\bp\\d+\\b/)?.[0]`);
+    expectTrue(next && next !== mover.id, `Tab stayed on ${mover.id}, got ${next}`);
+    await browser.key('Escape', 'Escape', 27);
+    expectEqual(await inspectorField('Title') !== undefined, true, 'the panel is shown again after Escape');
+  });
+
+  await step('a small window turns the panels into drawers, and two fingers zoom the drawing without touching what is on it', async () => {
+    const layout = () => browser.evaluate(`({ narrow: document.body.classList.contains('narrow'), stage: Math.round(document.getElementById('stage-wrap').getBoundingClientRect().width), sidebar: getComputedStyle(document.getElementById('sidebar')).display, position: getComputedStyle(document.getElementById('sidebar')).position, inspector: getComputedStyle(document.getElementById('inspector')).display })`);
+    const toggle = (id) => browser.evaluate(`document.getElementById(${JSON.stringify(id)}).click()`);
+    const stagePixels = () => browser.evaluate(`(() => { const c = document.getElementById('stage'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) | 0; return h; })()`);
+    await browser.resize(520, 800, true);
+    await new Promise((r) => setTimeout(r, 700));
+    let now = await layout();
+    expectEqual([now.narrow, now.sidebar, now.inspector], [true, 'none', 'none'], 'the panels in a small window');
+    expectTrue(now.stage >= 400, `the drawing has only ${now.stage} px`);
+    await toggle('toggle-sidebar');
+    now = await layout();
+    expectEqual([now.sidebar, now.position], ['block', 'absolute'], 'the library drawer');
+    expectTrue(now.stage >= 400, 'the drawer took room from the drawing');
+    await toggle('toggle-inspector');
+    now = await layout();
+    expectEqual([now.sidebar, now.inspector], ['none', 'block'], 'one drawer at a time');
+    await toggle('toggle-inspector');
+
+    const project = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); return localStorage.getItem('eebox:autosave'); })()`);
+    const before = await project();
+    const hashBefore = await stagePixels();
+    await browser.touchScreen(true);
+    const [cx, cy] = [260, 360];
+    await browser.touch('touchStart', [{ x: cx - 40, y: cy, id: 1 }]);
+    await browser.touch('touchStart', [{ x: cx - 40, y: cy, id: 1 }, { x: cx + 40, y: cy, id: 2 }]);
+    for (const spread of [60, 90, 120, 160]) await browser.touch('touchMove', [{ x: cx - spread, y: cy, id: 1 }, { x: cx + spread, y: cy, id: 2 }]);
+    await browser.touch('touchEnd', [{ x: cx + 160, y: cy, id: 2 }]);
+    await browser.touch('touchEnd', []);
+    await new Promise((r) => setTimeout(r, 400));
+    expectTrue((await stagePixels()) !== hashBefore, 'two fingers moving apart did not zoom');
+    expectEqual(await project(), before, 'the project after the pinch');
+    await browser.touchScreen(false);
+
+    await browser.resize(1516, 784);
+    await new Promise((r) => setTimeout(r, 700));
+    now = await layout();
+    expectEqual([now.narrow, now.position], [false, 'static'], 'the layout after the window was made wide again');
+  });
+
+  await step('the selected nodes of a schematic are chained and fed from the first, and Undo takes the wires back', async () => {
+    const own = await downloaded('save-project');
+    const bare = JSON.parse(own);
+    bare.project.schematic.wires = [];
+    await openFile(JSON.stringify(bare), 'bare.json');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('bare.json loaded')`, 'the project without wires');
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Schematic').click()`);
+    const wires = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); return JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.wires.length; })()`);
+    expectEqual(await wires(), 0, 'the wires of the bare project');
+    await browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', ctrlKey: true, bubbles: true }))`);
+    await browser.evaluate(`document.getElementById('chain-selected').click()`);
+    const chained = await wires();
+    expectTrue(chained > 0, 'chaining the nodes put in no wire');
+    expectTrue((await browser.evaluate(`document.getElementById('status').textContent`)).includes('added'), 'the number of wires is not said');
+    await browser.evaluate(`document.getElementById('undo').click()`);
+    expectEqual(await wires(), 0, 'the wires after Undo');
+    await browser.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', ctrlKey: true, bubbles: true }))`);
+    await browser.evaluate(`document.getElementById('feed-from-first').click()`);
+    expectTrue((await wires()) > 0, 'feeding the nodes from the first put in no wire');
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await openFile(own, 'own.json');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('own.json loaded')`, 'the project to come back');
+  });
+
+  await step('a note is written on the drawing with an arrow, dragged, shown in an export and deleted', async () => {
+    const notes = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); return JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.annotations ?? []; })()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
+    await browser.mouse('mousePressed', 260, 120);
+    await browser.mouse('mouseReleased', 260, 120);
+    expectEqual(await notes(), [], 'the notes before');
+    await browser.evaluate(`document.getElementById('note-tool').click()`);
+    expectTrue(await browser.evaluate(`document.getElementById('note-tool').classList.contains('active')`), 'the tool is not on');
+    await browser.mouse('mousePressed', 600, 300);
+    await browser.mouse('mouseMoved', 650, 250);
+    await browser.mouse('mouseMoved', 760, 180);
+    await browser.mouse('mouseReleased', 760, 180);
+    await browser.waitFor(`document.querySelector('dialog[open] input')`, 'the dialog for the text');
+    await browser.evaluate(`document.querySelector('dialog[open] input').value = 'Replace C16 by B16'`);
+    await browser.key('Enter', 'Enter', 13, '\r');
+    await browser.waitFor(`!document.querySelector('dialog[open]')`, 'the dialog to close');
+    let list = await notes();
+    expectEqual(list.length, 1, 'the notes after');
+    expectEqual(list[0].text, 'Replace C16 by B16', 'the text of the note');
+    expectTrue(list[0].target && list[0].x !== list[0].target.x, 'the note has no arrow');
+    expectEqual(await browser.evaluate(`document.getElementById('note-tool').classList.contains('active')`), false, 'the tool stays on after the note');
+    const svg = await downloaded('export-svg');
+    expectTrue(svg.includes('Replace C16 by B16'), 'the note is not in the exported drawing');
+    const before = list[0];
+    await browser.mouse('mousePressed', 770, 188);
+    await browser.mouse('mouseMoved', 800, 210);
+    await browser.mouse('mouseMoved', 840, 230);
+    await browser.mouse('mouseReleased', 840, 230);
+    list = await notes();
+    expectTrue(list[0].x > before.x && list[0].y > before.y, `the note did not move: ${before.x},${before.y} to ${list[0].x},${list[0].y}`);
+    expectEqual([list[0].target.x, list[0].target.y], [before.target.x + (list[0].x - before.x), before.target.y + (list[0].y - before.y)], 'the arrow follows the note');
+    await browser.key('Delete', 'Delete', 46);
+    expectEqual(await notes(), [], 'the notes after Delete');
+  });
+
+  await step('the language is switched to Ukrainian and back; the page, its dialogs and its messages follow, and the project is not touched', async () => {
+    const changeLanguage = async (code) => {
+      await browser.evaluate(`(() => { const select = document.getElementById('language'); select.value = ${JSON.stringify(code)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await new Promise((r) => setTimeout(r, 1500));
+      await browser.waitFor(`document.documentElement.lang === ${JSON.stringify(code)} && document.querySelectorAll('#palette summary').length > 0`, `the page in ${code}`);
+    };
+    const titleBefore = await inspectorField('Title');
+    const wiresBefore = await browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.wires.length`);
+    await changeLanguage('uk');
+    const toolbar = await browser.evaluate(`[...document.querySelectorAll('header button')].map((b) => b.textContent.trim().replace(/\\s*\\u25BE$/, '')).filter(Boolean)`);
+    expectTrue(toolbar.includes('\u0429\u0438\u0442') && toolbar.includes('\u0421\u0445\u0435\u043c\u0430') && toolbar.includes('\u0424\u0430\u0439\u043b') && toolbar.includes('\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430'), `the toolbar is not in Ukrainian: ${toolbar.slice(0, 8).join(', ')}`);
+    expectEqual(await browser.evaluate(`document.getElementById('language').value`), 'uk', 'the language selector');
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].projects-dialog')`, 'the projects dialog');
+    const dialogText = await browser.evaluate(`document.querySelector('dialog[open]').innerText`);
+    expectTrue(dialogText.includes('\u041f\u0440\u043e\u0454\u043a\u0442\u0438 \u0432 \u0446\u044c\u043e\u043c\u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456') && dialogText.includes('\u0417\u0430\u043a\u0440\u0438\u0442\u0438'), 'the projects dialog is not in Ukrainian');
+    expectTrue(/\d+ (\u043c\u043e\u0434\u0443\u043b\u0456\u0432|\u043c\u043e\u0434\u0443\u043b\u0456|\u043c\u043e\u0434\u0443\u043b\u044c), \d+ (\u0432\u0443\u0437\u043b\u0456\u0432|\u0432\u0443\u0437\u043b\u0438|\u0432\u0443\u0437\u043e\u043b), \d+ (\u043f\u0440\u043e\u0432\u043e\u0434\u0456\u0432|\u043f\u0440\u043e\u0432\u043e\u0434\u0438|\u043f\u0440\u043e\u0432\u0456\u0434)/.test(dialogText), `the counts in the list are not in Ukrainian: ${dialogText.slice(0, 400)}`);
+    await browser.evaluate(`document.querySelector('dialog[open]').close()`);
+    await browser.evaluate(`document.getElementById('check').click()`);
+    await browser.waitFor(`document.getElementById('problems') && !document.getElementById('problems').hidden`, 'the problems panel');
+    await browser.evaluate(`document.getElementById('check').click()`);
+    expectEqual(await browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.title`), titleBefore, 'the title of the project after the language changed');
+    expectEqual(await browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).project.schematic.wires.length`), wiresBefore, 'the wires of the project after the language changed');
+    await changeLanguage('en');
+    const back = await browser.evaluate(`[...document.querySelectorAll('header button')].map((b) => b.textContent.trim())`);
+    expectTrue(back.includes('Panel') && back.includes('Schematic'), 'the toolbar did not come back in English');
+  });
+
   await step('the page raised no errors in the second session', async () => {
     expectEqual(browser.problems, [], 'errors in the page');
   });

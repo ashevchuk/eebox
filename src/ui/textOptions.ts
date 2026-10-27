@@ -1,4 +1,4 @@
-import { PANEL_TEXTS, SCHEMATIC_TEXTS, SHEET_TEXTS, TEXT_NAMES, type TextKind, type TextVisibility } from '../view/textVisibility';
+import { GENERAL_TEXTS, PANEL_TEXTS, SCHEMATIC_TEXTS, SHEET_TEXTS, TEXT_NAMES, type TextKind, type TextVisibility } from '../view/textVisibility';
 
 export interface TextGroup {
   title: string;
@@ -8,6 +8,7 @@ export interface TextGroup {
 export const SCREEN_GROUPS: readonly TextGroup[] = [
   { title: 'Panel', kinds: PANEL_TEXTS },
   { title: 'Schematic', kinds: SCHEMATIC_TEXTS },
+  { title: 'Notes', kinds: GENERAL_TEXTS },
 ];
 
 export const EXPORT_GROUPS: readonly TextGroup[] = [...SCREEN_GROUPS, { title: 'Print sheet', kinds: SHEET_TEXTS }];

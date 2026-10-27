@@ -1,5 +1,6 @@
 import { markedBy } from '../electrical/problems';
 import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
+import { withNoteBounds } from '../layout/annotations';
 import { moveGroup } from '../layout/group';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import {
@@ -53,7 +54,7 @@ export class PanelView implements View {
 
   fitBounds(): Bounds {
     const frame = frameRect(this.session.project.panel);
-    return { minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height };
+    return withNoteBounds({ minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height }, this.session.project.panel.annotations);
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
@@ -74,6 +75,8 @@ export class PanelView implements View {
         ruler: this.session.ruler.line,
         bare: this.session.bareDrawing,
         texts: this.session.texts,
+        selectedAnnotationId: this.session.selection.annotationId ?? null,
+        annotations: this.session.notesOf('panel'),
         marked: this.session.marksVisible ? markedBy(this.session.findings, 'placements') : new Map(),
       },
       width,
@@ -272,6 +275,15 @@ export class PanelView implements View {
     }
     if (changed) this.session.commit(project);
     this.session.select({});
+  }
+
+  /** Moves the selected modules and combs by whole rows and units; nothing moves if one of them would not fit. */
+  nudgeSelection(railDelta: number, slotDelta: number): void {
+    const chosen = selectedIds(this.session.selection);
+    if (chosen.placements.length + chosen.combs.length === 0) return;
+    const result = moveGroup(this.session.project.panel, this.session.widthOf, this.session.combLookup, chosen.placements, chosen.combs, railDelta, slotDelta);
+    if (!result.ok) return this.session.notify('There is no room there: a module or the end of the rail is in the way.', true);
+    this.session.commit({ ...this.session.project, panel: result.panel });
   }
 
   selectAll(): void {

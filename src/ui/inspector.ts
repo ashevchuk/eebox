@@ -41,6 +41,7 @@ import {
 } from '../electrical/loads';
 import type { Finding } from '../electrical/problems';
 import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
+import { removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from '../layout/annotations';
 import { INFO_LABELS, MAX_NOTES_CHARS, STATUSES, setInfoField } from '../layout/info';
 import { mmFromUnits, roundUnits } from '../layout/units';
 import { MODULE_UNIT_MM } from '../library/types';
@@ -135,7 +136,8 @@ type Target =
   | { kind: 'wire'; wire: Wire }
   | { kind: 'wires'; wires: Wire[] }
   | { kind: 'node'; node: SchematicNode }
-  | { kind: 'nodes'; count: number };
+  | { kind: 'nodes'; count: number }
+  | { kind: 'annotation'; note: Annotation; owner: Mode };
 
 /** Adds copies of what is selected, edge to edge after it; the number is typed in and nothing is kept in the field. */
 const REPEAT_FIELD: InspectorField = {
@@ -149,6 +151,8 @@ const NOT_A_DECIMAL = 'Enter a number.';
 /** What the selection points at, given which view is showing: a module node stands for its placement. */
 function targetOf({ project, selection, mode }: InspectContext): Target {
   const { panel, schematic } = project;
+  const note = (mode === 'schematic' ? schematic.annotations : panel.annotations)?.find((n) => n.id === selection.annotationId);
+  if (note) return { kind: 'annotation', note, owner: mode };
   if (mode === 'schematic') {
     const chosen = schematic.wires.filter((w) => selectedWires(selection).includes(w.id));
     if (chosen.length > 1) return { kind: 'wires', wires: chosen };
@@ -281,6 +285,12 @@ const lengthText = (unit: LengthUnit, units: number): string => (unit === 'mm' ?
 
 function unitsOf(typed: number | null, unit: LengthUnit = 'units'): number | null {
   return typed === null || unit === 'units' ? typed : roundUnits(typed / MODULE_UNIT_MM);
+}
+
+const notesOf = (project: Project, owner: Mode): Annotation[] => (owner === 'schematic' ? project.schematic.annotations : project.panel.annotations) ?? [];
+
+function withNoteList(project: Project, owner: Mode, list: readonly Annotation[]): Project {
+  return owner === 'schematic' ? { ...project, schematic: withNotes(project.schematic, list) } : { ...project, panel: withNotes(project.panel, list) };
 }
 
 const INFO_PREFIX = 'info.';
@@ -416,6 +426,16 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: `${target.count} nodes selected`,
         fields: [readonly('count', 'Selected', target.count)],
         actions: [],
+      };
+    case 'annotation':
+      return {
+        title: 'Note',
+        fields: [
+          text('noteText', 'Text', target.note.text),
+          readonly('arrow', 'Arrow', target.note.target ? `points at ${Math.round(target.note.target.x)}, ${Math.round(target.note.target.y)} mm` : 'none'),
+          readonly('id', 'Id', target.note.id),
+        ],
+        actions: [...(target.note.target ? [{ key: 'removeArrow', label: 'Take the arrow away' }] : []), { key: 'removeNote', label: 'Delete the note' }],
       };
     case 'group':
       return {
@@ -696,6 +716,11 @@ export function applyEdit(
       }
       return fail('That property cannot be edited.');
     }
+    case 'annotation': {
+      if (key !== 'noteText') return fail('That property cannot be edited.');
+      const result = setAnnotationText(notesOf(project, target.owner), target.note.id, text);
+      return result.ok ? { ok: true, project: withNoteList(project, target.owner, result.list) } : fail('A note is 1 to 200 characters on one line.');
+    }
     case 'wires':
     case 'nodes':
     case 'group':
@@ -799,6 +824,12 @@ export function applyAction(ctx: InspectContext, key: string, options: { confirm
       schematic = result.schematic;
     }
     return { ok: true, project: { ...ctx.project, schematic } };
+  }
+  if (target.kind === 'annotation' && (key === 'removeArrow' || key === 'removeNote')) {
+    const list = notesOf(ctx.project, target.owner);
+    if (key === 'removeNote') return { ok: true, project: withNoteList(ctx.project, target.owner, removeAnnotation(list, target.note.id)), selection: {} };
+    const result = setAnnotationTarget(list, target.note.id, undefined);
+    return result.ok ? { ok: true, project: withNoteList(ctx.project, target.owner, result.list) } : fail('That note is gone.');
   }
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);

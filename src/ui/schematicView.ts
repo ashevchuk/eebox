@@ -1,6 +1,10 @@
 import { energy, type Energy } from '../electrical/energy';
 import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
+import { t } from '../i18n';
+import { withNoteBounds } from '../layout/annotations';
+import { drawAnnotations } from '../view/annotationDraw';
+import { chainNodes, feedFrom, type AutowireResult } from '../schematic/autowire';
 import { FREE_NODE_PRESETS, nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import {
   PORT_RADIUS,
@@ -170,7 +174,7 @@ export class SchematicView implements View {
       const text = wireLabelText(wire.label, currents.get(wire.id), this.session.texts);
       return path && text ? [wireLabelBox(text, pathMidpoint(path))] : [];
     });
-    return boundsWithBoxes(boundsWithRoutes(schematicBounds(layout), routes), labels);
+    return withNoteBounds(boundsWithBoxes(boundsWithRoutes(schematicBounds(layout), routes), labels), schematic.annotations);
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
@@ -228,6 +232,7 @@ export class SchematicView implements View {
       const text = wireLabelText(wire.label, amps, this.session.texts);
       if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
     }
+    drawAnnotations(ctx, this.session.notesOf('schematic'), this.session.selection.annotationId ?? null, this.session.texts.annotations);
     this.drawPreview(ctx, frame);
   }
 
@@ -649,6 +654,37 @@ export class SchematicView implements View {
     this.session.select(nodeGroupSelection(this.session.project.schematic.nodes.map((n) => n.id), (id) => this.placementOf(id)));
   }
 
+  /** The node that was selected first feeds the others: its outputs go to the inputs of each. */
+  feedFromFirst(): void {
+    const ids = selectedNodes(this.session.selection);
+    if (ids.length < 2) return this.session.notify('Select two or more nodes first: the one you Ctrl+click first feeds the others.', true);
+    const { terminalsOf } = this.frame();
+    this.finishAutowire(feedFrom(this.session.project.schematic, terminalsOf, ids[0]!, ids.slice(1)));
+  }
+
+  /** The selected nodes are wired one to the next, from the top down. */
+  chainSelected(): void {
+    const ids = selectedNodes(this.session.selection);
+    if (ids.length < 2) return this.session.notify('Select two or more nodes first: Ctrl+click adds one, a Ctrl-drag over empty space takes those inside.', true);
+    const { terminalsOf } = this.frame();
+    this.finishAutowire(chainNodes(this.session.project.schematic, terminalsOf, ids));
+  }
+
+  private finishAutowire(result: AutowireResult): void {
+    if (result.added === 0) return this.session.notify('Nothing was wired: the poles that face each other are wired already, or no pole of one fits a pole of the other.', true);
+    this.session.commit({ ...this.session.project, schematic: result.schematic });
+    const left = result.skipped.length;
+    this.session.notify(`${result.added} wire${result.added === 1 ? '' : 's'} added${left > 0 ? `; ${left} node${left === 1 ? '' : 's'} got none` : ''}.`);
+  }
+
+  /** Moves the selected nodes by a step in millimetres. */
+  nudgeSelected(dx: number, dy: number): void {
+    const ids = selectedNodes(this.session.selection);
+    if (ids.length === 0) return;
+    const { schematic } = this.session.project;
+    this.session.commit({ ...this.session.project, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (ids.includes(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) } });
+  }
+
   /** Lines the selected nodes up; with fewer than two selected nothing is done. */
   alignSelected(how: NodeAlign): void {
     const ids = selectedNodes(this.session.selection);
@@ -677,6 +713,12 @@ export class SchematicView implements View {
     const same = schematic.nodes.every((n, i) => n.x === project.schematic.nodes[i]!.x && n.y === project.schematic.nodes[i]!.y);
     if (same) return this.session.notify(unchanged);
     this.session.commit({ ...project, schematic });
+  }
+
+  /** Selects one node by its id, as a click on it does. */
+  selectNodeById(id: string): void {
+    const node = this.session.project.schematic.nodes.find((n) => n.id === id);
+    if (node) this.selectNode(node);
   }
 
   private selectNode(node: SchematicNode): void {
@@ -803,7 +845,7 @@ export class SchematicView implements View {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = orphan
-      ? `${shelved?.label ?? node.label} (${shelved ? 'on the shelf' : 'missing'})`
+      ? `${shelved?.label ?? node.label} (${t(shelved ? 'on the shelf' : 'missing')})`
       : (placement?.label ?? node.label);
     let fontSize = 12;
     ctx.font = `${fontSize}px ${FONT_FAMILY}`;

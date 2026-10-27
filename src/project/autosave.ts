@@ -5,12 +5,15 @@ export interface KeyValueStore {
   setItem(key: string, value: string): void;
 }
 
-const KEY = 'eebox:autosave';
+export const AUTOSAVE_KEY = 'eebox:autosave';
+const KEY = AUTOSAVE_KEY;
+
+export const serializeAutosave = (file: ProjectFile): string => JSON.stringify(file);
 
 /** Returns false when the browser refuses the write (quota, private mode). */
 export function saveAutosave(store: KeyValueStore, file: ProjectFile): boolean {
   try {
-    store.setItem(KEY, JSON.stringify(file));
+    store.setItem(KEY, serializeAutosave(file));
     return true;
   } catch {
     return false;

@@ -1,10 +1,11 @@
+import type { Annotation } from '../layout/annotations';
 import { INFO_KEYS, INFO_LABELS } from '../layout/info';
 import type { CombPlacement, ModuleRef, Placement, ShelfItem } from '../layout/placement';
 import type { SchematicNode, TerminalRef, Wire } from '../schematic/model';
 import { canonicalJson } from './canonical';
 import { moduleKey, type ProjectFile } from './file';
 
-export type ChangeArea = 'project' | 'rows' | 'modules' | 'combs' | 'nodes' | 'wires';
+export type ChangeArea = 'project' | 'rows' | 'modules' | 'combs' | 'nodes' | 'wires' | 'notes';
 export type ChangeKind = 'added' | 'removed' | 'changed';
 
 export interface Change {
@@ -20,9 +21,10 @@ export const AREA_TITLES: Record<ChangeArea, string> = {
   combs: 'Combs',
   nodes: 'Schematic nodes',
   wires: 'Wires',
+  notes: 'Notes on the drawings',
 };
 
-const AREA_ORDER: ChangeArea[] = ['project', 'rows', 'modules', 'combs', 'nodes', 'wires'];
+const AREA_ORDER: ChangeArea[] = ['project', 'rows', 'modules', 'combs', 'nodes', 'wires', 'notes'];
 const KIND_ORDER: ChangeKind[] = ['added', 'removed', 'changed'];
 const MAX_SHOWN_CHARS = 60;
 
@@ -170,6 +172,25 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
       ],
     ),
   );
+
+  for (const [drawing, list, newer] of [
+    ['panel', a.annotations, b.annotations],
+    ['schematic', before.project.schematic.annotations, after.project.schematic.annotations],
+  ] as const) {
+    out.push(
+      ...compareLists(
+        list ?? [],
+        newer ?? [],
+        'notes',
+        (n: Annotation) => `${drawing}: "${n.text}" (${n.id})`,
+        (p, q) => [
+          ...(p.text !== q.text ? [`text ${show(p.text)} \u2192 ${show(q.text)}`] : []),
+          ...(p.x !== q.x || p.y !== q.y ? [`moved from ${Math.round(p.x)}, ${Math.round(p.y)} to ${Math.round(q.x)}, ${Math.round(q.y)} mm`] : []),
+          ...(!same(p.target, q.target) ? [q.target ? (p.target ? 'arrow moved' : 'arrow added') : 'arrow taken away'] : []),
+        ],
+      ),
+    );
+  }
 
   for (const [key, def] of Object.entries(after.modules)) {
     const was = before.modules[key];

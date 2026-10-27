@@ -1,3 +1,4 @@
+import type { Annotation } from '../layout/annotations';
 import { CROSS_SECTIONS_MM2 } from '../electrical/cables';
 import { isEarthingSystem, type EarthingSystemId } from '../electrical/earthing';
 import { loadSpecProblem, type LoadSpec } from '../electrical/loads';
@@ -68,6 +69,8 @@ export const routeProblem = (route: unknown): string | null =>
 export interface Schematic {
   nodes: SchematicNode[];
   wires: Wire[];
+  /** Notes written on the schematic; only when there are some. */
+  annotations?: Annotation[];
 }
 
 /** The terminals of a node, or undefined when the node is unknown or its module is missing. */

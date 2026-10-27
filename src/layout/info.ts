@@ -79,7 +79,12 @@ export function infoRows(info: ProjectInfo | undefined): Array<[string, string]>
   return order.flatMap((key): Array<[string, string]> => (info?.[key] ? [[INFO_LABELS[key], info[key]!]] : []));
 }
 
-/** Revision and status as a short line for a list or a stamp; empty when neither is given. */
+/** The revision and the status, each as a short phrase; none when neither is given. */
+export function stampParts(info: ProjectInfo | undefined): string[] {
+  return [info?.revision ? `rev ${info.revision}` : '', info?.status ?? ''].filter(Boolean);
+}
+
+/** The same as one line for a list or a stamp. */
 export function stampOf(info: ProjectInfo | undefined): string {
-  return [info?.revision ? `rev ${info.revision}` : '', info?.status ?? ''].filter(Boolean).join(' · ');
+  return stampParts(info).join(' · ');
 }

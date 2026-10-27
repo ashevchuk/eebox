@@ -1,3 +1,4 @@
+import { annotationsCheck, type Annotation } from '../layout/annotations';
 import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
@@ -130,6 +131,7 @@ const PROJECT_SPEC: FieldSpec = {
 const PANEL_SPEC: FieldSpec = {
   title: { required: false, check: labelCheck },
   info: { required: false, check: infoCheck },
+  annotations: { required: false, check: annotationsCheck },
   railLengthsUnits: { required: true, check: railLengthsCheck },
   railPitchesMm: { required: true, check: pitchListCheck },
   railLabels: { required: true, check: railLabelsCheck },
@@ -172,6 +174,7 @@ const PLACEMENT_SPEC: FieldSpec = {
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },
   wires: { required: true, check: arrayCheck },
+  annotations: { required: false, check: annotationsCheck },
 };
 const NODE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
@@ -339,6 +342,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
     panel: {
       ...(panelRaw.title !== undefined ? { title: panelRaw.title as string } : {}),
       ...(panelRaw.info !== undefined ? { info: panelRaw.info as ProjectInfo } : {}),
+      ...(panelRaw.annotations !== undefined ? { annotations: panelRaw.annotations as Annotation[] } : {}),
       railLengthsUnits,
       railPitchesMm,
       railLabels,
@@ -346,7 +350,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       combs,
       shelf,
     },
-    schematic: { nodes, wires },
+    schematic: { nodes, wires, ...(schematicRaw.annotations !== undefined ? { annotations: schematicRaw.annotations as Annotation[] } : {}) },
   };
   return {
     ok: true,
