@@ -6,6 +6,7 @@ import { railRect } from '../view/geometry';
 import { History } from '../view/history';
 import { render } from '../view/render';
 import { conductorStyle, theme } from '../view/theme';
+import { ArtEditorView } from './artEditorView';
 import { FieldsView } from './fieldsView';
 import type { InspectorView } from './inspector';
 import { applyEditorAction, applyEditorEdit, describeEditor, validateDraft, type EditorState } from './libraryEditor';
@@ -50,6 +51,7 @@ export interface DesignerOptions {
 }
 
 type Tool = 'place' | 'connect';
+type Mode = 'terminals' | 'face';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_SHOWN_ERRORS = 6;
@@ -89,6 +91,7 @@ export class ModuleDesignerView {
   private pristine: boolean;
   private selected: number | null = null;
   private tool: Tool = 'place';
+  private mode: Mode = 'terminals';
   private connectFrom: number | null = null;
   /** The width the drawing shows, when the slider has moved it; null follows the width of the module. */
   private previewWidth: number | null = null;
@@ -115,6 +118,10 @@ export class ModuleDesignerView {
   private readonly widthLabel = document.createElement('span');
   private readonly moduleFields: FieldsView;
   private readonly terminalFields: FieldsView;
+  private readonly face: ArtEditorView;
+  private readonly modeButtons = new Map<Mode, HTMLButtonElement>();
+  private readonly terminalStage: HTMLElement[] = [];
+  private readonly terminalSide = document.createElement('div');
 
   constructor(
     library: Library,
@@ -151,13 +158,24 @@ export class ModuleDesignerView {
     hint.textContent =
       'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. ' +
       'Connect: click two terminals to join them inside the module.';
-    stage.append(this.toolbar(), this.svgHost, this.widthControl(), hint, this.railCaption(), this.railCanvas);
+    this.face = new ArtEditorView({
+      draft: () => this.draft,
+      module: () => this.module,
+      commit: (draft) => {
+        this.pristine = false;
+        this.commit(draft, this.selected);
+      },
+      say: (message, isError) => this.say(message, isError),
+    });
+    const toolbar = this.toolbar();
+    this.terminalStage.push(toolbar, this.svgHost, hint);
+    stage.append(this.modeSwitch(), toolbar, this.svgHost, this.face.stage, this.widthControl(), hint, this.railCaption(), this.railCanvas);
 
     const side = document.createElement('section');
     side.className = 'designer-fields';
-    const terminalHost = document.createElement('div');
+    const terminalHost = this.terminalSide;
     const moduleHost = document.createElement('div');
-    side.append(terminalHost, moduleHost);
+    side.append(terminalHost, this.face.side, moduleHost);
     const handlers = {
       onEdit: (key: string, raw: string | string[]) => this.edit(key, typeof raw === 'string' ? raw : raw.join(' ')),
       onAction: (action: { key: string }) => this.act(action.key),
@@ -182,7 +200,42 @@ export class ModuleDesignerView {
   open(): void {
     document.body.append(this.dialog);
     this.dialog.showModal();
+    this.showMode();
     this.renderAll(true);
+  }
+
+  private modeSwitch(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'designer-toolbar designer-modes';
+    for (const [mode, label, title] of [
+      ['terminals', 'Terminals', 'Place and join the terminals'],
+      ['face', 'Face', 'Draw on the face of the module: lines, shapes and text'],
+    ] as const) {
+      const el = button(label, () => this.setMode(mode), title);
+      this.modeButtons.set(mode, el);
+      bar.append(el);
+    }
+    return bar;
+  }
+
+  private setMode(mode: Mode): void {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.face.reset();
+    this.connectFrom = null;
+    this.say('');
+    this.showMode();
+    this.renderAll(true);
+  }
+
+  /** Shows the stage and the fields of the mode that is on and hides those of the other. */
+  private showMode(): void {
+    const face = this.mode === 'face';
+    for (const el of this.terminalStage) el.style.display = face ? 'none' : '';
+    this.terminalSide.style.display = face ? 'none' : '';
+    this.face.stage.style.display = face ? '' : 'none';
+    this.face.side.style.display = face ? '' : 'none';
+    for (const [mode, el] of this.modeButtons) el.classList.toggle('active', mode === this.mode);
   }
 
   private get draft(): Library {
@@ -333,7 +386,8 @@ export class ModuleDesignerView {
 
   private renderAll(force = false): void {
     this.layout = designerLayout(this.module, this.shownWidth);
-    this.drawStage();
+    if (this.mode === 'face') this.face.render();
+    else this.drawStage();
     this.drawRailPreview();
     this.renderFields(force);
     const problems = validateDraft(this.draft);
@@ -548,7 +602,8 @@ export class ModuleDesignerView {
       else this.undo();
       return;
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selected !== null && !typing) {
+    if (this.mode === 'face' && this.face.onKey(e)) return;
+    if (this.mode === 'terminals' && (e.key === 'Delete' || e.key === 'Backspace') && this.selected !== null && !typing) {
       e.preventDefault();
       this.act(`removeTerminal:${this.selected}`);
     }

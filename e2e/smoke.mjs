@@ -323,6 +323,80 @@ try {
     await clickButton('Panel');
   });
 
+  await step('the designer draws on the face of a module and keeps the drawing with the module', async () => {
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the earlier designer to close');
+    await browser.evaluate(`document.getElementById('new-module').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].some((b) => b.textContent === 'Face')`, 'the designer');
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.innerText.startsWith('Name'));
+      const input = row.querySelector('input'); input.value = 'Face test'; input.dispatchEvent(new Event('change', { bubbles: true }));
+      const width = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.innerText.startsWith('Width') && !r.innerText.startsWith('Width, mm')).querySelector('input');
+      width.value = '3'; width.dispatchEvent(new Event('change', { bubbles: true }));
+      [...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click();
+    })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face');
+    const tool = (name) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === ${JSON.stringify(name)}).click()`);
+    /** A point on the face, in millimetres from its corner, as a position on the screen. */
+    const at = (x, y) => browser.evaluate(`(() => {
+      const svg = document.querySelector('.designer-dialog[open] .face-stage svg'); const r = svg.getBoundingClientRect();
+      const k = r.width / svg.width.baseVal.value; const scale = (svg.width.baseVal.value - 24) / 52.5;
+      return [r.left + (12 + ${x} * scale) * k, r.top + (12 + ${y} * scale) * k];
+    })()`);
+    const drag = async (from, to) => {
+      const [x1, y1] = await at(...from); const [x2, y2] = await at(...to);
+      await browser.mouse('mouseMoved', x1, y1);
+      await browser.mouse('mousePressed', x1, y1);
+      await browser.mouse('mouseMoved', (x1 + x2) / 2, (y1 + y2) / 2);
+      await browser.mouse('mouseMoved', x2, y2);
+      await browser.mouse('mouseReleased', x2, y2);
+    };
+    const layers = () => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-layer')].map((b) => b.textContent)`);
+    await tool('Rectangle');
+    await drag([5, 20], [25, 40]);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 1`, 'the rectangle');
+    expectEqual(await layers(), ['1. rect'], 'the shapes after the rectangle');
+    const field = (label) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === ${JSON.stringify(label)})?.querySelector('input')?.value`);
+    expectEqual([await field('X'), await field('Width')], ['5', '20'], 'the rectangle as it was drawn');
+    await drag([15, 30], [20, 30]);
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'X')?.querySelector('input').value === '10'`, 'the rectangle to be moved');
+    const [hx, hy] = await browser.evaluate(`(() => { const r = document.querySelector('.designer-dialog[open] .face-stage [data-handle="e"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+    const [gx, gy] = await at(35, 30);
+    await browser.mouse('mouseMoved', hx, hy);
+    await browser.mouse('mousePressed', hx, hy);
+    await browser.mouse('mouseMoved', gx, gy);
+    await browser.mouse('mouseReleased', gx, gy);
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Width')?.querySelector('input').value === '25'`, 'the rectangle to be widened');
+    await tool('Text');
+    const [tx, ty] = await at(26, 60);
+    await browser.mouse('mousePressed', tx, ty);
+    await browser.mouse('mouseReleased', tx, ty);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 2`, 'the text');
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('.designer-dialog[open] .face-side .inspector-field, .designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Text');
+      const input = row.querySelector('input'); input.value = 'RCD'; input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .face-layer')].some((b) => b.textContent.includes('RCD'))`, 'the words of the text');
+    await tool('Polyline');
+    for (const p of [[8, 70], [26, 80], [40, 70]]) { const [x, y] = await at(...p); await browser.mouse('mousePressed', x, y); await browser.mouse('mouseReleased', x, y); }
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Finish line').click()`);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'the polyline');
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'On other widths');
+      const select = row.querySelector('select'); select.value = 'stretch'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-layer.selected')?.textContent.includes('stretch')`, 'the anchor to be set');
+    await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the module to be saved');
+    const art = await browser.evaluate(`(async () => {
+      const db = await new Promise((resolve, reject) => { const r = indexedDB.open('eebox', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+      const libraries = await new Promise((resolve, reject) => { const r = db.transaction('libraries').objectStore('libraries').getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+      return libraries.flatMap((l) => l.modules).find((m) => m.name === 'Face test')?.art?.map((s) => [s.kind, s.anchor ?? 'left', s.text ?? '']);
+    })()`);
+    expectEqual(art, [['rect', 'left', ''], ['text', 'left', 'RCD'], ['polyline', 'stretch', '']], 'the drawing stored with the module');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
+  });
+
   await step('the library editor opens a module in the designer and takes the changes back unsaved', async () => {
     await browser.evaluate(`[...document.querySelectorAll('#palette button')].find((b) => b.textContent === 'edit').click()`);
     await browser.waitFor(`document.querySelector('.editor-dialog[open]')`, 'the library editor');
