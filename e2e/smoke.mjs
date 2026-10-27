@@ -287,7 +287,7 @@ try {
     await browser.waitFor(`document.querySelectorAll('.designer-pin').length === 7`, 'seven terminals');
     expectEqual(await browser.evaluate(`document.querySelector('.designer-dialog .editor-errors').textContent`), '', 'problems with the block');
     await browser.evaluate(`[...document.querySelectorAll('.designer-toolbar button')].find((b) => b.textContent === 'Variants…').click()`);
-    await browser.waitFor(`document.querySelector('.designer-dialog dialog[open] input')`, 'the variants dialog');
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog dialog[open] button')].some((b) => b.textContent === 'Make variants')`, 'the variants dialog');
     await browser.evaluate(`(() => {
       const d = document.querySelector('.designer-dialog dialog'); d.querySelectorAll('input')[2].value = 'L1 L2 L3 N PE';
       [...d.querySelectorAll('button')].find((b) => b.textContent === 'Make variants').click();
