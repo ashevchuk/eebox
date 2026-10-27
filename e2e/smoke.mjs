@@ -366,6 +366,10 @@ try {
     await browser.mouse('mouseMoved', gx, gy);
     await browser.mouse('mouseReleased', gx, gy);
     await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Width')?.querySelector('input').value === '25'`, 'the rectangle to be widened');
+    const press = (label) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-side button, .designer-dialog[open] .inspector-actions button')].find((b) => b.textContent === ${JSON.stringify(label)}).click()`);
+    await press('Turn right');
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Width')?.querySelector('input').value === '20'`, 'the rectangle to be turned');
+    expectEqual([await field('Width'), await field('Height')], ['20', '25'], 'the sides of the rectangle after a quarter turn');
     await tool('Text');
     const [tx, ty] = await at(26, 60);
     await browser.mouse('mousePressed', tx, ty);
@@ -376,6 +380,11 @@ try {
       const input = row.querySelector('input'); input.value = 'RCD'; input.dispatchEvent(new Event('change', { bubbles: true }));
     })()`);
     await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .face-layer')].some((b) => b.textContent.includes('RCD'))`, 'the words of the text');
+    await press('Turn left');
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Rotation')?.querySelector('input').value === '-90'`, 'the text to be turned');
+    await browser.evaluate(`(() => { const i = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Rotation').querySelector('input'); i.value = '90'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await browser.waitFor(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Rotation')?.querySelector('input').value === '90'`, 'the rotation to be typed');
+    await browser.evaluate(`(() => { const i = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Short name').querySelector('input'); i.value = 'FT'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await tool('Polyline');
     for (const p of [[8, 70], [26, 80], [40, 70]]) { const [x, y] = await at(...p); await browser.mouse('mousePressed', x, y); await browser.mouse('mouseReleased', x, y); }
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Finish line').click()`);
@@ -399,9 +408,10 @@ try {
     const art = await browser.evaluate(`(async () => {
       const db = await new Promise((resolve, reject) => { const r = indexedDB.open('eebox', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
       const libraries = await new Promise((resolve, reject) => { const r = db.transaction('libraries').objectStore('libraries').getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
-      return libraries.flatMap((l) => l.modules).find((m) => m.name === 'Face test')?.art?.map((s) => [s.kind, s.anchor ?? 'left', s.text ?? '']);
+      const saved = libraries.flatMap((l) => l.modules).find((m) => m.name === 'Face test');
+      return saved && { short: saved.shortName, art: saved.art.map((s) => [s.kind, s.anchor ?? 'left', s.text ?? '', s.rotation ?? 0]) };
     })()`);
-    expectEqual(art, [['rect', 'left', ''], ['text', 'left', 'RCD'], ['polyline', 'stretch', ''], ['rect', 'left', ''], ['ellipse', 'left', ''], ['path', 'left', '']], 'the drawing stored with the module');
+    expectEqual(art, { short: 'FT', art: [['rect', 'left', '', 0], ['text', 'left', 'RCD', 90], ['polyline', 'stretch', '', 0], ['rect', 'left', '', 0], ['ellipse', 'left', '', 0], ['path', 'left', '', 0]] }, 'the drawing stored with the module');
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
     await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
   });

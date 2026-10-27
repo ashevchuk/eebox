@@ -46,7 +46,21 @@ export interface Box {
   y2: number;
 }
 
-/** The box a shape covers; the width of a text is an estimate, since the font is not measured here. */
+/** The box of a text before it is turned; its width is an estimate, since the font is not measured here. */
+export function textBox(shape: Extract<ArtShape, { kind: 'text' }>): Box {
+  const width = shape.text.length * shape.size * TEXT_WIDTH_PER_CHARACTER;
+  const left = shape.align === 'centre' ? shape.x - width / 2 : shape.align === 'right' ? shape.x - width : shape.x;
+  return { x1: left, y1: shape.y - shape.size / 2, x2: left + width, y2: shape.y + shape.size / 2 };
+}
+
+/** A point turned clockwise about another, in degrees, on a drawing whose y axis points down. */
+export function turnAbout(x: number, y: number, aboutX: number, aboutY: number, degrees: number): [number, number] {
+  const a = (degrees * Math.PI) / 180;
+  const [dx, dy] = [x - aboutX, y - aboutY];
+  return [aboutX + dx * Math.cos(a) - dy * Math.sin(a), aboutY + dx * Math.sin(a) + dy * Math.cos(a)];
+}
+
+/** The box a shape covers. */
 export function boundsOf(shape: ArtShape): Box {
   switch (shape.kind) {
     case 'line':
@@ -63,9 +77,10 @@ export function boundsOf(shape: ArtShape): Box {
         y2: Math.max(...shape.points.map((p) => p[1])),
       };
     case 'text': {
-      const width = shape.text.length * shape.size * TEXT_WIDTH_PER_CHARACTER;
-      const left = shape.align === 'centre' ? shape.x - width / 2 : shape.align === 'right' ? shape.x - width : shape.x;
-      return { x1: left, y1: shape.y - shape.size / 2, x2: left + width, y2: shape.y + shape.size / 2 };
+      const box = textBox(shape);
+      if (!shape.rotation) return box;
+      const corners = [[box.x1, box.y1], [box.x2, box.y1], [box.x2, box.y2], [box.x1, box.y2]].map(([x, y]) => turnAbout(x!, y!, shape.x, shape.y, shape.rotation!));
+      return { x1: Math.min(...corners.map((c) => c[0])), y1: Math.min(...corners.map((c) => c[1])), x2: Math.max(...corners.map((c) => c[0])), y2: Math.max(...corners.map((c) => c[1])) };
     }
     case 'path': {
       const points = flattenPath(parsePath(shape.d) ?? []).flat();
@@ -226,8 +241,9 @@ export function hits(shape: ArtShape, p: Point, tolerance: number): boolean {
       return shape.closed === true && shape.fill !== undefined && pointInPolygon(p, shape.points);
     }
     case 'text': {
-      const box = boundsOf(shape);
-      return inside(p, { x1: box.x1 - tolerance, y1: box.y1 - tolerance, x2: box.x2 + tolerance, y2: box.y2 + tolerance });
+      const box = textBox(shape);
+      const [x, y] = shape.rotation ? turnAbout(p.x, p.y, shape.x, shape.y, -shape.rotation) : [p.x, p.y];
+      return inside({ x, y }, { x1: box.x1 - tolerance, y1: box.y1 - tolerance, x2: box.x2 + tolerance, y2: box.y2 + tolerance });
     }
     case 'path': {
       const pieces = flattenPath(parsePath(shape.d) ?? []);
@@ -266,6 +282,65 @@ export function createShape(tool: Exclude<ArtTool, 'select' | 'polyline'>, from:
 /** An open line through the points a person clicked, or nothing while there are fewer than two. */
 export function polylineThrough(points: Array<[number, number]>): ArtShape | undefined {
   return points.length >= 2 && points.length <= MAX_ART_POINTS ? { kind: 'polyline', points, stroke: DEFAULT_INK, strokeWidth: 0.5 } : undefined;
+}
+
+/* Turning and flipping */
+
+const tidy = (value: number): number => Math.round(value * 1000) / 1000;
+
+export type Flip = 'horizontal' | 'vertical';
+
+/** Takes every point of a shape through a function; a rectangle or an ellipse is not made of points and is handled by the callers. */
+function throughPoints(shape: ArtShape, map: (x: number, y: number) => [number, number]): ArtShape {
+  const round = (x: number, y: number): [number, number] => {
+    const [mx, my] = map(x, y);
+    return [tidy(mx), tidy(my)];
+  };
+  switch (shape.kind) {
+    case 'line': {
+      const [x1, y1] = round(shape.x1, shape.y1);
+      const [x2, y2] = round(shape.x2, shape.y2);
+      return { ...shape, x1, y1, x2, y2 };
+    }
+    case 'polyline':
+      return { ...shape, points: shape.points.map(([x, y]) => round(x, y)) };
+    case 'path': {
+      const commands = parsePath(shape.d);
+      return commands ? { ...shape, d: formatPath(mapPathPoints(commands, round)) } : shape;
+    }
+    default:
+      return shape;
+  }
+}
+
+/** The shape turned clockwise by quarter turns about the middle of its box; a text is turned about its own point. */
+export function turnShape(shape: ArtShape, quarters: 1 | 2 | 3): ArtShape {
+  if (shape.kind === 'text') {
+    const total = (((shape.rotation ?? 0) + 90 * quarters) % 360 + 360) % 360;
+    const { rotation: _previous, ...rest } = shape;
+    return total === 0 ? rest : { ...rest, rotation: total > 180 ? total - 360 : total };
+  }
+  const box = boundsOf(shape);
+  const [cx, cy] = [(box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2];
+  if (shape.kind === 'rect') {
+    return quarters === 2 ? shape : { ...shape, x: tidy(cx - shape.height / 2), y: tidy(cy - shape.width / 2), width: shape.height, height: shape.width };
+  }
+  if (shape.kind === 'ellipse') return quarters === 2 ? shape : { ...shape, rx: shape.ry, ry: shape.rx };
+  return throughPoints(shape, (x, y) => {
+    const [dx, dy] = [x - cx, y - cy];
+    if (quarters === 1) return [cx - dy, cy + dx];
+    if (quarters === 2) return [cx - dx, cy - dy];
+    return [cx + dy, cy - dx];
+  });
+}
+
+/** The shape reflected about the middle of its box, or nothing when it cannot be: a text is turned, not mirrored. */
+export function flipShape(shape: ArtShape, flip: Flip): ArtShape | undefined {
+  if (shape.kind === 'text') return undefined;
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') return shape;
+  const box = boundsOf(shape);
+  const [cx, cy] = [(box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2];
+  return throughPoints(shape, (x, y) => (flip === 'horizontal' ? [2 * cx - x, y] : [x, 2 * cy - y]));
 }
 
 /* The drawing in a library draft */
@@ -397,6 +472,7 @@ export function shapeFields(shape: ArtShape): InspectorField[] {
     fields.push({ key: 'size', label: 'Letter height', kind: 'number', value: shape.size, min: 1, max: 60, hint: 'mm' });
     fields.push({ key: 'align', label: 'Aligned', kind: 'select', value: shape.align ?? 'left', options: TEXT_ALIGNS });
     fields.push({ key: 'bold', label: 'Bold', kind: 'select', value: shape.bold ? 'yes' : 'no', options: ['no', 'yes'] });
+    fields.push({ key: 'rotation', label: 'Rotation', kind: 'number', value: shape.rotation ?? 0, min: -360, max: 360, hint: 'degrees clockwise; 90 stands the text up' });
     fields.push(colour('fill', 'Colour', shape.fill));
   } else {
     fields.push(colour('fill', 'Fill', shape.fill));
@@ -418,7 +494,7 @@ const ANCHOR_HINTS: Record<ArtAnchor, string> = {
 
 export type ShapeEdit = { ok: true; shape: ArtShape } | { ok: false; message: string };
 
-const NUMBER_KEYS = new Set(['x1', 'y1', 'x2', 'y2', 'x', 'y', 'width', 'height', 'cx', 'cy', 'rx', 'ry', 'size', 'strokeWidth', 'period']);
+const NUMBER_KEYS = new Set(['rotation', 'x1', 'y1', 'x2', 'y2', 'x', 'y', 'width', 'height', 'cx', 'cy', 'rx', 'ry', 'size', 'strokeWidth', 'period']);
 
 function parsePoints(raw: string): Array<[number, number]> | undefined {
   const tokens = raw.trim().split(/\s+/).filter(Boolean);
@@ -433,7 +509,8 @@ export function applyShapeEdit(shape: ArtShape, key: string, raw: string): Shape
   if (NUMBER_KEYS.has(key)) {
     const value = Number(text);
     if (text === '' || !Number.isFinite(value)) return { ok: false, message: 'Enter a number.' };
-    record[key] = value;
+    if (key === 'rotation' && value === 0) delete record.rotation;
+    else record[key] = value;
   } else if (key === 'fill' || key === 'stroke') {
     if (text === NO_COLOUR) delete record[key];
     else record[key] = text;

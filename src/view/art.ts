@@ -53,7 +53,15 @@ export function drawArt(ctx: CanvasRenderingContext2D, art: readonly ArtShape[],
         ctx.font = `${shape.bold ? 'bold ' : ''}${shape.size}px ${FONT_FAMILY}`;
         ctx.textAlign = CANVAS_ALIGN[shape.align ?? 'left'];
         ctx.textBaseline = 'middle';
-        ctx.fillText(shape.text, shape.x, shape.y);
+        if (shape.rotation) {
+          ctx.save();
+          ctx.translate(shape.x, shape.y);
+          ctx.rotate((shape.rotation * Math.PI) / 180);
+          ctx.fillText(shape.text, 0, 0);
+          ctx.restore();
+        } else {
+          ctx.fillText(shape.text, shape.x, shape.y);
+        }
         break;
     }
   }

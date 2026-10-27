@@ -111,6 +111,8 @@ export interface ModuleDef {
   id: string;
   kind: ModuleKind;
   name: string;
+  /** What the face shows in place of `name`, which is too long there; the palette and the parts list keep `name`. */
+  shortName?: string;
   /** Width in 17.5 mm units. */
   widthUnits: number;
   poles: 1 | 2 | 3 | 4;

@@ -8,6 +8,7 @@ import {
   MAX_ART_COORDINATE_MM,
   MAX_ART_PATH_LENGTH,
   MAX_ART_PATH_SEGMENTS,
+  MAX_ART_ROTATION_DEGREES,
   MAX_ART_POINTS,
   MAX_ART_SHAPES,
   MAX_ART_STROKE_MM,
@@ -93,10 +94,17 @@ const priceCheck: FieldCheck = (v) =>
 const currencyCheck: FieldCheck = (v) =>
   typeof v === 'string' && CURRENCY_PATTERN.test(v) ? null : 'must be 1 to 8 letters, such as EUR';
 
+export const MAX_SHORT_NAME_LENGTH = 16;
+const shortNameCheck: FieldCheck = (v) =>
+  typeof v === 'string' && v.trim() === v && v.length >= 1 && v.length <= MAX_SHORT_NAME_LENGTH && !/[\u0000-\u001f\u007f]/.test(v)
+    ? null
+    : `must be 1 to ${MAX_SHORT_NAME_LENGTH} characters on one line, without surrounding spaces`;
+
 export const MODULE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   kind: { required: true, check: oneOf(MODULE_KINDS) },
   name: { required: true, check: nonEmptyString },
+  shortName: { required: false, check: shortNameCheck },
   widthUnits: { required: true, check: widthCheck },
   poles: { required: true, check: oneOf([1, 2, 3, 4]) },
   sku: { required: false, check: nonEmptyString },
@@ -362,6 +370,11 @@ export const ART_SPECS: Record<ArtKind, FieldSpec> = {
     },
     align: { required: false, check: oneOf(TEXT_ALIGNS) },
     bold: { required: false, check: boolean },
+    rotation: {
+      required: false,
+      check: (v) =>
+        typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= MAX_ART_ROTATION_DEGREES ? null : `must be a number of degrees from -${MAX_ART_ROTATION_DEGREES} to ${MAX_ART_ROTATION_DEGREES}`,
+    },
     ...COMMON,
   },
   path: {

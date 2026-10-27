@@ -137,6 +137,7 @@ function moduleView(module: ModuleDef): InspectorView {
   const fields: InspectorField[] = [
     text('id', 'Id', module.id),
     text('name', 'Name', module.name),
+    text('shortName', 'Short name', module.shortName ?? '', 'drawn on the face instead of the name'),
     select('kind', 'Kind', module.kind, MODULE_KINDS),
     number('widthUnits', 'Width', module.widthUnits, 'units of 17.5 mm; a fraction is fine'),
     number('widthMm', 'Width, mm', mmFromUnits(module.widthUnits), 'the real width of the device; this and the line above are one setting'),
@@ -290,6 +291,8 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       return apply((m) => ({ ...m, id: raw.trim() }), { kind: 'module', id: raw.trim() });
     case 'name':
       return apply((m) => ({ ...m, name: raw.trim() }));
+    case 'shortName':
+      return apply((m) => withOptional(m, 'shortName', optionalText(raw)));
     case 'kind':
       return apply((m) => withKind(m, raw as ModuleKind));
     case 'widthUnits':

@@ -534,20 +534,27 @@ export function importSvg(text: string, options: SvgImportOptions): SvgImport {
         const collect = (node: XmlElement | string): string => (typeof node === 'string' ? node : node.name === 'tspan' ? node.children.map(collect).join('') : '');
         const words = element.children.map(collect).join('').replace(/\s+/g, ' ').trim();
         if (words === '' || style.fill === 'none') return;
-        const [x, y] = apply(matrix, numberAttribute(element, 'x'), numberAttribute(element, 'y'));
+        const [baseX, baseY] = apply(matrix, numberAttribute(element, 'x'), numberAttribute(element, 'y'));
         const size = Math.min(MAX_ART_TEXT_SIZE_MM, Math.max(MIN_ART_TEXT_SIZE_MM, style.fontSize * k));
-        if (Math.abs(matrix[1]) > 1e-9 || Math.abs(matrix[2]) > 1e-9) notes.add('A rotated text is drawn level.');
+        const turnsOnly = Math.abs(matrix[0] * matrix[2] + matrix[1] * matrix[3]) < 1e-6 * k * k && Math.abs(Math.hypot(matrix[0], matrix[1]) - Math.hypot(matrix[2], matrix[3])) < 1e-6 * k;
+        if (!turnsOnly) notes.add('A skewed or stretched text is drawn straight.');
+        const degrees = turnsOnly ? Math.round(((Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI) * 100) / 100 : 0;
+        const angle = (degrees * Math.PI) / 180;
+        // The point of a text is the middle of its letters; an SVG gives the baseline, which lies lower in the direction the text is turned to.
+        const drop = size * BASELINE_BELOW_MIDDLE;
+        const [x, y] = [baseX + drop * Math.sin(angle), baseY - drop * Math.cos(angle)];
         if (words.length > MAX_ART_TEXT_LENGTH) notes.add(`A text longer than ${MAX_ART_TEXT_LENGTH} characters was cut short.`);
         shapes.push(
           finish({
             kind: 'text',
             x: mm(x),
-            y: mm(y - size * BASELINE_BELOW_MIDDLE),
+            y: mm(y),
             text: words.slice(0, MAX_ART_TEXT_LENGTH),
             size: mm(size),
             fill: style.fill,
             ...(style.textAnchor === 'middle' ? { align: 'centre' as const } : style.textAnchor === 'end' ? { align: 'right' as const } : {}),
             ...(style.bold ? { bold: true } : {}),
+            ...(degrees !== 0 ? { rotation: degrees } : {}),
           }),
         );
         return;

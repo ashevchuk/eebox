@@ -101,7 +101,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
     ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.font = `6px ${FONT_FAMILY}`;
-    const lines = wrapText((text) => ctx.measureText(text).width, def.name, room, Math.min(NAME_MAX_LINES, Math.max(1, Math.floor(r.width / NAME_LINE_SPACING_MM / 1.6))));
+    const lines = wrapText((text) => ctx.measureText(text).width, def.shortName ?? def.name, room, Math.min(NAME_MAX_LINES, Math.max(1, Math.floor(r.width / NAME_LINE_SPACING_MM / 1.6))));
     lines.forEach((line, i) => ctx.fillText(line, 0, (i - (lines.length - 1) / 2) * NAME_LINE_SPACING_MM));
   }
   ctx.restore();

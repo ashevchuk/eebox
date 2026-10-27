@@ -37,7 +37,13 @@ function element(shape: ArtShape): string {
       return `<path d="${shape.d}" ${paint(shape)}${own}/>`;
     case 'text': {
       const anchor = { left: 'start', centre: 'middle', right: 'end' }[shape.align ?? 'left'];
-      return `<text x="${num(shape.x)}" y="${num(shape.y + shape.size * BASELINE_BELOW_MIDDLE)}" font-size="${num(shape.size)}" font-family="sans-serif" text-anchor="${anchor}"${shape.bold ? ' font-weight="bold"' : ''} fill="${shape.fill ?? '#000000'}" stroke="none"${own}>${escapeXml(shape.text)}</text>`;
+      const angle = ((shape.rotation ?? 0) * Math.PI) / 180;
+      // The baseline lies below the middle of the letters, in the direction the text is turned to.
+      const drop = shape.size * BASELINE_BELOW_MIDDLE;
+      const x = shape.x - drop * Math.sin(angle);
+      const y = shape.y + drop * Math.cos(angle);
+      const turned = shape.rotation ? ` transform="rotate(${num(shape.rotation)} ${num(x)} ${num(y)})"` : '';
+      return `<text x="${num(x)}" y="${num(y)}" font-size="${num(shape.size)}" font-family="sans-serif" text-anchor="${anchor}"${shape.bold ? ' font-weight="bold"' : ''} fill="${shape.fill ?? '#000000'}" stroke="none"${turned}${own}>${escapeXml(shape.text)}</text>`;
     }
   }
 }

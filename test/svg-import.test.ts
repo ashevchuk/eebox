@@ -237,10 +237,11 @@ describe('what an SVG may hold and a face may not', () => {
     expect(notes(svg('<rect width="2" height="2" opacity="0.5"/>'))).toEqual(['Opacity, dashes, clipping and filters (opacity) are not drawn.']);
   });
 
-  it('is said when a transform or a path could not be read, and a rotated text is drawn level', () => {
+  it('is said when a transform or a path could not be read, and when a text is skewed, which a face cannot draw', () => {
     expect(notes(svg('<rect width="2" height="2" transform="wobble(2)"/><rect width="2" height="2"/>'))).toEqual(['The transform of a <rect> was not understood, so it was left out.']);
     expect(notes(svg('<path d="M 0" fill="red"/><rect width="2" height="2"/>'))).toEqual(['A path whose data could not be read was left out.']);
-    expect(notes(svg('<text x="1" y="5" transform="rotate(20)">a</text>'))).toEqual(['A rotated text is drawn level.']);
+    expect(notes(svg('<text x="1" y="5" transform="skewX(20)">a</text>'))).toEqual(['A skewed or stretched text is drawn straight.']);
+    expect(notes(svg('<text x="1" y="5" transform="rotate(20)">a</text>'))).toEqual([]);
   });
 
   it('is said when it is not known at all', () => {

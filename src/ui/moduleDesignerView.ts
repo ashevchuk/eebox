@@ -463,7 +463,7 @@ export class ModuleDesignerView {
       const x = body.x + unit * UNIT_PX;
       svg.append(svgElement('line', { x1: x, y1: body.y, x2: x, y2: body.y + body.height, stroke: '#9ca3af', 'stroke-dasharray': '3 4', 'stroke-width': 1 }));
     }
-    const label = this.module.name || this.module.id;
+    const label = this.module.shortName || this.module.name || this.module.id;
     const cx = body.x + body.width / 2;
     const cy = body.y + body.height / 2;
     svg.append(

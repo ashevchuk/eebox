@@ -31,7 +31,8 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | --- | --- | --- |
 | `id` | identifier | required, unique in the library |
 | `kind` | enum | `breaker`, `rcd`, `rcbo`, `contactor`, `spd`, `meter`, `psu`, `terminal`, `busbar`, `comb`, `switch`, `relay`, `other` |
-| `name` | string | required |
+| `name` | string | required; the name in the palette, the search and the parts list |
+| `shortName` | string | optional, 1 to 16 characters on one line; what the face of the module shows in place of `name`, which is too long there |
 | `widthUnits` | number | width in 17.5 mm units, from 0.1; a fraction is fine, so a relay of 22.5 mm is `1.2857` and a block of 29 mm `1.6571`. The designer takes the width in millimetres |
 | `poles` | 1, 2, 3 or 4 | decides the derived terminals |
 | `sku`, `ratedCurrentA`, `curve`, `breakingCapacityKA`, `residualCurrentMa` | optional | `curve` is one of `B C D K Z`; searchable in the palette |
@@ -131,7 +132,7 @@ the width the module is made for (`widthUnits`), and what is outside the face is
 | `rect` | `x`, `y`, `width`, `height` |
 | `ellipse` | `cx`, `cy`, `rx`, `ry` |
 | `polyline` | `points` (2 to 64 `[x, y]` pairs), `closed`; a fill needs `closed: true` |
-| `text` | `x`, `y`, `text` (1 to 40 characters), `size` (letter height in mm), `fill` (required), `align` (`left`, `centre`, `right`), `bold` |
+| `text` | `x`, `y`, `text` (1 to 40 characters), `size` (letter height in mm), `fill` (required), `align` (`left`, `centre`, `right`), `bold`, `rotation` (degrees clockwise about the point of the text, from -360 to 360; 90 stands the text up) |
 | `path` | `d`: absolute path data in mm, only `M x y`, `L x y`, `C x1 y1 x2 y2 x y` and `Z`, separated by single spaces, at most 400 commands, each piece starting with `M`; a stroke or a fill |
 
 Every shape may have `stroke` and `fill` as `#rrggbb` (a rect, an ellipse and a polyline need at least one

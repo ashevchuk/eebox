@@ -120,6 +120,13 @@
           "type": "string",
           "minLength": 1
         },
+        "shortName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^\\S(.*\\S)?$",
+          "description": "What the face shows in place of the name, which is too long there. The palette and the parts list keep the name."
+        },
         "widthUnits": {
           "type": "number",
           "minimum": 0.1,
@@ -800,6 +807,12 @@
               "exclusiveMinimum": 0,
               "maximum": 20,
               "description": "Line width in mm; 0.5 when absent."
+            },
+            "rotation": {
+              "type": "number",
+              "minimum": -360,
+              "maximum": 360,
+              "description": "Degrees clockwise about the point of the text; 90 is a quarter turn. The text is level when absent."
             }
           }
         },

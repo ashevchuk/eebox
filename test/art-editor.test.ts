@@ -210,7 +210,7 @@ describe('the fields of a shape', () => {
 
   it('are those of its kind', () => {
     expect(keys(rect)).toEqual(['kind', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'strokeWidth', 'anchor']);
-    expect(keys(text)).toEqual(['kind', 'x', 'y', 'text', 'size', 'align', 'bold', 'fill', 'anchor']);
+    expect(keys(text)).toEqual(['kind', 'x', 'y', 'text', 'size', 'align', 'bold', 'rotation', 'fill', 'anchor']);
     expect(keys(polyline)).toEqual(['kind', 'points', 'closed', 'fill', 'stroke', 'strokeWidth', 'anchor']);
     expect(keys({ ...rect, anchor: 'tile', period: 2 })).toContain('period');
     expect(keys(rect)).not.toContain('period');

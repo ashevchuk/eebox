@@ -11,10 +11,10 @@ import {
   addShapes,
   addVertex,
   applyShapeEdit,
-  boundsOf,
   createShape,
   dragHandle,
   duplicateShape,
+  flipShape,
   handlesOf,
   moveLayer,
   polylineThrough,
@@ -24,7 +24,9 @@ import {
   shapeAt,
   shapeFields,
   snapMm,
+  textBox,
   translate,
+  turnShape,
   type ArtResult,
   type ArtTool,
   type Layer,
@@ -214,7 +216,7 @@ export class ArtEditorView {
     }
     const cx = (module.widthUnits * MODULE_UNIT_MM * scale) / 2;
     const cy = (FACE_HEIGHT_MM * scale) / 2 + 4 * scale;
-    face.append(svgElement('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 6 * scale, 'font-family': FONT_FAMILY, fill: '#14161d', opacity: 0.35, transform: `rotate(-90 ${cx} ${cy})`, 'pointer-events': 'none' }, module.name));
+    face.append(svgElement('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 6 * scale, 'font-family': FONT_FAMILY, fill: '#14161d', opacity: 0.35, transform: `rotate(-90 ${cx} ${cy})`, 'pointer-events': 'none' }, module.shortName ?? module.name));
   }
 
   private drawInProgress(face: SVGElement, scale: number): void {
@@ -229,10 +231,9 @@ export class ArtEditorView {
     if (!shape || this.tool !== 'select') return;
     const { widthUnits } = this.host.module();
     for (const { shape: placed } of placeArtFrom([shape], widthUnits, widthUnits)) {
-      const box = boundsOf(placed);
       const outline =
         placed.kind === 'text'
-          ? svgElement('rect', { x: box.x1 * scale, y: box.y1 * scale, width: (box.x2 - box.x1) * scale, height: (box.y2 - box.y1) * scale, fill: 'none', stroke: SELECTION_COLOUR, 'stroke-dasharray': '3 3' })
+          ? this.textOutline(placed, scale)
           : shapeElement({ ...placed, fill: 'none', stroke: SELECTION_COLOUR, strokeWidth: Math.max(placed.strokeWidth ?? 0.5, 1.5 / scale) } as PlacedShape, scale);
       outline.setAttribute('pointer-events', 'none');
       face.append(outline);
@@ -240,6 +241,20 @@ export class ArtEditorView {
     for (const handle of handlesOf(shape)) {
       face.append(svgElement('rect', { x: handle.x * scale - HANDLE_RADIUS_PX, y: handle.y * scale - HANDLE_RADIUS_PX, width: 2 * HANDLE_RADIUS_PX, height: 2 * HANDLE_RADIUS_PX, fill: '#14161d', stroke: SELECTION_COLOUR, 'stroke-width': 1.5, 'data-handle': handle.id, cursor: 'pointer' }));
     }
+  }
+
+  private textOutline(shape: Extract<PlacedShape, { kind: 'text' }>, scale: number): SVGElement {
+    const box = textBox(shape);
+    return svgElement('rect', {
+      x: box.x1 * scale,
+      y: box.y1 * scale,
+      width: (box.x2 - box.x1) * scale,
+      height: (box.y2 - box.y1) * scale,
+      fill: 'none',
+      stroke: SELECTION_COLOUR,
+      'stroke-dasharray': '3 3',
+      ...(shape.rotation ? { transform: `rotate(${shape.rotation} ${shape.x * scale} ${shape.y * scale})` } : {}),
+    });
   }
 
   private renderSide(): void {
@@ -257,6 +272,11 @@ export class ArtEditorView {
     if (shape && this.selected !== null) {
       const index = this.selected;
       for (const [layer, label, title] of LAYER_BUTTONS) this.layerBar.append(button(label, () => this.apply(moveLayer(this.host.draft(), this.host.module().id, index, layer)), title));
+      this.layerBar.append(button('Turn right', () => this.changeShape(index, turnShape(shape, 1), ''), 'Turn the shape a quarter turn clockwise about its middle'));
+      this.layerBar.append(button('Turn left', () => this.changeShape(index, turnShape(shape, 3), ''), 'Turn the shape a quarter turn anticlockwise about its middle'));
+      this.layerBar.append(button('Turn 180°', () => this.changeShape(index, turnShape(shape, 2), ''), 'Turn the shape half a turn about its middle'));
+      this.layerBar.append(button('Flip horizontally', () => this.changeShape(index, flipShape(shape, 'horizontal'), 'A text cannot be flipped, only turned.'), 'Reflect the shape left to right about its middle'));
+      this.layerBar.append(button('Flip vertically', () => this.changeShape(index, flipShape(shape, 'vertical'), 'A text cannot be flipped, only turned.'), 'Reflect the shape top to bottom about its middle'));
       this.layerBar.append(button('Duplicate', () => this.apply(duplicateShape(this.host.draft(), this.host.module().id, index))));
       this.layerBar.append(button('Delete', () => this.apply(removeShape(this.host.draft(), this.host.module().id, index))));
       if (shape.kind === 'polyline') {

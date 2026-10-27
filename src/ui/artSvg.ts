@@ -43,6 +43,7 @@ export function shapeElement(shape: PlacedShape, scale: number): SVGElement {
           'text-anchor': { left: 'start', centre: 'middle', right: 'end' }[shape.align ?? 'left'],
           'dominant-baseline': 'central',
           fill: shape.fill ?? '#000000',
+          ...(shape.rotation ? { transform: `rotate(${shape.rotation} ${shape.x * scale} ${shape.y * scale})` } : {}),
         },
         shape.text,
       );

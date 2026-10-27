@@ -19,6 +19,7 @@ export const MIN_ART_TEXT_SIZE_MM = 1;
 export const MAX_ART_TEXT_SIZE_MM = 60;
 export const MIN_ART_PERIOD_UNITS = 0.25;
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
+export const MAX_ART_ROTATION_DEGREES = 360;
 export const MAX_ART_PATH_SEGMENTS = 400;
 export const MAX_ART_PATH_LENGTH = 12000;
 
@@ -68,6 +69,8 @@ export interface ArtText extends Common {
   size: number;
   align?: TextAlign;
   bold?: boolean;
+  /** Degrees clockwise about the point of the text, a quarter turn at 90; the text is level when absent. */
+  rotation?: number;
 }
 export interface ArtPath extends Common {
   kind: 'path';
