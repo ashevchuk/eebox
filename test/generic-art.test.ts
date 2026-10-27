@@ -19,6 +19,8 @@ function boxOf(shape: ArtShape): { x1: number; y1: number; x2: number; y2: numbe
       return { x1: Math.min(...shape.points.map((p) => p[0])), y1: Math.min(...shape.points.map((p) => p[1])), x2: Math.max(...shape.points.map((p) => p[0])), y2: Math.max(...shape.points.map((p) => p[1])) };
     case 'text':
       return { x1: shape.x, y1: shape.y - shape.size / 2, x2: shape.x, y2: shape.y + shape.size / 2 };
+    case 'path':
+      return { x1: 0, y1: 0, x2: 0, y2: 0 };
   }
 }
 

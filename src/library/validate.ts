@@ -6,6 +6,8 @@ import {
   ART_ANCHORS,
   ART_KINDS,
   MAX_ART_COORDINATE_MM,
+  MAX_ART_PATH_LENGTH,
+  MAX_ART_PATH_SEGMENTS,
   MAX_ART_POINTS,
   MAX_ART_SHAPES,
   MAX_ART_STROKE_MM,
@@ -14,6 +16,7 @@ import {
   MIN_ART_PERIOD_UNITS,
   MIN_ART_TEXT_SIZE_MM,
   TEXT_ALIGNS,
+  parsePath,
   type ArtKind,
 } from './art';
 import { positionProblem } from './positions';
@@ -359,6 +362,17 @@ export const ART_SPECS: Record<ArtKind, FieldSpec> = {
     },
     align: { required: false, check: oneOf(TEXT_ALIGNS) },
     bold: { required: false, check: boolean },
+    ...COMMON,
+  },
+  path: {
+    ...artKind('path'),
+    d: {
+      required: true,
+      check: (v) =>
+        typeof v === 'string' && parsePath(v) !== undefined
+          ? null
+          : `must be path data as "M x y L x y C x1 y1 x2 y2 x y Z" in mm, absolute, with single spaces, from 1 to ${MAX_ART_PATH_SEGMENTS} commands and at most ${MAX_ART_PATH_LENGTH} characters, each piece starting with M`,
+    },
     ...COMMON,
   },
 };

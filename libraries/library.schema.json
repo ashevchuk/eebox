@@ -802,6 +802,58 @@
               "description": "Line width in mm; 0.5 when absent."
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "d"
+          ],
+          "properties": {
+            "kind": {
+              "const": "path"
+            },
+            "d": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12000,
+              "pattern": "^M( -?\\d+(\\.\\d+)?){2}( (M|L)( -?\\d+(\\.\\d+)?){2}| C( -?\\d+(\\.\\d+)?){6}| Z)*$",
+              "description": "Absolute path data in mm from the top left corner of the face: M x y, L x y, C x1 y1 x2 y2 x y and Z, separated by single spaces, at most 400 commands."
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
         }
       ],
       "allOf": [

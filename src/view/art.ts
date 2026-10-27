@@ -1,4 +1,4 @@
-import { DEFAULT_STROKE_WIDTH_MM, placeArt, type ArtShape, type TextAlign } from '../library/art';
+import { DEFAULT_STROKE_WIDTH_MM, parsePath, placeArt, type ArtShape, type TextAlign } from '../library/art';
 import { FONT_FAMILY } from './font';
 import type { Rect } from './geometry';
 
@@ -37,6 +37,16 @@ export function drawArt(ctx: CanvasRenderingContext2D, art: readonly ArtShape[],
         ctx.beginPath();
         shape.points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
         if (shape.closed) ctx.closePath();
+        paint(ctx, shape);
+        break;
+      case 'path':
+        ctx.beginPath();
+        for (const c of parsePath(shape.d) ?? []) {
+          if (c.op === 'M') ctx.moveTo(c.x, c.y);
+          else if (c.op === 'L') ctx.lineTo(c.x, c.y);
+          else if (c.op === 'C') ctx.bezierCurveTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y);
+          else ctx.closePath();
+        }
         paint(ctx, shape);
         break;
       case 'text':

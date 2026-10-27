@@ -27,8 +27,8 @@ describe('the validation of the art of a module', () => {
 
   it('refuses what is not a list of known shapes', () => {
     expect(messages({})).toEqual(['art: must be an array']);
-    expect(messages([{ kind: 'star' }])).toEqual(['art[0].kind: must be one of: line, rect, ellipse, polyline, text']);
-    expect(messages([{ x: 1 }])).toEqual(['art[0].kind: must be one of: line, rect, ellipse, polyline, text']);
+    expect(messages([{ kind: 'star' }])).toEqual(['art[0].kind: must be one of: line, rect, ellipse, polyline, text, path']);
+    expect(messages([{ x: 1 }])).toEqual(['art[0].kind: must be one of: line, rect, ellipse, polyline, text, path']);
   });
 
   it('refuses unknown fields, so a typo does not drop part of a drawing', () => {

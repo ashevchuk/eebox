@@ -153,6 +153,10 @@ export class SvgContext {
     this.path.push('Z');
   }
 
+  bezierCurveTo(x1: number, y1: number, x2: number, y2: number, x: number, y: number): void {
+    this.path.push(`C${num(x1)} ${num(y1)} ${num(x2)} ${num(y2)} ${num(x)} ${num(y)}`);
+  }
+
   fill(): void {
     this.emit(`<path d="${this.path.join('')}"${this.fillAttributes()}${this.common()}/>`);
   }

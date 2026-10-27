@@ -1,5 +1,9 @@
 import {
   ART_ANCHORS,
+  flattenPath,
+  formatPath,
+  mapPathPoints,
+  parsePath,
   DEFAULT_STROKE_WIDTH_MM,
   MAX_ART_COORDINATE_MM,
   MAX_ART_POINTS,
@@ -63,7 +67,18 @@ export function boundsOf(shape: ArtShape): Box {
       const left = shape.align === 'centre' ? shape.x - width / 2 : shape.align === 'right' ? shape.x - width : shape.x;
       return { x1: left, y1: shape.y - shape.size / 2, x2: left + width, y2: shape.y + shape.size / 2 };
     }
+    case 'path': {
+      const points = flattenPath(parsePath(shape.d) ?? []).flat();
+      if (points.length === 0) return { x1: 0, y1: 0, x2: 0, y2: 0 };
+      return { x1: Math.min(...points.map((p) => p[0])), y1: Math.min(...points.map((p) => p[1])), x2: Math.max(...points.map((p) => p[0])), y2: Math.max(...points.map((p) => p[1])) };
+    }
   }
+}
+
+/** The path with every point taken through a function, as a shape; a path that cannot be read is left as it is. */
+function mappedPath(shape: Extract<ArtShape, { kind: 'path' }>, map: (x: number, y: number) => [number, number]): ArtShape {
+  const commands = parsePath(shape.d);
+  return commands ? { ...shape, d: formatPath(mapPathPoints(commands, map)) } : shape;
 }
 
 function moved(shape: ArtShape, dx: number, dy: number): ArtShape {
@@ -78,6 +93,8 @@ function moved(shape: ArtShape, dx: number, dy: number): ArtShape {
       return { ...shape, points: shape.points.map(([x, y]): [number, number] => [x + dx, y + dy]) };
     case 'text':
       return { ...shape, x: shape.x + dx, y: shape.y + dy };
+    case 'path':
+      return mappedPath(shape, (x, y) => [x + dx, y + dy]);
   }
 }
 
@@ -153,6 +170,14 @@ export function dragHandle(shape: ArtShape, id: string, to: Point): ArtShape {
     }
     case 'text':
       return shape;
+    case 'path': {
+      const from = boundsOf(shape);
+      const box = pulledBox(from, id, at);
+      const scaleOf = (low: number, high: number, newLow: number, newHigh: number) => (v: number) => (high === low ? v + (newLow - low) : newLow + ((v - low) / (high - low)) * (newHigh - newLow));
+      const mapX = scaleOf(from.x1, from.x2, box.x1, box.x2);
+      const mapY = scaleOf(from.y1, from.y2, box.y1, box.y2);
+      return mappedPath(shape, (x, y) => [clampCoordinate(mapX(x)), clampCoordinate(mapY(y))]);
+    }
   }
 }
 
@@ -203,6 +228,12 @@ export function hits(shape: ArtShape, p: Point, tolerance: number): boolean {
     case 'text': {
       const box = boundsOf(shape);
       return inside(p, { x1: box.x1 - tolerance, y1: box.y1 - tolerance, x2: box.x2 + tolerance, y2: box.y2 + tolerance });
+    }
+    case 'path': {
+      const pieces = flattenPath(parsePath(shape.d) ?? []);
+      const near = pieces.some((piece) => piece.slice(1).some((b, i) => distanceToSegment(p, { x: piece[i]![0], y: piece[i]![1] }, { x: b[0], y: b[1] }) <= reach));
+      if (near) return true;
+      return shape.fill !== undefined && pieces.filter((piece) => pointInPolygon(p, piece)).length % 2 === 1;
     }
   }
 }
@@ -273,6 +304,15 @@ export function addShape(draft: Library, moduleId: string, shape: ArtShape): Art
   return { ok: true, draft: withArt(draft, moduleId, [...art, shape]), index: art.length };
 }
 
+/** Puts several shapes on top of the drawing in one step, and selects the first of them. */
+export function addShapes(draft: Library, moduleId: string, shapes: ArtShape[]): ArtResult {
+  const art = artOf(draft, moduleId);
+  if (art.length + shapes.length > MAX_ART_SHAPES) return fail(`A face has at most ${MAX_ART_SHAPES} shapes.`);
+  const problem = firstProblem(shapes);
+  if (problem) return fail(problem);
+  return { ok: true, draft: withArt(draft, moduleId, [...art, ...shapes]), index: art.length };
+}
+
 /** Replaces a shape, if the result is one the library accepts. */
 export function replaceShape(draft: Library, moduleId: string, index: number, shape: ArtShape): ArtResult {
   const art = artOf(draft, moduleId);
@@ -335,6 +375,7 @@ const GEOMETRY_KEYS: Record<ArtShape['kind'], readonly string[]> = {
   ellipse: ['cx', 'cy', 'rx', 'ry'],
   polyline: [],
   text: ['x', 'y'],
+  path: [],
 };
 const FROM_LEFT = 'mm from the left edge';
 const FROM_TOP = 'mm from the top edge';
@@ -350,6 +391,7 @@ export function shapeFields(shape: ArtShape): InspectorField[] {
     fields.push({ key: 'points', label: 'Points', kind: 'text', value: shape.points.map(([x, y]) => `${x},${y}`).join(' '), hint: 'x,y pairs in mm, 2 to 64' });
     fields.push({ key: 'closed', label: 'Closed', kind: 'select', value: shape.closed ? 'yes' : 'no', options: ['no', 'yes'] });
   }
+  if (shape.kind === 'path') fields.push({ key: 'segments', label: 'Path', kind: 'readonly', value: `${parsePath(shape.d)?.length ?? 0} commands, taken from an SVG` });
   if (shape.kind === 'text') {
     fields.push({ key: 'text', label: 'Text', kind: 'text', value: shape.text, hint: 'one line, up to 40 characters' });
     fields.push({ key: 'size', label: 'Letter height', kind: 'number', value: shape.size, min: 1, max: 60, hint: 'mm' });

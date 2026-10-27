@@ -8,6 +8,7 @@ import {
   ART_TOOLS,
   FACE_HEIGHT_MM,
   addShape,
+  addShapes,
   addVertex,
   applyShapeEdit,
   boundsOf,
@@ -29,18 +30,21 @@ import {
   type Layer,
   type Point,
 } from './artEditor';
+import { svgElement, shapeElement } from './artSvg';
 import { FieldsView } from './fieldsView';
+import { openSvgImportDialog } from './svgImportDialog';
 
 /** What the face editor needs from the designer around it. */
 export interface ArtEditorHost {
   draft(): Library;
   module(): ModuleDef;
+  /** Shows a modal dialog on top of the designer. */
+  openDialog(dialog: HTMLDialogElement): void;
   /** Records a new draft in the history of the designer, once for each gesture. */
   commit(draft: Library): void;
   say(message: string, isError?: boolean): void;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_SCALE_PX_PER_MM = 4;
 const STAGE_WIDTH_PX = 540;
 const STAGE_HEIGHT_PX = 380;
@@ -65,13 +69,6 @@ const LAYER_BUTTONS: Array<[Layer, string, string]> = [
   ['front', 'To front', 'Put the shape over all the others'],
 ];
 
-function svgElement(tag: string, attributes: Record<string, string | number>, text?: string): SVGElement {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [name, value] of Object.entries(attributes)) el.setAttribute(name, String(value));
-  if (text !== undefined) el.textContent = text;
-  return el;
-}
-
 function button(label: string, onClick: () => void, title?: string): HTMLButtonElement {
   const el = document.createElement('button');
   el.textContent = label;
@@ -84,41 +81,6 @@ type Gesture =
   | { kind: 'create'; tool: Exclude<ArtTool, 'select' | 'polyline' | 'text'>; from: Point; to: Point }
   | { kind: 'move'; index: number; from: Point; original: ArtShape; moved: boolean; current: ArtShape }
   | { kind: 'handle'; index: number; id: string; original: ArtShape; current: ArtShape };
-
-/** The shape as SVG, in pixels at `scale` pixels to the millimetre. */
-function shapeElement(shape: PlacedShape, scale: number): SVGElement {
-  const paint = {
-    fill: shape.fill ?? 'none',
-    stroke: shape.kind === 'text' ? 'none' : (shape.stroke ?? 'none'),
-    'stroke-width': (shape.strokeWidth ?? 0.5) * scale,
-    'stroke-linejoin': 'round',
-  };
-  switch (shape.kind) {
-    case 'line':
-      return svgElement('line', { x1: shape.x1 * scale, y1: shape.y1 * scale, x2: shape.x2 * scale, y2: shape.y2 * scale, ...paint, fill: 'none' });
-    case 'rect':
-      return svgElement('rect', { x: shape.x * scale, y: shape.y * scale, width: shape.width * scale, height: shape.height * scale, ...paint });
-    case 'ellipse':
-      return svgElement('ellipse', { cx: shape.cx * scale, cy: shape.cy * scale, rx: shape.rx * scale, ry: shape.ry * scale, ...paint });
-    case 'polyline':
-      return svgElement(shape.closed ? 'polygon' : 'polyline', { points: shape.points.map(([x, y]) => `${x * scale},${y * scale}`).join(' '), ...paint });
-    case 'text':
-      return svgElement(
-        'text',
-        {
-          x: shape.x * scale,
-          y: shape.y * scale,
-          'font-size': shape.size * scale,
-          'font-family': FONT_FAMILY,
-          'font-weight': shape.bold ? 'bold' : 'normal',
-          'text-anchor': { left: 'start', centre: 'middle', right: 'end' }[shape.align ?? 'left'],
-          'dominant-baseline': 'central',
-          fill: shape.fill ?? '#000000',
-        },
-        shape.text,
-      );
-  }
-}
 
 const describe = (shape: ArtShape, index: number): string => {
   const brief = shape.kind === 'text' ? `“${shape.text}”` : (shape.anchor ?? '');
@@ -152,6 +114,7 @@ export class ArtEditorView {
       this.toolButtons.set(tool, el);
       this.toolbar.append(el);
     }
+    this.toolbar.append(button('Import SVG…', () => this.importSvg(), 'Put the drawing of an SVG file on the face'));
     this.toolbar.append(button('Finish line', () => this.finishPolyline(), 'Make the polyline from the points clicked so far'));
     this.hint.className = 'designer-hint';
     this.stage.append(this.toolbar, this.svgHost, this.hint);
@@ -296,6 +259,18 @@ export class ArtEditorView {
       }
     }
     this.fields.render(shape ? { title: `Shape ${(this.selected ?? 0) + 1}`, fields: shapeFields(shape), actions: [] } : { title: 'No shape selected', fields: [], actions: [] });
+  }
+
+  private importSvg(): void {
+    openSvgImportDialog({
+      module: this.host.module(),
+      openDialog: (dialog) => this.host.openDialog(dialog),
+      accept: (shapes) => {
+        this.tool = 'select';
+        this.apply(addShapes(this.host.draft(), this.host.module().id, shapes));
+        this.host.say(`${shapes.length} shape${shapes.length === 1 ? '' : 's'} imported.`);
+      },
+    });
   }
 
   private select(index: number | null): void {

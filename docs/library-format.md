@@ -132,6 +132,7 @@ the width the module is made for (`widthUnits`), and what is outside the face is
 | `ellipse` | `cx`, `cy`, `rx`, `ry` |
 | `polyline` | `points` (2 to 64 `[x, y]` pairs), `closed`; a fill needs `closed: true` |
 | `text` | `x`, `y`, `text` (1 to 40 characters), `size` (letter height in mm), `fill` (required), `align` (`left`, `centre`, `right`), `bold` |
+| `path` | `d`: absolute path data in mm, only `M x y`, `L x y`, `C x1 y1 x2 y2 x y` and `Z`, separated by single spaces, at most 400 commands, each piece starting with `M`; a stroke or a fill |
 
 Every shape may have `stroke` and `fill` as `#rrggbb` (a rect, an ellipse and a polyline need at least one
 of them), `strokeWidth` in mm (0.5 when absent), and an `anchor` that says what a placed copy of another
@@ -142,6 +143,11 @@ width does with it:
 - `stretch`: its x coordinates and widths are scaled with the width, so a circle becomes an ellipse;
 - `tile`: repeated every `period` units (0.25 and more) from its place, as many times as whole periods
   fit in the width, at most 48; the rest of the width stays empty.
+
+A path is what an imported SVG turns into: the module designer reads the shapes, paths (with arcs and
+curves), polygons, texts and groups with transforms of an SVG file, puts them on the face as the shapes
+above and lists what it leaves out (images, scripts, styles, gradients, opacity, clipping). The file is
+read by the application's own reader, which refuses a document type and entities and runs nothing.
 
 Text is drawn in the font that comes with the application, so it looks the same on every machine.
 

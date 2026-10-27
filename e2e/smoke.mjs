@@ -385,6 +385,15 @@ try {
       const select = row.querySelector('select'); select.value = 'stretch'; select.dispatchEvent(new Event('change', { bubbles: true }));
     })()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-layer.selected')?.textContent.includes('stretch')`, 'the anchor to be set');
+    const imported = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><script>alert(1)</script><image href="x.png"/><rect x="0" y="0" width="20" height="4" fill="#cc0000"/><circle cx="10" cy="12" r="6" fill="none" stroke="#000000" stroke-width="1"/><path d="M4 18 A6 6 0 0 1 16 18" stroke="#003399" fill="none"/></svg>`;
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Import SVG…').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] dialog[open] textarea')`, 'the import dialog');
+    await browser.evaluate(`(() => { const t = document.querySelector('.designer-dialog[open] dialog[open] textarea'); t.value = ${JSON.stringify(imported)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] dialog[open] .svg-import-preview svg') && !document.querySelector('.designer-dialog[open] dialog[open] button.primary').disabled`, 'the preview of the SVG');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] dialog[open] .svg-import-notes li')].map((l) => l.textContent)`), ['<script> is not drawn.', '<image> is not drawn.'], 'what the import leaves out');
+    await browser.evaluate(`document.querySelector('.designer-dialog[open] dialog[open] button.primary').click()`);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 6`, 'the imported shapes');
+    expectEqual(await layers(), ['1. rect', '2. text “RCD”', '3. polyline stretch', '4. rect', '5. ellipse', '6. path'], 'the shapes after the import');
     await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
     await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the module to be saved');
     const art = await browser.evaluate(`(async () => {
@@ -392,7 +401,7 @@ try {
       const libraries = await new Promise((resolve, reject) => { const r = db.transaction('libraries').objectStore('libraries').getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
       return libraries.flatMap((l) => l.modules).find((m) => m.name === 'Face test')?.art?.map((s) => [s.kind, s.anchor ?? 'left', s.text ?? '']);
     })()`);
-    expectEqual(art, [['rect', 'left', ''], ['text', 'left', 'RCD'], ['polyline', 'stretch', '']], 'the drawing stored with the module');
+    expectEqual(art, [['rect', 'left', ''], ['text', 'left', 'RCD'], ['polyline', 'stretch', ''], ['rect', 'left', ''], ['ellipse', 'left', ''], ['path', 'left', '']], 'the drawing stored with the module');
     await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
     await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
   });

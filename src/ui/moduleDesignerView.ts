@@ -161,6 +161,11 @@ export class ModuleDesignerView {
     this.face = new ArtEditorView({
       draft: () => this.draft,
       module: () => this.module,
+      openDialog: (dialog) => {
+        dialog.addEventListener('close', () => dialog.remove());
+        this.dialog.append(dialog);
+        dialog.showModal();
+      },
       commit: (draft) => {
         this.pristine = false;
         this.commit(draft, this.selected);

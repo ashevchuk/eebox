@@ -12,7 +12,7 @@
     "test": "vitest run",
     "gen:library": "vite-node scripts/generate-generic-library.ts",
     "test:watch": "vitest",
-    "e2e": "node e2e/smoke.mjs"
+    "e2e": "node e2e/smoke.mjs && node e2e/persistence.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
