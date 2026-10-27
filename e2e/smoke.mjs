@@ -281,7 +281,7 @@ try {
     })()`);
     await browser.waitFor(`document.querySelector('.designer-dialog dialog[open]')`, 'the block dialog');
     await browser.evaluate(`(() => {
-      const d = document.querySelector('.designer-dialog dialog'); const c = [...d.querySelectorAll('label input, label select')];
+      const d = document.querySelector('.designer-dialog dialog[open]'); const c = [...d.querySelectorAll('label input, label select')];
       c[0].value = '1'; c[1].value = '6'; c[2].value = 'N'; c[3].checked = true;
       [...d.querySelectorAll('button')].find((b) => b.textContent === 'OK').click();
     })()`);
@@ -290,7 +290,7 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('.designer-toolbar button')].find((b) => b.textContent === 'Variants…').click()`);
     await browser.waitFor(`[...document.querySelectorAll('.designer-dialog dialog[open] button')].some((b) => b.textContent === 'Make variants')`, 'the variants dialog');
     await browser.evaluate(`(() => {
-      const d = document.querySelector('.designer-dialog dialog'); d.querySelectorAll('input')[2].value = 'L1 L2 L3 N PE';
+      const d = document.querySelector('.designer-dialog dialog[open]'); d.querySelectorAll('input')[2].value = 'L1 L2 L3 N PE';
       [...d.querySelectorAll('button')].find((b) => b.textContent === 'Make variants').click();
     })()`);
     await browser.waitFor(`document.querySelector('.designer-dialog .editor-status')?.textContent.includes('Made 5 variants')`, 'five variants');
