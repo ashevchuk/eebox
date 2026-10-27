@@ -1,3 +1,4 @@
+import { genericArt } from './genericArt';
 import type { ModuleDef, TerminalDef } from './types';
 
 /**
@@ -459,6 +460,11 @@ function withWidthRange(def: ModuleDef): ModuleDef {
   return range ? { ...def, resizable: { minUnits: range[0], maxUnits: range[1] } } : def;
 }
 
+function withArt(def: ModuleDef): ModuleDef {
+  const art = genericArt(def);
+  return art ? { ...def, art } : def;
+}
+
 export function genericModules(): ModuleDef[] {
   return [
     ...breakers(),
@@ -475,7 +481,7 @@ export function genericModules(): ModuleDef[] {
     ...transferController(),
     ...bars(),
     ...combs(),
-  ].map(withWidthRange);
+  ].map(withWidthRange).map(withArt);
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -488,7 +494,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '7';
+export const GENERIC_LIBRARY_VERSION = '8';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

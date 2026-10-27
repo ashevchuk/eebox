@@ -1,4 +1,5 @@
 import { TILE_HEIGHT_MM, TILE_OVERLAP_MM, TILE_WIDTH_MM, sheetsWithContent, tileLayout } from '../project/tiles';
+import { FONT_FAMILY } from '../view/font';
 import { printArea } from '../view/geometry';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
@@ -19,7 +20,7 @@ const element = (tag: string, className: string, text?: string): HTMLElement => 
  */
 export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: View): void {
   const measuring = document.createElement('canvas').getContext('2d')!;
-  measuring.font = '8px sans-serif';
+  measuring.font = `8px ${FONT_FAMILY}`;
   const combInfo = (item: { module: Parameters<Session['resolve']>[0]; widthUnits?: number }) => {
     const def = session.resolve(item.module);
     return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;

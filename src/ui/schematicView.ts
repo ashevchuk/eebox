@@ -45,6 +45,7 @@ import { Camera, type Bounds, type Point } from '../view/Camera';
 import { drawConductorDot, strokeConductor } from '../view/conductorDraw';
 import { rectBetween } from '../view/geometry';
 import { theme } from '../view/theme';
+import { FONT_FAMILY } from '../view/font';
 import { LEVER_COLORS } from '../view/render';
 import { selectedWires, toggleWire, wireGroupSelection } from './selection';
 import type { Session } from './session';
@@ -683,7 +684,7 @@ export class SchematicView implements View {
 
   private drawWireLabel(ctx: CanvasRenderingContext2D, text: string, at: Point): void {
     ctx.save();
-    ctx.font = '9px sans-serif';
+    ctx.font = `9px ${FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const width = ctx.measureText(text).width + 8;
@@ -725,13 +726,13 @@ export class SchematicView implements View {
       ? `${shelved?.label ?? node.label} (${shelved ? 'on the shelf' : 'missing'})`
       : (placement?.label ?? node.label);
     let fontSize = 12;
-    ctx.font = `${fontSize}px sans-serif`;
+    ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     while (fontSize > MIN_LABEL_FONT && ctx.measureText(label).width > r.width - 16) {
       fontSize -= 1;
-      ctx.font = `${fontSize}px sans-serif`;
+      ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     }
     ctx.fillText(label, r.x + r.width / 2 + 3, r.y + r.height / 2);
-    ctx.font = '8px sans-serif';
+    ctx.font = `8px ${FONT_FAMILY}`;
     if (node.earthing) ctx.fillText(node.earthing, r.x + r.width / 2 + 3, r.y + 8);
     for (const { terminal, point } of layout.ports) {
       const custom = placement?.terminalLabels?.[terminal.id];

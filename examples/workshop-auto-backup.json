@@ -621,7 +621,31 @@
       "resizable": {
         "minUnits": 2,
         "maxUnits": 8
-      }
+      },
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 66,
+          "height": 9,
+          "fill": "#e5e7eb",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "stretch"
+        },
+        {
+          "kind": "ellipse",
+          "cx": 6,
+          "cy": 7,
+          "rx": 2,
+          "ry": 2,
+          "fill": "#22c55e",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "left"
+        }
+      ]
     },
     "generic-iec/contactor-3p-40-230": {
       "id": "contactor-3p-40-230",
@@ -713,7 +737,50 @@
             "closedWhen": "coil"
           }
         ]
-      }
+      },
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 48.5,
+          "height": 9,
+          "fill": "#1f2937",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "stretch"
+        },
+        {
+          "kind": "line",
+          "x1": 4,
+          "y1": 9.5,
+          "x2": 12,
+          "y2": 4.5,
+          "stroke": "#ffffff",
+          "strokeWidth": 0.8,
+          "anchor": "left"
+        },
+        {
+          "kind": "line",
+          "x1": 3,
+          "y1": 74,
+          "x2": 49.5,
+          "y2": 74,
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.6,
+          "anchor": "stretch"
+        },
+        {
+          "kind": "line",
+          "x1": 3,
+          "y1": 77.5,
+          "x2": 49.5,
+          "y2": 77.5,
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.6,
+          "anchor": "stretch"
+        }
+      ]
     },
     "generic-iec/rcd-4p-40-30": {
       "id": "rcd-4p-40-30",
@@ -722,7 +789,50 @@
       "widthUnits": 4,
       "poles": 4,
       "ratedCurrentA": 40,
-      "residualCurrentMa": 30
+      "residualCurrentMa": 30,
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 66,
+          "height": 9,
+          "fill": "#1f2937",
+          "anchor": "stretch"
+        },
+        {
+          "kind": "rect",
+          "x": 12.2,
+          "y": 3.5,
+          "width": 3.6,
+          "height": 5,
+          "fill": "#e5e7eb",
+          "anchor": "tile",
+          "period": 1
+        },
+        {
+          "kind": "ellipse",
+          "cx": 64,
+          "cy": 75,
+          "rx": 3.4,
+          "ry": 3.4,
+          "fill": "#facc15",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "right"
+        },
+        {
+          "kind": "text",
+          "x": 64,
+          "y": 75,
+          "text": "T",
+          "size": 3.6,
+          "fill": "#1f2937",
+          "align": "centre",
+          "bold": true,
+          "anchor": "right"
+        }
+      ]
     }
   }
 }

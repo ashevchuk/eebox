@@ -2,6 +2,20 @@ import { isStoredLabel } from '../layout/labels';
 import { MAX_LABEL_LENGTH, MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../layout/limits';
 import { MIN_WIDTH_UNITS } from '../layout/units';
 import { parseExpression } from './logicExpression';
+import {
+  ART_ANCHORS,
+  ART_KINDS,
+  MAX_ART_COORDINATE_MM,
+  MAX_ART_POINTS,
+  MAX_ART_SHAPES,
+  MAX_ART_STROKE_MM,
+  MAX_ART_TEXT_LENGTH,
+  MAX_ART_TEXT_SIZE_MM,
+  MIN_ART_PERIOD_UNITS,
+  MIN_ART_TEXT_SIZE_MM,
+  TEXT_ALIGNS,
+  type ArtKind,
+} from './art';
 import { positionProblem } from './positions';
 import {
   CONDUCTORS,
@@ -93,6 +107,7 @@ export const MODULE_SPEC: FieldSpec = {
   comb: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   resizable: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   logic: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
+  art: { required: false, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
 };
 
 export const MAX_LOGIC_INPUTS = 8;
@@ -204,6 +219,7 @@ export function validateModuleDeep(
   if (isComb && def.terminals !== undefined) errors.push({ path: `${path}.terminals`, message: 'a comb has no terminals' });
   if (def.comb !== undefined) validateObject(def.comb, COMB_SPEC, `${path}.comb`, errors);
   const narrowest = checkResizable(def, path, errors);
+  if (def.art !== undefined) validateArt(def.art, `${path}.art`, errors);
   if (def.logic !== undefined && !Array.isArray(def.terminals)) {
     errors.push({ path: `${path}.logic`, message: 'needs explicit terminals to refer to' });
   }
@@ -277,6 +293,112 @@ function validateLogic(raw: unknown, terminalIds: Set<string>, path: string, err
     for (const name of parsed.names) {
       if (!names.includes(name) && !flagNames.includes(name)) errors.push({ path: `${contactPath}.closedWhen`, message: `"${name}" is not an input or a flag` });
     }
+  });
+}
+
+/* The drawing on the face of a module. */
+const ART_COLOUR = /^#[0-9a-fA-F]{6}$/;
+const colourCheck: FieldCheck = (v) => (typeof v === 'string' && ART_COLOUR.test(v) ? null : 'must be a colour like #1f2937');
+const coordinate: FieldCheck = (v) =>
+  typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= MAX_ART_COORDINATE_MM ? null : `must be a number of mm within ${MAX_ART_COORDINATE_MM} of the corner`;
+const extent: FieldCheck = (v) =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_ART_COORDINATE_MM ? null : `must be above 0 and at most ${MAX_ART_COORDINATE_MM} mm`;
+const boolean: FieldCheck = (v) => (typeof v === 'boolean' ? null : 'must be true or false');
+
+const COMMON: FieldSpec = {
+  anchor: { required: false, check: oneOf(ART_ANCHORS) },
+  period: {
+    required: false,
+    check: (v) =>
+      typeof v === 'number' && Number.isFinite(v) && v >= MIN_ART_PERIOD_UNITS && v <= MAX_RAIL_LENGTH_UNITS
+        ? null
+        : `must be a number of units from ${MIN_ART_PERIOD_UNITS} to ${MAX_RAIL_LENGTH_UNITS}`,
+  },
+  stroke: { required: false, check: colourCheck },
+  fill: { required: false, check: colourCheck },
+  strokeWidth: {
+    required: false,
+    check: (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_ART_STROKE_MM ? null : `must be above 0 and at most ${MAX_ART_STROKE_MM} mm`),
+  },
+};
+const artKind = (kind: ArtKind): FieldSpec => ({ kind: { required: true, check: oneOf([kind]) } });
+
+export const ART_SPECS: Record<ArtKind, FieldSpec> = {
+  line: { ...artKind('line'), x1: { required: true, check: coordinate }, y1: { required: true, check: coordinate }, x2: { required: true, check: coordinate }, y2: { required: true, check: coordinate }, ...COMMON },
+  rect: { ...artKind('rect'), x: { required: true, check: coordinate }, y: { required: true, check: coordinate }, width: { required: true, check: extent }, height: { required: true, check: extent }, ...COMMON },
+  ellipse: { ...artKind('ellipse'), cx: { required: true, check: coordinate }, cy: { required: true, check: coordinate }, rx: { required: true, check: extent }, ry: { required: true, check: extent }, ...COMMON },
+  polyline: {
+    ...artKind('polyline'),
+    points: {
+      required: true,
+      check: (v) =>
+        Array.isArray(v) && v.length >= 2 && v.length <= MAX_ART_POINTS && v.every((p) => Array.isArray(p) && p.length === 2 && coordinate(p[0]) === null && coordinate(p[1]) === null)
+          ? null
+          : `must list 2 to ${MAX_ART_POINTS} points, each [x, y] in mm`,
+    },
+    closed: { required: false, check: boolean },
+    ...COMMON,
+  },
+  text: {
+    ...artKind('text'),
+    x: { required: true, check: coordinate },
+    y: { required: true, check: coordinate },
+    text: {
+      required: true,
+      check: (v) =>
+        typeof v === 'string' && v.length >= 1 && v.length <= MAX_ART_TEXT_LENGTH && !/[\u0000-\u001f\u007f]/.test(v)
+          ? null
+          : `must be 1 to ${MAX_ART_TEXT_LENGTH} characters on one line`,
+    },
+    size: {
+      required: true,
+      check: (v) =>
+        typeof v === 'number' && Number.isFinite(v) && v >= MIN_ART_TEXT_SIZE_MM && v <= MAX_ART_TEXT_SIZE_MM
+          ? null
+          : `must be from ${MIN_ART_TEXT_SIZE_MM} to ${MAX_ART_TEXT_SIZE_MM} mm`,
+    },
+    align: { required: false, check: oneOf(TEXT_ALIGNS) },
+    bold: { required: false, check: boolean },
+    ...COMMON,
+  },
+};
+
+/** The checks that need more than one field of a shape. */
+function checkShape(shape: Record<string, unknown>, path: string, errors: ValidationError[]): void {
+  const { kind, anchor, period } = shape;
+  if (anchor === 'tile' && period === undefined) errors.push({ path: `${path}.period`, message: 'is required for the anchor "tile"' });
+  if (anchor !== 'tile' && period !== undefined) errors.push({ path: `${path}.period`, message: 'is only allowed for the anchor "tile"' });
+  if (kind === 'text') {
+    if (shape.fill === undefined) errors.push({ path: `${path}.fill`, message: 'is required for a text: the colour of its letters' });
+    if (shape.stroke !== undefined) errors.push({ path: `${path}.stroke`, message: 'is not used by a text' });
+    return;
+  }
+  if (kind === 'line') {
+    if (shape.stroke === undefined) errors.push({ path: `${path}.stroke`, message: 'is required for a line' });
+    if (shape.fill !== undefined) errors.push({ path: `${path}.fill`, message: 'is not used by a line' });
+    return;
+  }
+  if (shape.stroke === undefined && shape.fill === undefined) errors.push({ path, message: 'needs a stroke or a fill, or nothing is drawn' });
+  if (kind === 'polyline' && shape.fill !== undefined && shape.closed !== true) errors.push({ path: `${path}.fill`, message: 'needs "closed": true, an open line has no inside' });
+  if (kind !== 'polyline' && shape.closed !== undefined) errors.push({ path: `${path}.closed`, message: 'is only used by a polyline' });
+}
+
+/** Validates the drawing on the face of a module. */
+export function validateArt(raw: unknown, path: string, errors: ValidationError[]): void {
+  if (!Array.isArray(raw)) {
+    errors.push({ path, message: 'must be an array' });
+    return;
+  }
+  if (raw.length > MAX_ART_SHAPES) errors.push({ path, message: `at most ${MAX_ART_SHAPES} shapes` });
+  raw.slice(0, MAX_ART_SHAPES).forEach((entry, index) => {
+    const at = `${path}[${index}]`;
+    const kind = typeof entry === 'object' && entry !== null ? (entry as { kind?: unknown }).kind : undefined;
+    if (typeof kind !== 'string' || !(ART_KINDS as readonly string[]).includes(kind)) {
+      errors.push({ path: `${at}.kind`, message: `must be one of: ${ART_KINDS.join(', ')}` });
+      return;
+    }
+    const shape = validateObject(entry, ART_SPECS[kind as ArtKind], at, errors);
+    if (shape) checkShape(shape, at, errors);
   });
 }
 

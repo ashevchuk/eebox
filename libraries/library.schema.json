@@ -187,6 +187,9 @@
         },
         "logic": {
           "$ref": "#/definitions/logic"
+        },
+        "art": {
+          "$ref": "#/definitions/art"
         }
       },
       "allOf": [
@@ -430,6 +433,411 @@
           "description": "Usable length of each DIN rail, top to bottom, in 17.5 mm units; a fraction is fine, as a rail cut to a measure is."
         }
       }
+    },
+    "artShape": {
+      "description": "A shape on the face of a module, which is 90 mm tall and as wide as the module; coordinates are in mm from its top left corner, for the width the module is made for.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x1",
+            "y1",
+            "x2",
+            "y2",
+            "stroke"
+          ],
+          "properties": {
+            "kind": {
+              "const": "line"
+            },
+            "x1": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "y1": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "x2": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "y2": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rect"
+            },
+            "x": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "y": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "description": "mm"
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "description": "mm"
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cx",
+            "cy",
+            "rx",
+            "ry"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ellipse"
+            },
+            "cx": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "cy": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "rx": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "description": "mm"
+            },
+            "ry": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "description": "mm"
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "points"
+          ],
+          "properties": {
+            "kind": {
+              "const": "polyline"
+            },
+            "points": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 64,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000,
+                  "maximum": 1000
+                }
+              },
+              "description": "[x, y] pairs in mm."
+            },
+            "closed": {
+              "type": "boolean",
+              "description": "Joins the last point to the first; needed for a fill."
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x",
+            "y",
+            "text",
+            "size",
+            "fill"
+          ],
+          "properties": {
+            "kind": {
+              "const": "text"
+            },
+            "x": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "y": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000,
+              "description": "Millimetres from the top left corner of the face."
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
+              "description": "One line."
+            },
+            "size": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60,
+              "description": "Height of the letters in mm."
+            },
+            "align": {
+              "enum": [
+                "left",
+                "centre",
+                "right"
+              ]
+            },
+            "bold": {
+              "type": "boolean"
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right",
+                "centre",
+                "stretch",
+                "tile"
+              ],
+              "description": "What a placed copy of another width does with the shape: stay at the left edge (default), follow the right edge, stay in the middle, stretch across the width, or repeat every `period` units."
+            },
+            "period": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 1000,
+              "description": "Units between the repeats of a `tile` shape; only for the anchor tile."
+            },
+            "stroke": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "fill": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "A colour like #1f2937."
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "description": "Line width in mm; 0.5 when absent."
+            }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "anchor": {
+                "const": "tile"
+              }
+            },
+            "required": [
+              "anchor"
+            ]
+          },
+          "then": {
+            "required": [
+              "period"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "period"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "art": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/definitions/artShape"
+      },
+      "description": "What is drawn on the face of the module, under its name and terminals, first shape at the bottom."
     }
   }
 }

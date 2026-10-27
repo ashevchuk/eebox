@@ -1,3 +1,5 @@
+import { drawArt } from './art';
+import { FONT_FAMILY } from './font';
 import { drawConductorDot } from './conductorDraw';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
@@ -91,14 +93,14 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
   ctx.textBaseline = 'middle';
   const rating = def.ratedCurrentA === undefined ? '' : `${def.curve ?? ''}${def.ratedCurrentA}`;
   if (rating && r.width >= MIN_RATING_WIDTH_MM) {
-    ctx.font = 'bold 8px sans-serif';
+    ctx.font = `bold 8px ${FONT_FAMILY}`;
     ctx.fillText(rating, r.x + r.width / 2, r.y + 22);
   }
   if (r.width >= MIN_NAME_WIDTH_MM) {
     const room = r.height - NAME_TOP_MM - NAME_BOTTOM_MM;
     ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.font = '6px sans-serif';
+    ctx.font = `6px ${FONT_FAMILY}`;
     const lines = wrapText((text) => ctx.measureText(text).width, def.name, room, Math.min(NAME_MAX_LINES, Math.max(1, Math.floor(r.width / NAME_LINE_SPACING_MM / 1.6))));
     lines.forEach((line, i) => ctx.fillText(line, 0, (i - (lines.length - 1) / 2) * NAME_LINE_SPACING_MM));
   }
@@ -108,7 +110,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect): void
 const itemWidth = (scene: Scene, item: { module: ModuleRef; widthUnits?: number }): number =>
   item.widthUnits ?? scene.resolve(item.module)?.widthUnits ?? 1;
 
-const LABEL_FONT = '8px sans-serif';
+const LABEL_FONT = `8px ${FONT_FAMILY}`;
 const ROW_LABEL_MAX_LENGTH = 110;
 
 function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
@@ -214,6 +216,7 @@ function drawModule(
   }
   fillRect(ctx, r, COLORS.body);
   fillRect(ctx, { ...r, height: 14 }, LEVER_COLORS[def.kind]);
+  if (def.art) drawArt(ctx, def.art, r, def.widthUnits, widthUnits);
   ctx.strokeStyle = '#6b7280';
   ctx.lineWidth = 0.6;
   ctx.strokeRect(r.x, r.y, r.width, r.height);
@@ -244,7 +247,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, line: RulerLine, scale: number
   }
   const lines = describeMeasurement(measurement(line));
   const size = 12 * px;
-  ctx.font = `${size}px sans-serif`;
+  ctx.font = `${size}px ${FONT_FAMILY}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const width = Math.max(...lines.map((text) => ctx.measureText(text).width)) + 10 * px;
@@ -282,7 +285,7 @@ export function render(
     ctx.lineWidth = 2;
     ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
     if (panel.title) {
-      ctx.font = 'bold 14px sans-serif';
+      ctx.font = `bold 14px ${FONT_FAMILY}`;
       ctx.fillStyle = theme().label;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';

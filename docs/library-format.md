@@ -118,6 +118,33 @@ gets 18 at 9 units. A terminal without a `count` stays single. Terminals of a re
 
 Leave `resizable` out for devices whose width follows from their poles, such as breakers.
 
+### Art
+
+`art` is a list of up to 32 shapes drawn on the face of the module on the panel, over the body and the
+band at the top and under the name and the terminals; the first shape is at the bottom. The face is 90 mm
+tall and as wide as the module (17.5 mm a unit). Coordinates are millimetres from its top left corner, for
+the width the module is made for (`widthUnits`), and what is outside the face is cut off.
+
+| Shape | Fields |
+| --- | --- |
+| `line` | `x1`, `y1`, `x2`, `y2`, `stroke` (required) |
+| `rect` | `x`, `y`, `width`, `height` |
+| `ellipse` | `cx`, `cy`, `rx`, `ry` |
+| `polyline` | `points` (2 to 64 `[x, y]` pairs), `closed`; a fill needs `closed: true` |
+| `text` | `x`, `y`, `text` (1 to 40 characters), `size` (letter height in mm), `fill` (required), `align` (`left`, `centre`, `right`), `bold` |
+
+Every shape may have `stroke` and `fill` as `#rrggbb` (a rect, an ellipse and a polyline need at least one
+of them), `strokeWidth` in mm (0.5 when absent), and an `anchor` that says what a placed copy of another
+width does with it:
+
+- `left` (when absent): stays where it is;
+- `right`: moves with the right edge; `centre`: moves by half of the change;
+- `stretch`: its x coordinates and widths are scaled with the width, so a circle becomes an ellipse;
+- `tile`: repeated every `period` units (0.25 and more) from its place, as many times as whole periods
+  fit in the width, at most 48; the rest of the width stays empty.
+
+Text is drawn in the font that comes with the application, so it looks the same on every machine.
+
 ## Enclosure
 
 `id`, `name` and `railLengthsUnits`: usable length of each DIN rail from top to bottom, in units

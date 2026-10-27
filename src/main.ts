@@ -32,6 +32,7 @@ import { LIGHT_THEME, setColourScheme } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
 import { openModuleDesigner } from './ui/moduleDesignerView';
+import { embedFont, loadFonts } from './view/fontLoader';
 import { MODULE_TEMPLATES } from './ui/moduleTemplates';
 import { EXAMPLES } from './examples';
 import { chooseExample } from './ui/examplesDialog';
@@ -367,7 +368,7 @@ function printLabels(): void {
 
 function exportSvg(): void {
   const stem = fileStem(session.project.panel.title, 'panel');
-  downloadBlob(new Blob([renderToSvg(activeView(), session, LIGHT_THEME)], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
+  downloadBlob(new Blob([embedFont(renderToSvg(activeView(), session, LIGHT_THEME))], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
 }
 
 function exportCircuits(): void {
@@ -752,6 +753,8 @@ async function init(): Promise<void> {
     showStatus(`Library storage failed: ${(error as Error).message}`, true);
   }
   resizeCanvas();
+  const fontProblem = await loadFonts();
+  if (fontProblem) showStatus(fontProblem, true);
   await restoreInitialProject(stored);
   if (autosaveStore) startAutosave(autosaveStore);
 }

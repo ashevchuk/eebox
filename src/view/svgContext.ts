@@ -132,15 +132,25 @@ export class SvgContext {
 
   /** Clockwise arcs only, which is all the views draw. */
   arc(x: number, y: number, radius: number, start: number, end: number): void {
-    const point = (angle: number) => `${num(x + radius * Math.cos(angle))} ${num(y + radius * Math.sin(angle))}`;
+    this.ellipse(x, y, radius, radius, 0, start, end);
+  }
+
+  /** Clockwise and not turned, like `arc`. */
+  ellipse(x: number, y: number, rx: number, ry: number, _rotation: number, start: number, end: number): void {
+    const point = (angle: number) => `${num(x + rx * Math.cos(angle))} ${num(y + ry * Math.sin(angle))}`;
+    const radii = `${num(rx)} ${num(ry)}`;
     const span = end - start;
     const command = this.path.length === 0 ? 'M' : 'L';
     if (span >= FULL_TURN - 1e-9) {
       const opposite = start + Math.PI;
-      this.path.push(`${command}${point(start)}A${num(radius)} ${num(radius)} 0 1 1 ${point(opposite)}A${num(radius)} ${num(radius)} 0 1 1 ${point(start)}Z`);
+      this.path.push(`${command}${point(start)}A${radii} 0 1 1 ${point(opposite)}A${radii} 0 1 1 ${point(start)}Z`);
       return;
     }
-    this.path.push(`${command}${point(start)}A${num(radius)} ${num(radius)} 0 ${span > Math.PI ? 1 : 0} 1 ${point(end)}`);
+    this.path.push(`${command}${point(start)}A${radii} 0 ${span > Math.PI ? 1 : 0} 1 ${point(end)}`);
+  }
+
+  closePath(): void {
+    this.path.push('Z');
   }
 
   fill(): void {

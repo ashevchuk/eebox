@@ -44,6 +44,11 @@ try {
     expectEqual(browser.problems, [], 'errors in the page');
   });
 
+  await step('the bundled font is loaded, so drawings look the same on every machine', async () => {
+    await browser.waitFor(`[...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'eebox-sans' && f.status === 'loaded').length === 2`, 'both weights of the bundled font');
+    expectTrue(await browser.evaluate(`document.fonts.check('bold 8px "eebox-sans"') && document.fonts.check('8px "eebox-sans"')`), 'the font to be usable');
+  });
+
   await step('menus open, show their items and close on Escape', async () => {
     await clickButton('File');
     expectTrue(await browser.evaluate(`!document.querySelectorAll('.menu-list')[0].hidden`), 'File did not open');
@@ -411,6 +416,7 @@ try {
       HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create; return await blob.text();
     })()`);
     expectTrue(svg.includes('#ffd700') && svg.includes('#ff0000'), 'the exported drawing does not use the PUE colours');
+    expectTrue(svg.includes('data:font/woff;base64,'), 'the exported drawing does not carry its font');
     await browser.evaluate(`(() => { document.getElementById('colour-scheme').click(); })()`);
     await browser.waitFor(`document.querySelector('dialog[open] .colours-table')`, 'the colours dialog again');
     await browser.evaluate(`(() => { const s = document.querySelector('dialog[open] select'); s.value = 'eu'; s.dispatchEvent(new Event('change', { bubbles: true })); [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save').click(); })()`);

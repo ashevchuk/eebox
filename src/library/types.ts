@@ -1,3 +1,4 @@
+import type { ArtShape } from './art';
 export const SCHEMA_VERSION = 1;
 export const MODULE_UNIT_MM = 17.5;
 
@@ -134,6 +135,8 @@ export interface ModuleDef {
   resizable?: ResizeSpec;
   /** Needs explicit `terminals`, which it refers to. */
   logic?: ModuleLogic;
+  /** What is drawn on the face of the module, under its name and terminals. */
+  art?: ArtShape[];
 }
 
 export interface EnclosureDef {
