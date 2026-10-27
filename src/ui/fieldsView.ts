@@ -27,6 +27,8 @@ export class FieldsView {
   constructor(
     private readonly container: HTMLElement,
     private readonly handlers: FieldsHandlers,
+    /** Puts the buttons under the title instead of after the fields, for forms too long to scroll to the end. */
+    private readonly buttonsFirst = false,
   ) {}
 
   /** True while one of its fields has the focus. */
@@ -53,6 +55,8 @@ export class FieldsView {
     const title = document.createElement('h3');
     title.textContent = model.title;
     this.container.replaceChildren(title);
+    const bar = this.actionBar(model);
+    if (bar && this.buttonsFirst) this.container.append(bar);
     for (const field of model.fields) {
       const row = document.createElement('div');
       row.className = 'inspector-field';
@@ -105,17 +109,20 @@ export class FieldsView {
       row.append(label, cell);
       this.container.append(row);
     }
-    if (model.actions.length > 0) {
-      const bar = document.createElement('div');
-      bar.className = 'inspector-actions';
-      for (const action of model.actions) {
-        const button = document.createElement('button');
-        button.textContent = action.label;
-        button.addEventListener('click', () => this.handlers.onAction(action));
-        bar.append(button);
-      }
-      this.container.append(bar);
+    if (bar && !this.buttonsFirst) this.container.append(bar);
+  }
+
+  private actionBar(model: Model): HTMLElement | undefined {
+    if (model.actions.length === 0) return undefined;
+    const bar = document.createElement('div');
+    bar.className = this.buttonsFirst ? 'inspector-actions first' : 'inspector-actions';
+    for (const action of model.actions) {
+      const button = document.createElement('button');
+      button.textContent = action.label;
+      button.addEventListener('click', () => this.handlers.onAction(action));
+      bar.append(button);
     }
+    return bar;
   }
 
   private sync(model: Model, force: boolean): void {

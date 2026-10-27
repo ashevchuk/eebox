@@ -318,6 +318,29 @@ try {
     await clickButton('Panel');
   });
 
+  await step('the library editor opens a module in the designer and takes the changes back unsaved', async () => {
+    await browser.evaluate(`[...document.querySelectorAll('#palette button')].find((b) => b.textContent === 'edit').click()`);
+    await browser.waitFor(`document.querySelector('.editor-dialog[open]')`, 'the library editor');
+    await browser.evaluate(`[...document.querySelectorAll('.editor-dialog[open] .editor-item')].find((i) => i.textContent.includes('Smoke test module')).click()`);
+    await browser.waitFor(`[...document.querySelectorAll('.editor-dialog[open] .editor-fields button')].some((b) => b.textContent === 'Open in designer')`, 'the designer button');
+    await browser.evaluate(`[...document.querySelectorAll('.editor-dialog[open] .editor-fields button')].find((b) => b.textContent === 'Open in designer').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .designer-fields')`, 'the designer');
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.innerText.startsWith('Name'));
+      const input = row.querySelector('input'); input.value = 'Renamed in designer'; input.dispatchEvent(new Event('change', { bubbles: true }));
+      document.querySelector('.designer-dialog[open] button.primary').click();
+    })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the designer to save');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
+    await browser.waitFor(`[...document.querySelectorAll('.editor-dialog[open] .editor-item')].some((i) => i.textContent.includes('Renamed in designer'))`, 'the editor to show the new name');
+    expectTrue(await browser.evaluate(`!document.querySelector('.editor-dialog[open] header button.primary').disabled`), 'the editor to offer to save');
+    await browser.evaluate(`[...document.querySelectorAll('.editor-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open] button')].some((b) => b.textContent === 'Discard')`, 'the question about the unsaved changes');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard').click()`);
+    await browser.waitFor(`!document.querySelector('.editor-dialog[open]')`, 'the editor to close');
+  });
+
   await step('an example is chosen from the File menu and loads without problems', async () => {
     await clickButton('File');
     await browser.evaluate(`document.getElementById('open-example').click()`);

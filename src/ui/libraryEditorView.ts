@@ -3,9 +3,11 @@ import { stableStringify } from '../library/equality';
 import { MODULE_KINDS, type Library, type ModuleKind } from '../library/types';
 import { validateLibrary, type ValidationError } from '../library/validate';
 import { FieldsView } from './fieldsView';
+import { openModuleDesigner } from './moduleDesignerView';
 import {
   addEnclosure,
   addModule,
+  DESIGN_ACTION,
   applyEditorAction,
   applyEditorEdit,
   describeEditor,
@@ -70,7 +72,7 @@ export class LibraryEditorView {
     this.fields = new FieldsView(fieldsPane, {
       onEdit: (key, raw) => this.edit(key, typeof raw === 'string' ? raw : raw.join(' ')),
       onAction: (action) => this.act(action.key),
-    });
+    }, true);
     this.errors.className = 'editor-errors';
 
     const header = document.createElement('header');
@@ -242,7 +244,29 @@ export class LibraryEditorView {
     this.renderAll();
   }
 
+  /**
+   * The designer works on a copy of the draft and hands it back when it saves, so the library is
+   * still stored only by this editor's own Save.
+   */
+  private openDesigner(): void {
+    const { target } = this.state;
+    if (target.kind !== 'module') return;
+    openModuleDesigner(
+      structuredClone(this.state.draft),
+      { moduleId: target.id, isNew: false },
+      {
+        save: async (saved) => {
+          this.state = { draft: saved, target: this.state.target };
+          this.message = '';
+          this.renderAll(true);
+        },
+        askConfirmation: (message, confirmLabel) => this.host.askConfirmation(message, confirmLabel),
+      },
+    );
+  }
+
   private act(key: string): void {
+    if (key === DESIGN_ACTION) return this.openDesigner();
     const result = applyEditorAction(this.state, key);
     if (!result.ok) {
       this.say(result.message, true);

@@ -152,6 +152,7 @@ function moduleView(module: ModuleDef): InspectorView {
     number('resizeMax', 'Widest copy', optional(module.resizable?.maxUnits), 'units; a placed copy can have any width in the range'),
   ];
   const actions: InspectorAction[] = [
+    ...(module.kind === 'comb' ? [] : [{ key: DESIGN_ACTION, label: 'Open in designer' }]),
     { key: 'duplicate', label: 'Duplicate' },
     { key: 'remove', label: 'Remove' },
   ];
@@ -367,9 +368,13 @@ export function applyEditorEdit(state: EditorState, key: string, raw: string): E
   return fail('That property cannot be edited.');
 }
 
+/** The button that opens the module designer; only a view can do that, so the model refuses it. */
+export const DESIGN_ACTION = 'designModule';
+
 /** Runs a button of the editor: duplicating or removing the item, or changing the list of terminals. */
 export function applyEditorAction(state: EditorState, key: string): EditorResult {
   const { draft, target } = state;
+  if (key === DESIGN_ACTION) return fail('The designer is opened by the editor window.');
   if (target.kind === 'enclosure' && key === 'remove') {
     return { ok: true, draft: { ...draft, enclosures: draft.enclosures.filter((e) => e.id !== target.id) }, target: { kind: 'library' } };
   }
