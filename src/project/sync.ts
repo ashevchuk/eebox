@@ -131,3 +131,30 @@ export function planModuleUpdate(project: Project, snapshot: Snapshot, fromLibra
     newProblems,
   };
 }
+
+/**
+ * Makes a placed module use another definition, as a design made from a bundled device does: the
+ * terminals that the new definition lacks lose their wires, the width is brought back into its range,
+ * and the problems that appear are listed. The schematic node of the module stays, so the rest of
+ * the wiring is kept.
+ */
+export function planModuleSwap(project: Project, snapshot: Snapshot, placementId: string, ref: ModuleRef, def: ModuleDef, resolve: Resolve): UpdatePlan {
+  const placement = project.panel.placements.find((p) => p.id === placementId);
+  const nothing: UpdatePlan = { changed: [], missing: [], project, snapshot, droppedWires: 0, newProblems: [] };
+  if (!placement) return nothing;
+  const before = resolve(placement.module);
+  const nextSnapshot: Snapshot = { ...snapshot, [moduleKey(ref)]: def };
+  const moved = adjustPlacement({ ...placement, module: ref }, def);
+  const kept = new Set(terminalsOf(def, moved.widthUnits ?? def.widthUnits).map((t) => t.id));
+  const lost = new Set(before ? terminalsOf(before, placement.widthUnits ?? before.widthUnits).map((t) => t.id).filter((id) => !kept.has(id)) : []);
+  const node = project.schematic.nodes.find((n) => n.placementId === placementId);
+  const lostOnNode = (end: { node: string; terminal: string }) => node !== undefined && end.node === node.id && lost.has(end.terminal);
+  const wires = project.schematic.wires.filter((w) => !lostOnNode(w.a) && !lostOnNode(w.b));
+  const nextProject: Project = {
+    panel: { ...project.panel, placements: project.panel.placements.map((p) => (p.id === placementId ? moved : p)) },
+    schematic: { ...project.schematic, wires },
+  };
+  const warnings = new Set(projectWarnings(project, (r) => snapshot[moduleKey(r)] ?? resolve(r)));
+  const newProblems = projectWarnings(nextProject, (r) => nextSnapshot[moduleKey(r)] ?? resolve(r)).filter((message) => !warnings.has(message));
+  return { changed: [{ key: moduleKey(ref), name: def.name, fields: before ? differingFields(before, def) : [] }], missing: [], project: nextProject, snapshot: nextSnapshot, droppedWires: project.schematic.wires.length - wires.length, newProblems };
+}

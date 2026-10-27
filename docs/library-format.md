@@ -149,6 +149,10 @@ curves), polygons, texts and groups with transforms of an SVG file, puts them on
 above and lists what it leaves out (images, scripts, styles, gradients, opacity, clipping). The file is
 read by the application's own reader, which refuses a document type and entities and runs nothing.
 
+An SVG written by *Export SVG* has the anchor and the period of a shape in its `data-anchor` and
+`data-period` attributes, which the importer reads back and any other program ignores. A shape without
+them takes the anchor chosen in the import dialog.
+
 Text is drawn in the font that comes with the application, so it looks the same on every machine.
 
 ## Enclosure

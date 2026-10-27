@@ -6,7 +6,10 @@ import { railRect } from '../view/geometry';
 import { History } from '../view/history';
 import { render } from '../view/render';
 import { conductorStyle, theme } from '../view/theme';
+import { artToSvg } from '../library/svgExport';
+import { fileStem } from '../project/names';
 import { ArtEditorView } from './artEditorView';
+import { downloadBlob } from './download';
 import { FieldsView } from './fieldsView';
 import type { InspectorView } from './inspector';
 import { applyEditorAction, applyEditorEdit, describeEditor, validateDraft, type EditorState } from './libraryEditor';
@@ -161,6 +164,11 @@ export class ModuleDesignerView {
     this.face = new ArtEditorView({
       draft: () => this.draft,
       module: () => this.module,
+      exportSvg: () => {
+        const name = this.module.name || this.module.id;
+        downloadBlob(new Blob([artToSvg(this.module)], { type: 'image/svg+xml' }), `${fileStem(name, this.module.id)}-face.svg`);
+        this.say(`The face is saved as ${fileStem(name, this.module.id)}-face.svg.`);
+      },
       openDialog: (dialog) => {
         dialog.addEventListener('close', () => dialog.remove());
         this.dialog.append(dialog);

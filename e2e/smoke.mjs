@@ -406,6 +406,88 @@ try {
     await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
   });
 
+  await step('a design made of a placed bundled module is on the panel at once, and the next edit goes to the same module', async () => {
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the earlier designer to close');
+    const place = await browser.evaluate(`(async () => {
+      const search = document.getElementById('palette-search');
+      search.value = 'mcb 1p b6'; search.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      const r = document.querySelector('#palette .module').getBoundingClientRect();
+      return [r.x + 20, r.y + r.height / 2];
+    })()`);
+    await browser.mouse('mousePressed', place[0], place[1]);
+    await browser.mouse('mouseMoved', place[0] + 60, place[1] + 20);
+    await browser.mouse('mouseMoved', 700, 400);
+    await browser.mouse('mouseMoved', 640, 395);
+    await browser.mouse('mouseReleased', 640, 395);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('MCB 1P B6')`, 'the placed module in the inspector');
+    const designer = async () => {
+      await browser.evaluate(`[...document.querySelectorAll('#inspector button')].find((b) => b.textContent === 'Edit module…').click()`);
+      await browser.waitFor(`document.querySelector('.designer-dialog[open] .designer-fields')`, 'the designer');
+    };
+    const field = (label) => browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === ${JSON.stringify(label)})?.querySelector('input,select')?.value`);
+    const drawRect = async (from, to) => {
+      const [[x1, y1], [x2, y2]] = await browser.evaluate(`(() => {
+        const svg = document.querySelector('.designer-dialog[open] .face-stage svg'); const r = svg.getBoundingClientRect();
+        const k = r.width / svg.width.baseVal.value; const scale = (svg.width.baseVal.value - 24) / 17.5;
+        const at = (p) => [r.left + (12 + p[0] * scale) * k, r.top + (12 + p[1] * scale) * k];
+        return [at(${JSON.stringify(from)}), at(${JSON.stringify(to)})];
+      })()`);
+      await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Rectangle').click()`);
+      await browser.mouse('mouseMoved', x1, y1);
+      await browser.mouse('mousePressed', x1, y1);
+      await browser.mouse('mouseMoved', x2, y2);
+      await browser.mouse('mouseReleased', x2, y2);
+    };
+    const savedArt = () => browser.evaluate(`JSON.parse(localStorage.getItem('eebox:autosave')).modules && Object.values(JSON.parse(localStorage.getItem('eebox:autosave')).modules).find((m) => m.name === 'Swap test')?.art?.length`);
+
+    await designer();
+    expectEqual(await field('Id'), 'mcb-1p-b6-copy', 'the module the designer works on');
+    await browser.evaluate(`(() => { const row = [...document.querySelectorAll('.designer-dialog[open] .designer-fields .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Name'); const i = row.querySelector('input'); i.value = 'Swap test'; i.dispatchEvent(new Event('change', { bubbles: true })); [...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click(); })()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face');
+    await drawRect([2, 30], [12, 40]);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 3`, 'the rectangle');
+    const exported = await browser.evaluate(`(async () => {
+      let blob = null; let name = ''; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
+      const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { name = this.download; };
+      [...document.querySelectorAll('.designer-dialog[open] .face-stage .designer-toolbar button')].find((b) => b.textContent === 'Export SVG').click();
+      await new Promise((r) => setTimeout(r, 400));
+      HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create;
+      return { name, text: blob ? await blob.text() : '' };
+    })()`);
+    expectEqual(exported.name, 'swap-test-face.svg', 'the name of the exported file');
+    expectTrue(exported.text.startsWith('<svg ') && (exported.text.match(/<rect /g) ?? []).length === 3, 'the exported face has not its three rectangles');
+    await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the module to be saved');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('Swap test')`, 'the placed module to take the design');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('now uses')`, 'the status to say so');
+    await browser.waitFor(`localStorage.getItem('eebox:autosave').includes('Swap test')`, 'the autosave to hold the design');
+    expectEqual(await savedArt(), 3, 'the shapes of the module the project stored');
+
+    await designer();
+    expectEqual([await field('Id'), await field('Name')], ['mcb-1p-b6-copy', 'Swap test'], 'the module the second edit opens');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] .designer-modes button')].find((b) => b.textContent === 'Face').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .face-stage svg')`, 'the face again');
+    await drawRect([2, 45], [12, 55]);
+    await browser.waitFor(`document.querySelectorAll('.designer-dialog[open] .face-layer').length === 4`, 'the second rectangle');
+    await browser.evaluate(`document.querySelector('.designer-dialog[open] button.primary').click()`);
+    await browser.waitFor(`document.querySelector('.designer-dialog[open] .editor-status')?.textContent.includes('Saved')`, 'the second save');
+    await browser.evaluate(`[...document.querySelectorAll('.designer-dialog[open] header button')].find((b) => b.textContent === 'Close').click()`);
+    await browser.waitFor(`!document.querySelector('.designer-dialog[open]')`, 'the designer to close');
+    await browser.waitFor(`document.getElementById('status').textContent.includes('has the new')`, 'the panel to take the second edit');
+    await browser.waitFor(`JSON.parse(localStorage.getItem('eebox:autosave')).modules && Object.values(JSON.parse(localStorage.getItem('eebox:autosave')).modules).find((m) => m.name === 'Swap test')?.art?.length === 4`, 'the project to hold the four shapes');
+    const found = (query) => browser.evaluate(`(async () => {
+      const search = document.getElementById('palette-search'); search.value = ${JSON.stringify(query)}; search.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      return [...document.querySelectorAll('#palette .module')].map((m) => m.textContent.trim());
+    })()`);
+    expectEqual((await found('swap test')).length, 1, 'the modules called Swap test in the palette');
+    expectEqual((await found('b6 (copy)')).length, 0, 'the copies of the bundled module that the second edit would have made');
+    await found('');
+  });
+
   await step('the library editor opens a module in the designer and takes the changes back unsaved', async () => {
     await browser.evaluate(`[...document.querySelectorAll('#palette button')].find((b) => b.textContent === 'edit').click()`);
     await browser.waitFor(`document.querySelector('.editor-dialog[open]')`, 'the library editor');

@@ -17,7 +17,8 @@ import { exportLibraryJson } from './library/validate';
 import type { Project } from './project';
 import { loadAutosave, saveAutosave, type KeyValueStore } from './project/autosave';
 import { bomToCsv, buildBom } from './project/bom';
-import { parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
+import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
+import { planModuleSwap, planModuleUpdate } from './project/sync';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
 import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colourScheme';
@@ -414,11 +415,40 @@ function exportBom(): void {
   downloadBlob(new Blob(['\uFEFF', bomToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-bom.csv`);
 }
 
-function openDesigner(library: Library, moduleId: string, options: { isNew: boolean; offerTemplates?: boolean }): void {
-  openModuleDesigner(library, { moduleId, ...options }, {
+/**
+ * Brings the project up to date with a module that was just saved, so a design shows on the panel at
+ * once: the placed module a bundled device was designed from is given the design, and the copy of a
+ * module that the project stored is replaced. Wires that would be lost are asked about first.
+ */
+async function useDesigned(library: Library, moduleId: string, placementId: string | undefined): Promise<void> {
+  const def = library.modules.find((m) => m.id === moduleId);
+  if (!def) return;
+  const ref = { libraryId: library.id, moduleId };
+  const key = moduleKey(ref);
+  const placement = placementId === undefined ? undefined : session.project.panel.placements.find((p) => p.id === placementId);
+  const swap = placement !== undefined && moduleKey(placement.module) !== key;
+  const onlyThis = (r: ModuleRef) => (moduleKey(r) === key ? session.libraryResolve(r) : (session.snapshot[moduleKey(r)] ?? session.libraryResolve(r)));
+  const plan = swap ? planModuleSwap(session.project, session.snapshot, placement.id, ref, def, session.resolve) : planModuleUpdate(session.project, session.snapshot, onlyThis);
+  if (!swap && plan.changed.length === 0) return;
+  const effects = [
+    plan.droppedWires > 0 ? `removes ${plan.droppedWires} wire${plan.droppedWires === 1 ? '' : 's'} from terminals that no longer exist` : '',
+    plan.newProblems.length > 0 ? `causes ${plan.newProblems.length} problem${plan.newProblems.length === 1 ? '' : 's'}: ${plan.newProblems.slice(0, 3).join('; ')}` : '',
+  ].filter(Boolean);
+  if (effects.length > 0 && !(await confirmDialog(`Using "${def.name}" on the panel ${effects.join(' and ')}. Continue?`, 'Continue'))) {
+    showStatus(`"${def.name}" is saved in ${library.name}; the panel still has the previous definition.`);
+    return;
+  }
+  session.commit(plan.project, plan.snapshot);
+  showStatus(swap ? `The module on the panel now uses "${def.name}" from ${library.name}.` : `The panel has the new "${def.name}".`);
+}
+
+function openDesigner(library: Library, moduleId: string, options: { isNew: boolean; offerTemplates?: boolean; placementId?: string }): void {
+  const { placementId, ...designer } = options;
+  openModuleDesigner(library, { moduleId, ...designer }, {
     save: async (saved) => {
       await storage.put(saved);
       await refreshLibraries();
+      await useDesigned(saved, moduleId, placementId);
     },
     askConfirmation: (message, confirmLabel) => confirmDialog(message, confirmLabel),
   });
@@ -436,20 +466,20 @@ function designNewModule(): void {
   openDesigner(draft, id, { isNew: true, offerTemplates: true });
 }
 
-function designCopyOf(def: ModuleDef): void {
+function designCopyOf(def: ModuleDef, placementId?: string): void {
   const draft = myLibraryDraft();
   const id = uniqueId(`${def.id}-copy`, draft.modules.map((m) => m.id));
   draft.modules.push({ ...structuredClone(def), id, name: `${def.name} (copy)` });
-  openDesigner(draft, id, { isNew: true });
+  openDesigner(draft, id, { isNew: true, ...(placementId ? { placementId } : {}) });
 }
 
 /** A module of a library the user owns is edited in place; one of the bundled library is copied first. */
-function designModuleOf(ref: ModuleRef): void {
+function designModuleOf(ref: ModuleRef, placementId?: string): void {
   const library = session.libraries.find((l) => l.id === ref.libraryId);
   const stored = library?.modules.find((m) => m.id === ref.moduleId);
-  if (library && stored && library.id !== bundledLibraryId) return openDesigner(structuredClone(library), stored.id, { isNew: false });
+  if (library && stored && library.id !== bundledLibraryId) return openDesigner(structuredClone(library), stored.id, { isNew: false, ...(placementId ? { placementId } : {}) });
   const def = session.resolve(ref);
-  if (def) designCopyOf(def);
+  if (def) designCopyOf(def, placementId);
   else showStatus('That module is not in any library, so it cannot be edited.', true);
 }
 

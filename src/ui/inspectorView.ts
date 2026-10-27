@@ -12,7 +12,7 @@ export class InspectorView {
     private readonly session: Session,
     private readonly confirm: (message: string) => Promise<boolean>,
     /** Opens the designer on the module of a placed copy; the model cannot do that by itself. */
-    private readonly onEditModule: (module: ModuleRef) => void = () => {},
+    private readonly onEditModule: (module: ModuleRef, placementId: string) => void = () => {},
   ) {
     this.fields = new FieldsView(container, {
       onEdit: (key, raw) => void this.edit(key, raw),
@@ -42,7 +42,7 @@ export class InspectorView {
       const { project, selection } = this.session;
       const placementId = selection.placementId ?? project.schematic.nodes.find((n) => n.id === selection.nodeId)?.placementId;
       const placement = project.panel.placements.find((p) => p.id === placementId);
-      if (placement) this.onEditModule(placement.module);
+      if (placement) this.onEditModule(placement.module, placement.id);
       return;
     }
     let result = applyAction(this.context(), key);

@@ -40,6 +40,8 @@ export interface ArtEditorHost {
   module(): ModuleDef;
   /** Shows a modal dialog on top of the designer. */
   openDialog(dialog: HTMLDialogElement): void;
+  /** Saves the face as an SVG file. */
+  exportSvg(): void;
   /** Records a new draft in the history of the designer, once for each gesture. */
   commit(draft: Library): void;
   say(message: string, isError?: boolean): void;
@@ -98,6 +100,7 @@ export class ArtEditorView {
   private readonly layerBar = document.createElement('div');
   private readonly fields: FieldsView;
   private readonly toolButtons = new Map<ArtTool, HTMLButtonElement>();
+  private readonly exportButton: HTMLButtonElement;
   private tool: ArtTool = 'select';
   private selected: number | null = null;
   private gesture: Gesture | null = null;
@@ -114,7 +117,9 @@ export class ArtEditorView {
       this.toolButtons.set(tool, el);
       this.toolbar.append(el);
     }
+    this.exportButton = button('Export SVG', () => this.host.exportSvg(), 'Save the drawing of the face as an SVG file, to import onto another module or to open in a drawing program');
     this.toolbar.append(button('Import SVG…', () => this.importSvg(), 'Put the drawing of an SVG file on the face'));
+    this.toolbar.append(this.exportButton);
     this.toolbar.append(button('Finish line', () => this.finishPolyline(), 'Make the polyline from the points clicked so far'));
     this.hint.className = 'designer-hint';
     this.stage.append(this.toolbar, this.svgHost, this.hint);
@@ -152,6 +157,7 @@ export class ArtEditorView {
     const module = this.host.module();
     if (this.selected !== null && this.selected >= this.art.length) this.selected = this.art.length > 0 ? this.art.length - 1 : null;
     for (const [tool, el] of this.toolButtons) el.classList.toggle('active', tool === this.tool);
+    this.exportButton.disabled = this.art.length === 0;
     this.hint.textContent = `${TOOL_HINTS[this.tool]} Edited at ${module.widthUnits} unit${module.widthUnits === 1 ? '' : 's'}, the width the module is made for; the rail below shows the other widths.`;
     this.drawStage(module);
     this.renderSide();

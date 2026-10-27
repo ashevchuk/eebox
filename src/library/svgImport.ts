@@ -11,6 +11,7 @@ import {
   type ArtShape,
   type PathCommand,
 } from './art';
+import { ANCHOR_ATTRIBUTE, BASELINE_BELOW_MIDDLE, PERIOD_ATTRIBUTE, isAnchor, isPeriod } from './svgExport';
 import { validateArt, type ValidationError } from './validate';
 import { parseXml, type XmlElement } from './xml';
 
@@ -369,9 +370,18 @@ export function importSvg(text: string, options: SvgImportOptions): SvgImport {
   const shapes: ArtShape[] = [];
 
   const mm = (value: number) => Math.round(value * 1000) / 1000;
+  /** What a shape says of itself about the width, set before the shape is made; else what the dialog says. */
+  let own: { anchor: ArtAnchor; period?: number } | undefined;
   const finish = <T extends ArtShape>(shape: T): ArtShape => {
-    const withAnchor: ArtShape = options.anchor === 'left' ? shape : options.anchor === 'tile' ? { ...shape, anchor: 'tile', period: options.period ?? 1 } : { ...shape, anchor: options.anchor };
-    return withAnchor;
+    const anchor = own?.anchor ?? options.anchor;
+    const period = own?.anchor === 'tile' ? own.period : options.period;
+    return anchor === 'left' ? shape : anchor === 'tile' ? { ...shape, anchor: 'tile', period: period ?? 1 } : { ...shape, anchor };
+  };
+  const ownAnchor = (element: XmlElement) => {
+    const anchor = element.attributes[ANCHOR_ATTRIBUTE];
+    const period = Number(element.attributes[PERIOD_ATTRIBUTE]);
+    if (!isAnchor(anchor)) return undefined;
+    return anchor === 'tile' ? (isPeriod(period) ? { anchor, period } : undefined) : { anchor };
   };
   const paints = (style: Style, k: number): { fill?: string; stroke?: string; strokeWidth?: number } => ({
     ...(style.fill !== 'none' ? { fill: style.fill } : {}),
@@ -453,6 +463,7 @@ export function importSvg(text: string, options: SvgImportOptions): SvgImport {
     if (element.attributes.display === 'none' || /display\s*:\s*none/.test(element.attributes.style ?? '')) return;
     const transform = parseTransform(element.attributes.transform);
     if (!transform) return void notes.add(`The transform of a <${element.name}> was not understood, so it was left out.`);
+    own = ownAnchor(element);
     const ctx: Context = { matrix: multiply(parent.matrix, transform), style: styleOf(element, parent.style) };
     const { matrix, style } = ctx;
     const k = lengthScale(matrix);
@@ -531,7 +542,7 @@ export function importSvg(text: string, options: SvgImportOptions): SvgImport {
           finish({
             kind: 'text',
             x: mm(x),
-            y: mm(y - size * 0.35),
+            y: mm(y - size * BASELINE_BELOW_MIDDLE),
             text: words.slice(0, MAX_ART_TEXT_LENGTH),
             size: mm(size),
             fill: style.fill,
