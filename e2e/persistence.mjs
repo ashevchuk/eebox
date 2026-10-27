@@ -209,14 +209,20 @@ try {
     await dialogButton('Close');
   });
 
-  await step('a project that a new panel replaces is kept as an earlier state and comes back from the list', async () => {
+  await step('a project that a new panel replaces is kept as an earlier state under its own name and comes back from the list', async () => {
+    const setTitle = (text) =>
+      browser.evaluate(`(() => { const input = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Title').querySelector('input'); input.value = ${JSON.stringify(text)}; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    // A state that no earlier snapshot has, so that the one taken by the replacing panel is the one that is listed first.
+    await setTitle('Replaced one');
     await browser.evaluate(`document.getElementById('new-panel').click(); new Promise((r) => setTimeout(r, 300)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click())`);
     await browser.waitFor(`document.querySelector('#inspector .inspector-field input')?.value === ''`, 'the empty panel');
     await browser.evaluate(`document.getElementById('open-projects').click()`);
     await browser.waitFor(`document.querySelector('.projects-earlier')`, 'the earlier states');
+    expectEqual(await browser.evaluate(`document.querySelector('.projects-row strong').textContent`), 'Replaced one', 'the name of the earlier state, which is the name of the project that was replaced');
     await browser.evaluate(`document.querySelector('.projects-row button').click()`);
     await browser.waitFor(`document.getElementById('status').textContent.includes('loaded')`, 'the earlier state to load');
-    expectEqual(await inspectorField('Title'), 'Persist test', 'the title of the earlier state');
+    expectEqual(await inspectorField('Title'), 'Replaced one', 'the title of the earlier state');
+    await setTitle('Persist test');
   });
 
   await step('a backup holds the project, the libraries and the settings, and puts them back; garbage is refused', async () => {

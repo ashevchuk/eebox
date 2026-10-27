@@ -4,6 +4,8 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 
 **Try it: https://ashevchuk.github.io/eebox/**
 
+To work offline, download `eebox-<version>.zip` from the [releases](https://github.com/ashevchuk/eebox/releases), unpack it and open `index.html`; it needs no server.
+
 ![Panel layout](docs/images/panel.png)
 
 ![Wiring schematic](docs/images/schematic.png)
@@ -11,6 +13,10 @@ A modular electrical panel designer that runs entirely in the browser. Lay out D
 Shift-drag selects several modules at once and dragging one moves them all:
 
 ![A rubber band selecting modules](docs/images/selection.png)
+
+Find a module, node or wire by what it is called (Ctrl+F); a minimap in the corner shows where the view is:
+
+![Searching for a module, with the minimap](docs/images/find.png)
 
 A transfer controller and two contactors switch a workshop to the generator when the mains go away (the mains are switched off in this picture):
 
@@ -37,11 +43,15 @@ A transfer controller and two contactors switch a workshop to the generator when
 - **Arranging the schematic.** Ctrl-click and a Ctrl-drag over empty space select several nodes; *Nodes > Align* and *Distribute* line them up and *Arrange nodes* lays the whole schematic out in rows from the sources to the loads.
 - **Tables.** *Export > Tables...* shows the parts, circuits, wires and ferrules in the application, each column sortable.
 - **Several projects, earlier states and a backup.** *File > Projects...* keeps projects in the browser next to the autosaved one: save the one on the screen over the stored copy or as a new one, open another, delete one. The application also keeps the last 12 earlier states of the project on the screen, every few minutes and before something replaces it (a new panel, an example, an opened file, a restore), listed under *Earlier states*. *File > Back up everything...* downloads one JSON file with the project on the screen, the saved projects, your own libraries, snippets and settings; *Restore from backup...* adds the projects and snippets (nothing that is stored is overwritten) and replaces libraries and settings with the same id, after asking.
+
+  ![Projects kept in the browser, with earlier states](docs/images/projects.png)
 - **Snippets.** *Save selection as snippet...* keeps the selected modules with the wires between them under a name; *Insert* puts them on the panel at the nearest free place, with new ids and new nodes on the schematic, and takes the module definitions along if the project does not know them.
 - **Finding and moving about.** *Ctrl+F* (or *Find*) looks for a module, comb, source, load or wire by label, name, article number or id and takes you to it; *F* (or *Zoom to selection*) zooms to what is selected, and shows everything when nothing is; a minimap in the corner shows where the view is and moves it on a click or drag (*View > Minimap*).
 - **Arranging modules.** The *Modules* menu packs the selected modules to the left or right, spreads them with equal gaps, puts them at the start or end of the row, and copies a whole row with its modules, combs and label.
 - **Editing in the tables.** The labels and cross-sections in *Wires*, and the power, cable and length in *Circuits*, can be typed over in *Export > Tables...*; Enter moves to the next row, and a value that the inspector would refuse is refused with the same words.
 - **Calculation summary.** *Export > Calculation summary...* lists each circuit with a mark for its cable, voltage drop, breaker, RCD and earth, and the reason on hover: what is wrong, and what is not known yet. It uses the cable table of *File > Cable settings*, which is not verified.
+
+  ![The calculation summary](docs/images/summary.png)
 - **A tour.** A first visit starts a short tour of the views and menus; *?* has *Take the tour* for later.
 - **Print.** *Export > Print...* asks which parts go on the sheet (the drawings, the lists) and the paper, A4, A3 or Letter, landscape or portrait; the browser then shows the pages.
 - **Lengths.** The inspector shows the position and the width of a module in module units or in millimetres; the choice is kept.

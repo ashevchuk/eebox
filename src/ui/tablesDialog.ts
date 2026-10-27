@@ -9,12 +9,12 @@ export interface TablesHost {
 }
 
 /** The lists of the project in a dialog: one tab for each, a click on a heading sorts by it, some cells can be typed over. */
-export function openTablesDialog(start: Table[], host: TablesHost): void {
+export function openTablesDialog(start: Table[], host: TablesHost, heading = 'Tables of the project'): void {
   let tables = start;
   const dialog = document.createElement('dialog');
   dialog.className = 'app-dialog tables-dialog';
   const title = document.createElement('h2');
-  title.textContent = 'Tables of the project';
+  title.textContent = heading;
   const tabs = document.createElement('div');
   tabs.className = 'tables-tabs';
   const body = document.createElement('div');

@@ -431,7 +431,7 @@ async function keepSnapshot(force: boolean): Promise<void> {
     const all = await projectStore.list();
     lastSnapshotJson = json;
     if (all.some((p) => JSON.stringify(p.file) === json)) return;
-    const snapshot = { id: newSnapshotId(all, now), title: session.project.panel.title ?? '', savedAt: now, file, snapshot: true as const };
+    const snapshot = { id: newSnapshotId(all, now), title: file.project.panel.title ?? '', savedAt: now, file, snapshot: true as const };
     await projectStore.put(snapshot);
     lastSnapshotAt = now;
     for (const old of snapshotsToDrop([...all, snapshot])) await projectStore.remove(old.id);
@@ -1076,7 +1076,7 @@ function editTableCell(table: Table, row: number, column: number, raw: string): 
 
 byId('view-checks').addEventListener('click', () => {
   const checks = () => [summaryTable(session.project, session.resolve, session.cableSettings)];
-  openTablesDialog(checks(), { edit: () => 'That cell cannot be edited.', tables: checks });
+  openTablesDialog(checks(), { edit: () => 'That cell cannot be edited.', tables: checks }, 'Calculation summary');
 });
 byId('view-tables').addEventListener('click', () => openTablesDialog(currentTables(), { edit: editTableCell, tables: currentTables }));
 byId('arrange-nodes').addEventListener('click', () => {
