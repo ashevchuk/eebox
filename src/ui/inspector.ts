@@ -24,6 +24,7 @@ import {
   setTerminalLabel,
   type CombPlacement,
   type ModuleRef,
+  type Panel,
   type Placement,
 } from '../layout/placement';
 import { EARTHING_SYSTEMS, conductorsForSystem, isEarthingSystem, EARTHING_SYSTEM_IDS, type EarthingSystemId } from '../electrical/earthing';
@@ -40,6 +41,7 @@ import {
 } from '../electrical/loads';
 import type { Finding } from '../electrical/problems';
 import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
+import { INFO_LABELS, MAX_NOTES_CHARS, STATUSES, setInfoField } from '../layout/info';
 import { mmFromUnits, roundUnits } from '../layout/units';
 import { MODULE_UNIT_MM } from '../library/types';
 import { LENGTH_UNITS, type LengthUnit } from '../project/lengthUnitStorage';
@@ -66,7 +68,7 @@ import { copyItems, MAX_REPEAT_COPIES, repeatItems } from '../layout/clipboard';
 import { groupSelection, selectedIds, selectedWires } from './selection';
 import type { Mode, Selection } from './session';
 
-export type FieldKind = 'text' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
+export type FieldKind = 'text' | 'longtext' | 'integer' | 'number' | 'select' | 'readonly' | 'choices';
 
 export interface InspectorField {
   key: string;
@@ -281,6 +283,22 @@ function unitsOf(typed: number | null, unit: LengthUnit = 'units'): number | nul
   return typed === null || unit === 'units' ? typed : roundUnits(typed / MODULE_UNIT_MM);
 }
 
+const INFO_PREFIX = 'info.';
+const NO_STATUS = '';
+
+/** The fields of the info a drawing is passed on with: its version, who made it and what was decided about it. */
+function infoFields(panel: Panel): InspectorField[] {
+  const info = panel.info ?? {};
+  return [
+    text(`${INFO_PREFIX}revision`, INFO_LABELS.revision, info.revision ?? '', 'for example A or 2'),
+    text(`${INFO_PREFIX}author`, INFO_LABELS.author, info.author ?? ''),
+    text(`${INFO_PREFIX}date`, INFO_LABELS.date, info.date ?? '', 'for example 2026-10-27'),
+    { key: `${INFO_PREFIX}status`, label: INFO_LABELS.status, kind: 'select', value: info.status ?? NO_STATUS, options: [NO_STATUS, ...STATUSES], hint: 'where the project stands in a review' },
+    text(`${INFO_PREFIX}approver`, INFO_LABELS.approver, info.approver ?? ''),
+    { key: `${INFO_PREFIX}notes`, label: INFO_LABELS.notes, kind: 'longtext', value: info.notes ?? '', max: MAX_NOTES_CHARS, hint: 'what to change, or what was agreed' },
+  ];
+}
+
 function positionFields(
   item: Placement | CombPlacement,
   def: ModuleDef | undefined,
@@ -332,6 +350,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         actions: changed.length > 0 ? [{ key: 'updateModules', label: 'Update modules from libraries' }] : [],
         fields: [
           text('title', 'Title', panel.title ?? '', 'Untitled panel'),
+          ...infoFields(panel),
           integer('rows', 'Rows', panel.railLengthsUnits.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
           readonly('size', 'Size', `longest row ${longest} units`),
           readonly(
@@ -591,6 +610,12 @@ export function applyEdit(
       if (key === 'title') {
         const result = setPanelTitle(panel, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
+      }
+      if (key.startsWith(INFO_PREFIX)) {
+        const field = key.slice(INFO_PREFIX.length);
+        const result = setInfoField(panel, field, text);
+        if (result.ok) return withPanel(result.panel);
+        return fail(field === 'status' ? `Status: ${STATUSES.join(', ')}.` : field === 'notes' ? `Notes: at most ${MAX_NOTES_CHARS} characters.` : LABEL_MESSAGE);
       }
       if (key === 'rows') {
         const value = integerOf(raw);

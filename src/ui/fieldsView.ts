@@ -2,7 +2,7 @@ import type { InspectorAction, InspectorField, InspectorView as Model } from './
 
 interface Control {
   field: InspectorField;
-  input?: HTMLInputElement;
+  input?: HTMLInputElement | HTMLTextAreaElement;
   select?: HTMLSelectElement;
   hint?: HTMLElement;
   value?: HTMLElement;
@@ -93,6 +93,15 @@ export class FieldsView {
         select.addEventListener('change', () => this.handlers.onEdit(field.key, select.value));
         control.select = select;
         cell.append(select);
+      } else if (field.kind === 'longtext') {
+        const area = document.createElement('textarea');
+        area.rows = 4;
+        area.maxLength = field.max ?? 2000;
+        area.addEventListener('change', () => this.handlers.onEdit(field.key, area.value));
+        control.input = area;
+        control.hint = document.createElement('div');
+        control.hint.className = 'inspector-hint';
+        cell.append(area, control.hint);
       } else {
         const input = document.createElement('input');
         input.type = field.kind === 'text' ? 'text' : 'number';
@@ -140,8 +149,10 @@ export class FieldsView {
         const { input } = control;
         if (force || input !== document.activeElement) input.value = String(field.value);
         input.placeholder = field.placeholder ?? '';
-        if (field.min !== undefined) input.min = String(field.min);
-        if (field.max !== undefined) input.max = String(field.max);
+        if (input instanceof HTMLInputElement) {
+          if (field.min !== undefined) input.min = String(field.min);
+          if (field.max !== undefined) input.max = String(field.max);
+        }
         if (control.hint) control.hint.textContent = field.hint ?? '';
       }
     }

@@ -1,3 +1,4 @@
+import { stampOf } from '../layout/info';
 import { newestFirst, savedProjects, snapshotsOf, type StoredProject } from '../project/projectStore';
 
 export interface ProjectsHost {
@@ -9,6 +10,12 @@ export interface ProjectsHost {
   saveAsNew(): Promise<void>;
   open(project: StoredProject): Promise<void>;
   remove(project: StoredProject): Promise<boolean>;
+  /** Shows what differs between the project on the screen and this one. */
+  compare(project: StoredProject): void;
+  /** Downloads the project as a file to hand on. */
+  export(project: StoredProject): void;
+  /** Adds the project files to the list; says what became of each. */
+  importFiles(files: File[]): Promise<string>;
 }
 
 const counts = (p: StoredProject): string => {
@@ -25,9 +32,39 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
   title.textContent = 'Projects in this browser';
   const help = document.createElement('p');
   help.className = 'projects-help';
-  help.textContent = 'The project on the screen is also kept by itself, as one, for when the page is opened again; the ones here are kept until you take them away.';
+  help.textContent = 'The project on the screen is also kept by itself, as one, for when the page is opened again; the ones here are kept until you take them away. Export sends one to somebody, and Import (or dropping files here) adds the ones that were sent.';
   const list = document.createElement('div');
   list.className = 'projects-list';
+  const result = document.createElement('p');
+  result.className = 'projects-result';
+  result.hidden = true;
+  const importInput = document.createElement('input');
+  importInput.type = 'file';
+  importInput.accept = '.json,application/json';
+  importInput.multiple = true;
+  importInput.hidden = true;
+  const importFiles = async (files: File[]) => {
+    result.textContent = await host.importFiles(files);
+    result.hidden = false;
+    await refresh();
+  };
+  importInput.addEventListener('change', async () => {
+    const files = [...(importInput.files ?? [])];
+    importInput.value = '';
+    if (files.length > 0) await importFiles(files);
+  });
+  const importButton = document.createElement('button');
+  importButton.textContent = 'Import…';
+  importButton.title = 'Add project files that somebody sent; the project on the screen stays as it is';
+  importButton.addEventListener('click', () => importInput.click());
+  dialog.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+  });
+  dialog.addEventListener('drop', async (e) => {
+    if (!e.dataTransfer?.files.length) return;
+    e.preventDefault();
+    await importFiles([...e.dataTransfer.files]);
+  });
   const actions = document.createElement('div');
   actions.className = 'app-dialog-actions';
   const close = document.createElement('button');
@@ -46,7 +83,8 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
     const heading = document.createElement('strong');
     heading.textContent = project.title || 'Untitled panel';
     const detail = document.createElement('small');
-    detail.textContent = `${new Date(project.savedAt).toLocaleString()} · ${counts(project)}${project.id === current ? ' · open now' : ''}`;
+    const stamp = stampOf(project.file.project.panel.info);
+    detail.textContent = `${new Date(project.savedAt).toLocaleString()} · ${counts(project)}${stamp ? ` · ${stamp}` : ''}${project.id === current ? ' · open now' : ''}`;
     name.append(heading, detail);
     const open = document.createElement('button');
     open.textContent = 'Open';
@@ -54,7 +92,15 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
       await host.open(project);
       dialog.close();
     });
-    element.append(name, open);
+    const exportButton = document.createElement('button');
+    exportButton.textContent = 'Export';
+    exportButton.title = 'Download this project as a file, to send to somebody';
+    exportButton.addEventListener('click', () => host.export(project));
+    const compareButton = document.createElement('button');
+    compareButton.textContent = 'Compare';
+    compareButton.title = 'See what differs between this project and the one on the screen';
+    compareButton.addEventListener('click', () => host.compare(project));
+    element.append(name, open, compareButton, exportButton);
     if (removable) {
       const remove = document.createElement('button');
       remove.textContent = 'Delete';
@@ -94,10 +140,12 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
     await host.saveAsNew();
     await refresh();
   });
-  actions.append(close, saveNew, save);
-  dialog.append(title, help, list, actions);
+  actions.append(close, importButton, saveNew, save);
+  dialog.append(title, help, list, result, importInput, actions);
   dialog.addEventListener('close', () => dialog.remove());
   await refresh();
   document.body.append(dialog);
   dialog.showModal();
+  // A list that scrolls is the first thing a browser may focus, and its focus ring is no use here.
+  close.focus();
 }

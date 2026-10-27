@@ -1,3 +1,4 @@
+import { canonicalJson } from './canonical';
 import type { ProjectFile } from './file';
 
 /** A project kept in the browser under a name of its own, next to the one being worked on. */
@@ -63,7 +64,7 @@ export function planProjectImport(existing: readonly StoredProject[], incoming: 
   let unchanged = 0;
   for (const project of incoming) {
     const same = known.find((p) => p.id === project.id);
-    if (same && JSON.stringify(same.file) === JSON.stringify(project.file)) {
+    if (same && canonicalJson(same.file) === canonicalJson(project.file)) {
       unchanged++;
       continue;
     }

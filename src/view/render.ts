@@ -8,6 +8,7 @@ import { MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from 
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
+import { stampOf } from '../layout/info';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
 import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
 
@@ -318,12 +319,22 @@ export function render(
     ctx.strokeStyle = theme().frame;
     ctx.lineWidth = 2;
     ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
-    if (panel.title && texts.title) {
-      ctx.font = `bold 14px ${FONT_FAMILY}`;
+    if (texts.title) {
+      const stamp = stampOf(panel.info);
       ctx.fillStyle = theme().label;
-      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(fitText(ctx, panel.title, frame.width - 28), 14, 24);
+      let stampWidth = 0;
+      if (stamp) {
+        ctx.font = `10px ${FONT_FAMILY}`;
+        ctx.textAlign = 'right';
+        ctx.fillText(stamp, frame.width - 14, 24);
+        stampWidth = ctx.measureText(stamp).width + 14;
+      }
+      if (panel.title) {
+        ctx.font = `bold 14px ${FONT_FAMILY}`;
+        ctx.textAlign = 'left';
+        ctx.fillText(fitText(ctx, panel.title, frame.width - 28 - stampWidth), 14, 24);
+      }
     }
   }
 

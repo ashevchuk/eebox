@@ -248,6 +248,118 @@ try {
     expectEqual(await inspectorField('Title'), 'Persist test', 'the title after the restore');
   });
 
+  await step('a project of the list is exported, a file that is sent is imported into the list, and a project file dropped on the page is opened', async () => {
+    const dialogClick = (text) => browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === ${JSON.stringify(text)}).click()`);
+    const importIntoList = (content, name) =>
+      browser.evaluate(`(async () => {
+        const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(content)}], ${JSON.stringify(name)}));
+        const input = document.querySelector('dialog[open].projects-dialog input[type=file]'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 600));
+        return document.querySelector('.projects-result').textContent;
+      })()`);
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].projects-dialog')`, 'the projects dialog');
+    await dialogClick('Save as a new project');
+    await browser.waitFor(`document.querySelector('.projects-row.current')`, 'the saved project, marked as the open one');
+    const exported = await browser.evaluate(`(async () => {
+      let blob = null, name = null; const create = URL.createObjectURL; URL.createObjectURL = (b) => { blob = b; return create(b); };
+      const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { name = this.download; };
+      [...document.querySelector('.projects-row').querySelectorAll('button')].find((b) => b.textContent === 'Export').click();
+      await new Promise((r) => setTimeout(r, 400));
+      HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create;
+      return { name, text: blob ? await blob.text() : null };
+    })()`);
+    expectTrue(/\.eebox\.json$/.test(exported.name ?? ''), `the file is named ${exported.name}`);
+    expectEqual(JSON.parse(exported.text).format, 'eebox-project', 'the format of the exported file');
+    expectTrue((await importIntoList(exported.text, 'same.json')).includes('already in the list'), 'a file that is in the list was added again');
+    const changed = JSON.parse(exported.text);
+    changed.project.panel.title = 'Sent for approval';
+    expectTrue((await importIntoList(JSON.stringify(changed), 'sent.json')).includes('added "Sent for approval"'), 'a changed file was not added');
+    expectTrue(await browser.evaluate(`[...document.querySelectorAll('.projects-row strong')].some((s) => s.textContent === 'Sent for approval')`), 'the new project is not in the list');
+    const refused = await importIntoList('{"format":"eebox-workspace"}', 'backup.json');
+    expectTrue(refused.includes('Restore from backup'), `a backup was not sent to Restore: ${refused}`);
+    expectEqual(await inspectorField('Title'), 'Persist test', 'the project on the screen after the imports');
+    await dialogClick('Close');
+    // dropped on the page: a project is opened, not read as a library
+    await browser.evaluate(`(async () => {
+      const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(JSON.stringify(JSON.parse(exported.text)))}.replace('Persist test', 'Dropped')], 'dropped.json'));
+      const input = document.getElementById('import'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 500));
+      [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click();
+    })()`);
+    await browser.waitFor(`document.getElementById('status').textContent.includes('dropped.json loaded')`, 'the dropped project to open');
+    expectEqual(await inspectorField('Title'), 'Dropped', 'the title of the dropped project');
+    await browser.evaluate(`(() => { const input = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Title').querySelector('input'); input.value = 'Persist test'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  });
+
+  await step('keys typed into the notes are text, not shortcuts: F, Space and R do not zoom, pan or switch the ruler on', async () => {
+    await browser.evaluate(`(() => { const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label')?.textContent === 'Notes'); const area = row.querySelector('textarea'); area.value = ''; area.focus(); })()`);
+    await browser.key('F', 'KeyF', 70, 'F');
+    await browser.key(' ', 'Space', 32, ' ');
+    await browser.key('r', 'KeyR', 82, 'r');
+    await browser.key('Enter', 'Enter', 13, '\r');
+    await browser.key('f', 'KeyF', 70, 'f');
+    const typed = await browser.evaluate(`document.activeElement.value`);
+    expectEqual(typed, 'F r\nf', 'what the notes hold after the keys');
+    expectEqual(await browser.evaluate(`document.getElementById('ruler').classList.contains('active')`), false, 'the ruler switched on while typing');
+    await browser.evaluate(`(() => { document.activeElement.value = ''; document.activeElement.dispatchEvent(new Event('change', { bubbles: true })); document.activeElement.blur(); })()`);
+  });
+
+  await step('the info of a project is a stamp on the drawing, a block on the print sheet and a line in the list, and goes into the file', async () => {
+    const field = (label, value) =>
+      browser.evaluate(`(() => { const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.querySelector('label')?.textContent === ${JSON.stringify(label)}); const c = row.querySelector('input, select, textarea'); c.value = ${JSON.stringify(value)}; c.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await field('Revision', 'B');
+    await field('Author', 'A. Designer');
+    await field('Status', 'for review');
+    await field('Notes', 'Replace C16 by B16.\nAdd an RCD.');
+    const svg = await downloaded('export-svg');
+    expectTrue(svg.includes('rev B') && svg.includes('for review'), 'the stamp is not on the exported drawing');
+    await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Print').click())`);
+    await browser.waitFor(`document.querySelector('#print-sheet .title-block')`, 'the title block on the print sheet');
+    const block = await browser.evaluate(`(() => { const t = document.querySelector('#print-sheet .title-block'); return [[...t.querySelectorAll('th')].map((c) => c.textContent), [...t.querySelectorAll('td')].map((c) => c.textContent)]; })()`);
+    expectEqual(block, [['Revision', 'Author', 'Status'], ['B', 'A. Designer', 'for review']], 'the cells of the title block');
+    expectTrue((await browser.evaluate(`document.querySelector('#print-sheet .title-notes').textContent`)).startsWith('Replace C16 by B16.'), 'the notes are not under the title block');
+    const file = JSON.parse(await downloaded('save-project'));
+    expectEqual(file.project.panel.info.status, 'for review', 'the status in the project file');
+    await browser.evaluate(`document.getElementById('open-projects').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open].projects-dialog')`, 'the projects dialog');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Save the project' || b.textContent === 'Save over the open one').click()`);
+    await browser.waitFor(`document.querySelector('.projects-row small')?.textContent.includes('rev B \u00b7 for review')`, 'the stamp in the list of projects');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Close').click()`);
+    for (const label of ['Revision', 'Author', 'Status', 'Notes']) await field(label, '');
+    expectTrue(!(await downloaded('export-svg')).includes('rev B'), 'the stamp stayed after the info was cleared');
+  });
+
+  await step('a file that came back from a review is compared with the project on the screen', async () => {
+    const compareWith = (content, name) =>
+      browser.evaluate(`(async () => {
+        const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(content)}], ${JSON.stringify(name)}));
+        const input = document.getElementById('compare-file'); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 600));
+        const dialog = document.querySelector('dialog.diff-dialog[open]');
+        const text = dialog ? dialog.innerText : null;
+        dialog?.querySelector('button.primary').click();
+        await new Promise((r) => setTimeout(r, 200));
+        return text;
+      })()`);
+    const own = await downloaded('save-project');
+    expectTrue((await compareWith(own, 'same.json')).includes('No differences.'), 'a copy of the project differs from the project');
+    const reviewed = JSON.parse(own);
+    reviewed.project.panel.title = 'Reviewed';
+    reviewed.project.panel.info = { status: 'approved', notes: 'Fine.' };
+    const removed = reviewed.project.schematic.wires.pop();
+    reviewed.project.schematic.nodes.find((n) => n.kind === 'load').load = { ...(reviewed.project.schematic.nodes.find((n) => n.kind === 'load').load ?? {}), powerW: 4321 };
+    const text = await compareWith(JSON.stringify(reviewed), 'reviewed.json');
+    expectTrue(text.includes('title "Persist test" \u2192 "Reviewed"'), `the title change is not listed: ${text}`);
+    expectTrue(text.includes('status none \u2192 "approved"'), 'the status change is not listed');
+    expectTrue(text.includes('Wires') && text.includes(`${removed.id}:`), 'the removed wire is not listed');
+    expectTrue(text.includes('load power') && text.includes('4321 W'), 'the load change is not listed');
+    expectTrue(/\d+ differences: 0 added, 1 removed, \d+ changed/.test(text), `the counts are wrong: ${text.slice(0, 160)}`);
+    const unrelated = await browser.evaluate(`document.getElementById('status').textContent`);
+    expectTrue(!unrelated.includes('reviewed.json loaded'), 'comparing opened the file');
+    expectEqual(await inspectorField('Title'), 'Persist test', 'the project on the screen after the comparison');
+  });
+
   await step('a share link opens the same project in a fresh page', async () => {
     await browser.evaluate(`document.getElementById('share-link').click()`);
     await browser.waitFor(`location.hash.startsWith('#p=')`, 'the link in the address bar');

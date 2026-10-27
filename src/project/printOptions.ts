@@ -44,9 +44,9 @@ export function pageRule(options: Pick<PrintOptions, 'paper' | 'orientation'>): 
   return `@page { size: ${options.paper} ${options.orientation}; margin: ${PAGE_MARGIN_MM}mm; }`;
 }
 
-/** The tallest a drawing may be so that it, its caption and the title fit on one page. */
-export function drawingMaxHeightMm(options: Pick<PrintOptions, 'paper' | 'orientation'>): number {
-  return pageSizeMm(options).height - 2 * PAGE_MARGIN_MM - DRAWING_FURNITURE_MM;
+/** The tallest a drawing may be so that it, its caption and the title fit on one page; `reservedMm` is room kept for something else on it. */
+export function drawingMaxHeightMm(options: Pick<PrintOptions, 'paper' | 'orientation'>, reservedMm = 0): number {
+  return pageSizeMm(options).height - 2 * PAGE_MARGIN_MM - DRAWING_FURNITURE_MM - reservedMm;
 }
 
 export const anythingToPrint = (options: PrintOptions): boolean => PRINT_PARTS.some((part) => options.parts[part]);

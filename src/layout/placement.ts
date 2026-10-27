@@ -1,3 +1,4 @@
+import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
 import { LAYOUT_EPSILON_UNITS } from './units';
 
@@ -40,6 +41,8 @@ export interface CombPlacement {
 export interface Panel {
   /** Name of the whole panel, shown on the drawing and used for file names. */
   title?: string;
+  /** Which version this is and what the people it was passed to decided; only when something is stated. */
+  info?: ProjectInfo;
   /** Snapshot of the enclosure rails, so later library edits cannot move placed modules. */
   railLengthsUnits: number[];
   /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */

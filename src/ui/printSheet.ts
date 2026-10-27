@@ -1,5 +1,6 @@
 import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts, wireCells, wireList, WIRE_HEADER } from '../electrical/schedule';
 import { bomTotals, buildBom, lineTotal, type BomRow } from '../project/bom';
+import { INFO_LABELS, infoRows, type ProjectInfo } from '../layout/info';
 import { DEFAULT_PRINT_OPTIONS, drawingMaxHeightMm, type PrintOptions } from '../project/printOptions';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
@@ -65,6 +66,46 @@ function drawingOf(view: View, session: Session, caption: string, idPrefix: stri
   return figure;
 }
 
+const NOTES_LABEL = INFO_LABELS.notes;
+/** Height the title block takes on the page: its table, and a line for each line of the notes. */
+const TITLE_BLOCK_MM = 14;
+const NOTES_LINE_MM = 5;
+const MAX_NOTES_LINES = 12;
+
+export function titleBlockHeightMm(info: ProjectInfo | undefined): number {
+  const rows = infoRows(info);
+  if (rows.length === 0) return 0;
+  const notes = rows.find(([label]) => label === NOTES_LABEL)?.[1];
+  const lines = notes ? Math.min(MAX_NOTES_LINES, notes.split('\n').length + Math.floor(notes.length / 110)) : 0;
+  return (rows.some(([label]) => label !== NOTES_LABEL) ? TITLE_BLOCK_MM : 0) + lines * NOTES_LINE_MM;
+}
+
+/** What the drawing is passed on with: its fields in one row under the title, then the notes; nothing when nothing is stated. */
+function titleBlock(info: ProjectInfo | undefined): HTMLElement[] {
+  const rows = infoRows(info);
+  const fields = rows.filter(([label]) => label !== NOTES_LABEL);
+  const notes = rows.find(([label]) => label === NOTES_LABEL)?.[1];
+  const out: HTMLElement[] = [];
+  if (fields.length > 0) {
+    const element = document.createElement('table');
+    element.className = 'title-block';
+    const head = element.createTHead().insertRow();
+    const body = element.createTBody().insertRow();
+    for (const [label, text] of fields) {
+      head.append(Object.assign(document.createElement('th'), { textContent: label }));
+      body.insertCell().textContent = text;
+    }
+    out.push(element);
+  }
+  if (notes) {
+    const paragraph = document.createElement('p');
+    paragraph.className = 'title-notes';
+    paragraph.textContent = notes;
+    out.push(paragraph);
+  }
+  return out;
+}
+
 function table(header: readonly string[], rows: string[][]): HTMLTableElement {
   const element = document.createElement('table');
   const head = element.createTHead().insertRow();
@@ -92,8 +133,8 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   const { exportTexts } = session;
   const title = document.createElement('h1');
   title.textContent = panel.title ?? 'Panel';
-  sheet.style.setProperty('--drawing-max-height', `${drawingMaxHeightMm(options)}mm`);
-  const parts: HTMLElement[] = exportTexts.sheetTitle ? [title] : [];
+  sheet.style.setProperty('--drawing-max-height', `${drawingMaxHeightMm(options, exportTexts.sheetTitle ? titleBlockHeightMm(panel.info) : 0)}mm`);
+  const parts: HTMLElement[] = exportTexts.sheetTitle ? [title, ...titleBlock(panel.info)] : [];
   if (options.parts.panel) parts.push(drawingOf(views.panel, session, exportTexts.captions ? 'Panel layout' : '', 'panel-'));
   if (options.parts.schematic && schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, exportTexts.captions ? 'Wiring schematic' : '', 'schematic-'));
   const rows = buildBom(panel, session.resolve);

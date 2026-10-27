@@ -32,6 +32,10 @@ import { arrangeModules, duplicateRow, type ArrangeHow } from './layout/arrangeM
 import { MAX_RAILS } from './layout/limits';
 import { TOUR_DONE_KEY } from './ui/tour';
 import { TourView } from './ui/tourView';
+import { canonicalJson } from './project/canonical';
+import { diffProjects } from './project/diff';
+import { openDiffDialog } from './ui/diffDialog';
+import { describeImport, planProjectFiles, projectFileName, sniffFile } from './project/projectImport';
 import { MinimapView } from './ui/minimapView';
 import { overviewOf, type Overview } from './ui/overview';
 import { searchProject } from './ui/search';
@@ -240,7 +244,7 @@ canvas.addEventListener(
 );
 
 window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) return;
+  if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
   const mod = e.ctrlKey || e.metaKey;
   if (e.code === 'Space') {
     spaceHeld = true;
@@ -395,6 +399,21 @@ async function saveProjectHere(asNew: boolean): Promise<void> {
   showStatus(`Saved in this browser as "${session.project.panel.title || 'Untitled panel'}".`);
 }
 
+function showDifferences(file: ProjectFile, name: string): void {
+  openDiffDialog(`"${name}" compared with the project on the screen`, name, diffProjects(session.toFile(), file));
+}
+
+byId<HTMLInputElement>('compare-file').addEventListener('change', async (e) => {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  input.value = '';
+  const result = parseProjectJson(text);
+  if (!result.ok) return showStatus(describeErrors(file.name, result.errors).join('\n'), true);
+  showDifferences(result.file, file.name);
+});
+
 async function openProjectsList(): Promise<void> {
   await openProjectsDialog({
     list: () => projectStore.list(),
@@ -407,6 +426,14 @@ async function openProjectsList(): Promise<void> {
       if (!(await confirmDiscard())) return;
       applyLoaded(result.file, result.warnings, project.title || 'Untitled panel');
       currentProjectId = project.id;
+    },
+    compare: (project) => showDifferences(project.file, project.title || 'Untitled panel'),
+    export: (project) => downloadBlob(new Blob([JSON.stringify(project.file, null, 2)], { type: 'application/json' }), projectFileName(project.title)),
+    importFiles: async (files) => {
+      const texts = await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
+      const plan = planProjectFiles(await projectStore.list(), texts, Date.now());
+      for (const project of plan.put) await projectStore.put(project);
+      return describeImport(plan.results);
     },
     remove: async (project) => {
       if (!(await confirmDialog(`Delete "${project.title || 'Untitled panel'}" from this browser?`, 'Delete'))) return false;
@@ -424,13 +451,13 @@ let lastSnapshotAt = 0;
 async function keepSnapshot(force: boolean): Promise<void> {
   if (!hasWork(session.project)) return;
   const file = session.toFile();
-  const json = JSON.stringify(file);
+  const json = canonicalJson(file);
   const now = Date.now();
   if (json === lastSnapshotJson || (!force && now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS)) return;
   try {
     const all = await projectStore.list();
     lastSnapshotJson = json;
-    if (all.some((p) => JSON.stringify(p.file) === json)) return;
+    if (all.some((p) => canonicalJson(p.file) === json)) return;
     const snapshot = { id: newSnapshotId(all, now), title: file.project.panel.title ?? '', savedAt: now, file, snapshot: true as const };
     await projectStore.put(snapshot);
     lastSnapshotAt = now;
@@ -826,11 +853,27 @@ async function removeLibrary(library: Library): Promise<void> {
   await refreshLibraries();
 }
 
+async function openProjectFile(text: string, name: string): Promise<string | null> {
+  const result = parseProjectJson(text);
+  if (!result.ok) return describeErrors(name, result.errors).join('\n');
+  if (await confirmDiscard()) applyLoaded(result.file, result.warnings, name);
+  return null;
+}
+
 async function importFiles(files: FileList | File[]): Promise<void> {
   const lines: string[] = [];
   let failed = false;
   for (const file of files) {
     const source = await file.text();
+    const kind = sniffFile(source);
+    if (kind === 'project' || kind === 'workspace') {
+      const problem = kind === 'project' ? await openProjectFile(source, file.name) : (await restoreEverything(source, file.name), null);
+      if (problem) {
+        failed = true;
+        lines.push(problem);
+      }
+      continue;
+    }
     let libraryText = source;
     if (/\.csv$/i.test(file.name)) {
       const stem = file.name.replace(/\.csv$/i, '');
@@ -925,7 +968,7 @@ window.addEventListener(
   'pointerdown',
   () => {
     const active = document.activeElement;
-    if (active instanceof HTMLInputElement && inspector.owns(active)) active.blur();
+    if ((active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) && inspector.owns(active)) active.blur();
   },
   true,
 );
@@ -1010,10 +1053,7 @@ byId('ruler').addEventListener('click', () => {
   session.changed();
 });
 byId('save-project').addEventListener('click', () =>
-  downloadBlob(
-    new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }),
-    `${fileStem(session.project.panel.title, 'panel')}.eebox.json`,
-  ),
+  downloadBlob(new Blob([JSON.stringify(session.toFile(), null, 2)], { type: 'application/json' }), projectFileName(session.project.panel.title)),
 );
 byId('share-link').addEventListener('click', () => void shareLink());
 byId('export-png').addEventListener('click', () => void exportPng());

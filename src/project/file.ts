@@ -1,3 +1,4 @@
+import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
 import { CROSS_SECTIONS_MM2, INSTALL_METHODS, type CableSettings } from '../electrical/cables';
@@ -128,6 +129,7 @@ const PROJECT_SPEC: FieldSpec = {
 };
 const PANEL_SPEC: FieldSpec = {
   title: { required: false, check: labelCheck },
+  info: { required: false, check: infoCheck },
   railLengthsUnits: { required: true, check: railLengthsCheck },
   railPitchesMm: { required: true, check: pitchListCheck },
   railLabels: { required: true, check: railLabelsCheck },
@@ -336,6 +338,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const parsed: Project = {
     panel: {
       ...(panelRaw.title !== undefined ? { title: panelRaw.title as string } : {}),
+      ...(panelRaw.info !== undefined ? { info: panelRaw.info as ProjectInfo } : {}),
       railLengthsUnits,
       railPitchesMm,
       railLabels,
