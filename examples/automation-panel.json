@@ -1,0 +1,1634 @@
+{
+  "format": "eebox-project",
+  "version": 1,
+  "project": {
+    "panel": {
+      "plates": [
+        {
+          "id": "plate1",
+          "name": "Back plate",
+          "widthMm": 700,
+          "heightMm": 820
+        },
+        {
+          "id": "plate2",
+          "name": "Door",
+          "widthMm": 500,
+          "heightMm": 700
+        }
+      ],
+      "rails": [
+        {
+          "plate": "plate1",
+          "x": 20,
+          "y": 110,
+          "lengthUnits": 30,
+          "label": "Supply and control"
+        },
+        {
+          "plate": "plate1",
+          "x": 20,
+          "y": 680,
+          "lengthUnits": 24,
+          "label": "Automation"
+        },
+        {
+          "plate": "plate2",
+          "x": 30,
+          "y": 150,
+          "lengthUnits": 12,
+          "label": "Indicators"
+        }
+      ],
+      "placements": [
+        {
+          "id": "p1",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "main-switch-4p-100"
+          },
+          "rail": 0,
+          "slot": 0,
+          "label": "Main switch"
+        },
+        {
+          "id": "p2",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "rcd-4p-100-300"
+          },
+          "rail": 0,
+          "slot": 4,
+          "label": "RCD 300 mA"
+        },
+        {
+          "id": "p3",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-3p-c32"
+          },
+          "rail": 0,
+          "slot": 8,
+          "label": "Pump 1"
+        },
+        {
+          "id": "p4",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-3p-c32"
+          },
+          "rail": 0,
+          "slot": 11,
+          "label": "Pump 2"
+        },
+        {
+          "id": "p5",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "mcb-1p-c10"
+          },
+          "rail": 0,
+          "slot": 14,
+          "label": "Control"
+        },
+        {
+          "id": "p6",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "psu-24v-2a5"
+          },
+          "rail": 0,
+          "slot": 15,
+          "label": "PSU 24 V"
+        },
+        {
+          "id": "p7",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pe-bar-12"
+          },
+          "rail": 0,
+          "slot": 19,
+          "label": "PE"
+        },
+        {
+          "id": "p8",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "strip"
+          },
+          "rail": 1,
+          "slot": 0,
+          "label": "X1"
+        },
+        {
+          "id": "p9",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "analog-in"
+          },
+          "rail": 1,
+          "slot": 5,
+          "label": "AI"
+        },
+        {
+          "id": "p10",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "plc"
+          },
+          "rail": 1,
+          "slot": 10,
+          "label": "PLC"
+        },
+        {
+          "id": "p11",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "soft-starter"
+          },
+          "plate": "plate1",
+          "x": 40,
+          "y": 280,
+          "label": "Soft starter 1"
+        },
+        {
+          "id": "p12",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "soft-starter"
+          },
+          "plate": "plate1",
+          "x": 200,
+          "y": 280,
+          "label": "Soft starter 2"
+        },
+        {
+          "id": "p13",
+          "module": {
+            "libraryId": "automation-example",
+            "moduleId": "meter-panel"
+          },
+          "plate": "plate1",
+          "x": 360,
+          "y": 280,
+          "label": "Meter"
+        },
+        {
+          "id": "p14",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pilot-light-230"
+          },
+          "rail": 2,
+          "slot": 1,
+          "label": "Run 1"
+        },
+        {
+          "id": "p15",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pilot-light-230"
+          },
+          "rail": 2,
+          "slot": 3,
+          "label": "Run 2"
+        },
+        {
+          "id": "p16",
+          "module": {
+            "libraryId": "generic-iec",
+            "moduleId": "pilot-light-230"
+          },
+          "rail": 2,
+          "slot": 5,
+          "label": "Fault"
+        }
+      ],
+      "combs": [],
+      "shelf": [],
+      "title": "Pump station",
+      "ducts": [
+        {
+          "id": "d1",
+          "plate": "plate1",
+          "x": 20,
+          "y": 230,
+          "widthMm": 600,
+          "heightMm": 30,
+          "label": "Power duct"
+        },
+        {
+          "id": "d2",
+          "plate": "plate1",
+          "x": 520,
+          "y": 280,
+          "widthMm": 60,
+          "heightMm": 250,
+          "label": "Control"
+        },
+        {
+          "id": "d3",
+          "plate": "plate1",
+          "x": 20,
+          "y": 580,
+          "widthMm": 600,
+          "heightMm": 30,
+          "label": "Signal duct"
+        }
+      ]
+    },
+    "schematic": {
+      "nodes": [
+        {
+          "kind": "module",
+          "label": "Main switch 4P 100A",
+          "x": 400,
+          "y": 220,
+          "placementId": "p1",
+          "id": "n1"
+        },
+        {
+          "kind": "module",
+          "label": "RCD 4P 100A 300mA",
+          "x": 400,
+          "y": 440,
+          "placementId": "p2",
+          "id": "n2"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 3P C32",
+          "x": 100,
+          "y": 660,
+          "placementId": "p3",
+          "id": "n3"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 3P C32",
+          "x": 400,
+          "y": 660,
+          "placementId": "p4",
+          "id": "n4"
+        },
+        {
+          "kind": "module",
+          "label": "MCB 1P C10",
+          "x": 700,
+          "y": 660,
+          "placementId": "p5",
+          "id": "n5"
+        },
+        {
+          "kind": "module",
+          "label": "Power supply 24 V DC, 2.5 A",
+          "x": 700,
+          "y": 880,
+          "placementId": "p6",
+          "id": "n6"
+        },
+        {
+          "kind": "module",
+          "label": "Earth bar 12 terminals",
+          "x": 1000,
+          "y": 440,
+          "placementId": "p7",
+          "id": "n7"
+        },
+        {
+          "kind": "module",
+          "label": "Terminal strip 12 ways",
+          "x": 1300,
+          "y": 1120,
+          "placementId": "p8",
+          "id": "n8"
+        },
+        {
+          "kind": "module",
+          "label": "Analog input module 4 ch",
+          "x": 1000,
+          "y": 1120,
+          "placementId": "p9",
+          "id": "n9"
+        },
+        {
+          "kind": "module",
+          "label": "Controller 8 DI / 8 DO",
+          "x": 700,
+          "y": 1120,
+          "placementId": "p10",
+          "id": "n10"
+        },
+        {
+          "kind": "module",
+          "label": "Pilot light 230 V",
+          "x": 100,
+          "y": 1420,
+          "placementId": "p14",
+          "id": "n11"
+        },
+        {
+          "kind": "module",
+          "label": "Pilot light 230 V",
+          "x": 300,
+          "y": 1420,
+          "placementId": "p15",
+          "id": "n12"
+        },
+        {
+          "kind": "module",
+          "label": "Pilot light 230 V",
+          "x": 500,
+          "y": 1420,
+          "placementId": "p16",
+          "id": "n13"
+        },
+        {
+          "kind": "module",
+          "label": "Soft starter 3P 15 kW",
+          "x": 100,
+          "y": 880,
+          "placementId": "p11",
+          "id": "n14"
+        },
+        {
+          "kind": "module",
+          "label": "Soft starter 3P 15 kW",
+          "x": 400,
+          "y": 880,
+          "placementId": "p12",
+          "id": "n15"
+        },
+        {
+          "kind": "module",
+          "label": "Energy meter 3P for a plate",
+          "x": 1000,
+          "y": 660,
+          "placementId": "p13",
+          "id": "n16"
+        },
+        {
+          "kind": "source",
+          "label": "Mains 3-phase",
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "N",
+            "PE"
+          ],
+          "x": 400,
+          "y": 0,
+          "earthing": "TN-S",
+          "id": "n17"
+        },
+        {
+          "kind": "load",
+          "label": "Pump 1",
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "PE"
+          ],
+          "x": 100,
+          "y": 1120,
+          "load": {
+            "powerW": 11000,
+            "crossSectionMm2": 6,
+            "lengthM": 25
+          },
+          "id": "n18"
+        },
+        {
+          "kind": "load",
+          "label": "Pump 2",
+          "conductors": [
+            "L1",
+            "L2",
+            "L3",
+            "PE"
+          ],
+          "x": 400,
+          "y": 1120,
+          "load": {
+            "powerW": 11000,
+            "crossSectionMm2": 6,
+            "lengthM": 30
+          },
+          "id": "n19"
+        },
+        {
+          "kind": "load",
+          "label": "Pressure sensor",
+          "conductors": [
+            "SP",
+            "SN"
+          ],
+          "x": 1300,
+          "y": 1360,
+          "id": "n20"
+        }
+      ],
+      "wires": [
+        {
+          "id": "w1",
+          "a": {
+            "node": "n17",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w2",
+          "a": {
+            "node": "n17",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w3",
+          "a": {
+            "node": "n17",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w4",
+          "a": {
+            "node": "n17",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n1",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w5",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w6",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w7",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w8",
+          "a": {
+            "node": "n1",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n2",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w9",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w10",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w11",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n3",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w12",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w13",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w14",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n4",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w15",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n5",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w16",
+          "a": {
+            "node": "n2",
+            "terminal": "bottom:N"
+          },
+          "b": {
+            "node": "n6",
+            "terminal": "top:N"
+          }
+        },
+        {
+          "id": "w17",
+          "a": {
+            "node": "n17",
+            "terminal": "bottom:PE"
+          },
+          "b": {
+            "node": "n7",
+            "terminal": "top:PE1"
+          }
+        },
+        {
+          "id": "w18",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:PEb1"
+          },
+          "b": {
+            "node": "n18",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w19",
+          "a": {
+            "node": "n7",
+            "terminal": "bottom:PEb1"
+          },
+          "b": {
+            "node": "n19",
+            "terminal": "top:PE"
+          }
+        },
+        {
+          "id": "w20",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w21",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w22",
+          "a": {
+            "node": "n3",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n14",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w23",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L1"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w24",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L2"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w25",
+          "a": {
+            "node": "n4",
+            "terminal": "bottom:L3"
+          },
+          "b": {
+            "node": "n15",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w26",
+          "a": {
+            "node": "n14",
+            "terminal": "bottom:T1"
+          },
+          "b": {
+            "node": "n18",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w27",
+          "a": {
+            "node": "n14",
+            "terminal": "bottom:T2"
+          },
+          "b": {
+            "node": "n18",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w28",
+          "a": {
+            "node": "n14",
+            "terminal": "bottom:T3"
+          },
+          "b": {
+            "node": "n18",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w29",
+          "a": {
+            "node": "n15",
+            "terminal": "bottom:T1"
+          },
+          "b": {
+            "node": "n19",
+            "terminal": "top:L1"
+          }
+        },
+        {
+          "id": "w30",
+          "a": {
+            "node": "n15",
+            "terminal": "bottom:T2"
+          },
+          "b": {
+            "node": "n19",
+            "terminal": "top:L2"
+          }
+        },
+        {
+          "id": "w31",
+          "a": {
+            "node": "n15",
+            "terminal": "bottom:T3"
+          },
+          "b": {
+            "node": "n19",
+            "terminal": "top:L3"
+          }
+        },
+        {
+          "id": "w32",
+          "a": {
+            "node": "n5",
+            "terminal": "bottom:L"
+          },
+          "b": {
+            "node": "n6",
+            "terminal": "top:L"
+          }
+        },
+        {
+          "id": "w33",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:24V"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:P"
+          }
+        },
+        {
+          "id": "w34",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:0V"
+          },
+          "b": {
+            "node": "n10",
+            "terminal": "top:M"
+          }
+        },
+        {
+          "id": "w35",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:24V"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "bottom:P"
+          }
+        },
+        {
+          "id": "w36",
+          "a": {
+            "node": "n6",
+            "terminal": "bottom:0V"
+          },
+          "b": {
+            "node": "n9",
+            "terminal": "bottom:M"
+          }
+        },
+        {
+          "id": "w37",
+          "a": {
+            "node": "n9",
+            "terminal": "top:I1P"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:1"
+          }
+        },
+        {
+          "id": "w38",
+          "a": {
+            "node": "n9",
+            "terminal": "top:I1N"
+          },
+          "b": {
+            "node": "n8",
+            "terminal": "top:2"
+          }
+        },
+        {
+          "id": "w39",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:1"
+          },
+          "b": {
+            "node": "n20",
+            "terminal": "top:SP"
+          }
+        },
+        {
+          "id": "w40",
+          "a": {
+            "node": "n8",
+            "terminal": "bottom:2"
+          },
+          "b": {
+            "node": "n20",
+            "terminal": "top:SN"
+          }
+        }
+      ]
+    }
+  },
+  "modules": {
+    "generic-iec/main-switch-4p-100": {
+      "id": "main-switch-4p-100",
+      "kind": "switch",
+      "name": "Main switch 4P 100A",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 100,
+      "heightMm": 90,
+      "mounting": "rail",
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2,
+          "width": 66,
+          "height": 10.5,
+          "fill": "#facc15",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "stretch"
+        }
+      ]
+    },
+    "generic-iec/rcd-4p-100-300": {
+      "id": "rcd-4p-100-300",
+      "kind": "rcd",
+      "name": "RCD 4P 100A 300mA",
+      "widthUnits": 4,
+      "poles": 4,
+      "ratedCurrentA": 100,
+      "residualCurrentMa": 300,
+      "heightMm": 90,
+      "mounting": "rail",
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 66,
+          "height": 9,
+          "fill": "#1f2937",
+          "anchor": "stretch"
+        },
+        {
+          "kind": "ellipse",
+          "cx": 64,
+          "cy": 75,
+          "rx": 3.4,
+          "ry": 3.4,
+          "fill": "#facc15",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "right"
+        },
+        {
+          "kind": "text",
+          "x": 64,
+          "y": 75,
+          "text": "T",
+          "size": 3.6,
+          "fill": "#1f2937",
+          "align": "centre",
+          "bold": true,
+          "anchor": "right"
+        }
+      ]
+    },
+    "generic-iec/mcb-3p-c32": {
+      "id": "mcb-3p-c32",
+      "kind": "breaker",
+      "name": "MCB 3P C32",
+      "widthUnits": 3,
+      "poles": 3,
+      "ratedCurrentA": 32,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "heightMm": 90,
+      "mounting": "rail",
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 48.5,
+          "height": 9,
+          "fill": "#1f2937",
+          "anchor": "stretch"
+        }
+      ]
+    },
+    "generic-iec/mcb-1p-c10": {
+      "id": "mcb-1p-c10",
+      "kind": "breaker",
+      "name": "MCB 1P C10",
+      "widthUnits": 1,
+      "poles": 1,
+      "ratedCurrentA": 10,
+      "curve": "C",
+      "breakingCapacityKA": 6,
+      "heightMm": 90,
+      "mounting": "rail",
+      "art": [
+        {
+          "kind": "rect",
+          "x": 2,
+          "y": 2.5,
+          "width": 13.5,
+          "height": 9,
+          "fill": "#1f2937",
+          "anchor": "stretch"
+        }
+      ]
+    },
+    "generic-iec/psu-24v-2a5": {
+      "id": "psu-24v-2a5",
+      "kind": "psu",
+      "name": "Power supply 24 V DC, 2.5 A",
+      "widthUnits": 4,
+      "poles": 2,
+      "terminals": [
+        {
+          "name": "L",
+          "conductor": "L",
+          "side": "top"
+        },
+        {
+          "name": "N",
+          "conductor": "N",
+          "side": "top"
+        },
+        {
+          "name": "24V",
+          "conductor": "DCP",
+          "side": "bottom"
+        },
+        {
+          "name": "0V",
+          "conductor": "DCN",
+          "side": "bottom"
+        }
+      ],
+      "heightMm": 90,
+      "mounting": "rail",
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 8
+      },
+      "art": [
+        {
+          "kind": "line",
+          "x1": 31.5,
+          "y1": 5.5,
+          "x2": 38.5,
+          "y2": 5.5,
+          "stroke": "#ffffff",
+          "strokeWidth": 0.9,
+          "anchor": "centre"
+        },
+        {
+          "kind": "line",
+          "x1": 31.5,
+          "y1": 8.5,
+          "x2": 38.5,
+          "y2": 8.5,
+          "stroke": "#ffffff",
+          "strokeWidth": 0.9,
+          "anchor": "centre"
+        },
+        {
+          "kind": "ellipse",
+          "cx": 65,
+          "cy": 77,
+          "rx": 1.8,
+          "ry": 1.8,
+          "fill": "#22c55e",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.3,
+          "anchor": "right"
+        },
+        {
+          "kind": "ellipse",
+          "cx": 6,
+          "cy": 77,
+          "rx": 3.6,
+          "ry": 3.6,
+          "fill": "#e5e7eb",
+          "stroke": "#1f2937",
+          "strokeWidth": 0.4,
+          "anchor": "left"
+        },
+        {
+          "kind": "line",
+          "x1": 6,
+          "y1": 74,
+          "x2": 6,
+          "y2": 77,
+          "stroke": "#1f2937",
+          "strokeWidth": 0.7,
+          "anchor": "left"
+        }
+      ]
+    },
+    "generic-iec/pe-bar-12": {
+      "id": "pe-bar-12",
+      "kind": "busbar",
+      "name": "Earth bar 12 terminals",
+      "widthUnits": 6,
+      "poles": 1,
+      "resizable": {
+        "minUnits": 2,
+        "maxUnits": 24
+      },
+      "terminals": [
+        {
+          "name": "PE",
+          "conductor": "PE",
+          "side": "top",
+          "net": "PE",
+          "count": 6
+        },
+        {
+          "name": "PEb",
+          "conductor": "PE",
+          "side": "bottom",
+          "net": "PE",
+          "count": 6
+        }
+      ],
+      "heightMm": 90,
+      "mounting": "rail",
+      "art": [
+        {
+          "kind": "rect",
+          "x": 0,
+          "y": 40,
+          "width": 105,
+          "height": 8,
+          "fill": "#2f9e44",
+          "anchor": "stretch"
+        },
+        {
+          "kind": "rect",
+          "x": 0,
+          "y": 42.5,
+          "width": 105,
+          "height": 3,
+          "fill": "#f2d21b",
+          "anchor": "stretch"
+        },
+        {
+          "kind": "ellipse",
+          "cx": 8.75,
+          "cy": 7,
+          "rx": 3.6,
+          "ry": 3.6,
+          "fill": "#e5e7eb",
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.4,
+          "anchor": "tile",
+          "period": 1
+        },
+        {
+          "kind": "line",
+          "x1": 6.35,
+          "y1": 5.8,
+          "x2": 11.15,
+          "y2": 8.2,
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.5,
+          "anchor": "tile",
+          "period": 1
+        },
+        {
+          "kind": "ellipse",
+          "cx": 8.75,
+          "cy": 84,
+          "rx": 3.6,
+          "ry": 3.6,
+          "fill": "#e5e7eb",
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.4,
+          "anchor": "tile",
+          "period": 1
+        },
+        {
+          "kind": "line",
+          "x1": 6.35,
+          "y1": 82.8,
+          "x2": 11.15,
+          "y2": 85.2,
+          "stroke": "#9ca3af",
+          "strokeWidth": 0.5,
+          "anchor": "tile",
+          "period": 1
+        }
+      ]
+    },
+    "automation-example/strip": {
+      "id": "strip",
+      "kind": "terminal",
+      "name": "Terminal strip 12 ways",
+      "widthUnits": 4.1143,
+      "heightMm": 60,
+      "mounting": "rail",
+      "poles": 1,
+      "terminals": [
+        {
+          "name": "1",
+          "conductor": "SP",
+          "side": "top",
+          "unit": -0.329,
+          "net": "way1"
+        },
+        {
+          "name": "1",
+          "conductor": "SP",
+          "side": "bottom",
+          "unit": -0.329,
+          "net": "way1"
+        },
+        {
+          "name": "2",
+          "conductor": "SN",
+          "side": "top",
+          "unit": 0.014,
+          "net": "way2"
+        },
+        {
+          "name": "2",
+          "conductor": "SN",
+          "side": "bottom",
+          "unit": 0.014,
+          "net": "way2"
+        },
+        {
+          "name": "3",
+          "conductor": "C",
+          "side": "top",
+          "unit": 0.357,
+          "net": "way3"
+        },
+        {
+          "name": "3",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 0.357,
+          "net": "way3"
+        },
+        {
+          "name": "4",
+          "conductor": "C",
+          "side": "top",
+          "unit": 0.7,
+          "net": "way4"
+        },
+        {
+          "name": "4",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 0.7,
+          "net": "way4"
+        },
+        {
+          "name": "5",
+          "conductor": "C",
+          "side": "top",
+          "unit": 1.043,
+          "net": "way5"
+        },
+        {
+          "name": "5",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 1.043,
+          "net": "way5"
+        },
+        {
+          "name": "6",
+          "conductor": "C",
+          "side": "top",
+          "unit": 1.386,
+          "net": "way6"
+        },
+        {
+          "name": "6",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 1.386,
+          "net": "way6"
+        },
+        {
+          "name": "7",
+          "conductor": "C",
+          "side": "top",
+          "unit": 1.729,
+          "net": "way7"
+        },
+        {
+          "name": "7",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 1.729,
+          "net": "way7"
+        },
+        {
+          "name": "8",
+          "conductor": "C",
+          "side": "top",
+          "unit": 2.071,
+          "net": "way8"
+        },
+        {
+          "name": "8",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 2.071,
+          "net": "way8"
+        },
+        {
+          "name": "9",
+          "conductor": "C",
+          "side": "top",
+          "unit": 2.414,
+          "net": "way9"
+        },
+        {
+          "name": "9",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 2.414,
+          "net": "way9"
+        },
+        {
+          "name": "10",
+          "conductor": "C",
+          "side": "top",
+          "unit": 2.757,
+          "net": "way10"
+        },
+        {
+          "name": "10",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 2.757,
+          "net": "way10"
+        },
+        {
+          "name": "11",
+          "conductor": "C",
+          "side": "top",
+          "unit": 3.1,
+          "net": "way11"
+        },
+        {
+          "name": "11",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 3.1,
+          "net": "way11"
+        },
+        {
+          "name": "12",
+          "conductor": "C",
+          "side": "top",
+          "unit": 3.443,
+          "net": "way12"
+        },
+        {
+          "name": "12",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 3.443,
+          "net": "way12"
+        }
+      ]
+    },
+    "automation-example/analog-in": {
+      "id": "analog-in",
+      "kind": "plc",
+      "name": "Analog input module 4 ch",
+      "widthUnits": 4,
+      "heightMm": 100,
+      "mounting": "both",
+      "poles": 2,
+      "terminals": [
+        {
+          "name": "I1P",
+          "conductor": "SP",
+          "side": "top",
+          "unit": -0.278
+        },
+        {
+          "name": "I1N",
+          "conductor": "SN",
+          "side": "top",
+          "unit": 0.167
+        },
+        {
+          "name": "I2P",
+          "conductor": "SP",
+          "side": "top",
+          "unit": 0.611
+        },
+        {
+          "name": "I2N",
+          "conductor": "SN",
+          "side": "top",
+          "unit": 1.056
+        },
+        {
+          "name": "I3P",
+          "conductor": "SP",
+          "side": "top",
+          "unit": 1.5
+        },
+        {
+          "name": "I3N",
+          "conductor": "SN",
+          "side": "top",
+          "unit": 1.944
+        },
+        {
+          "name": "I4P",
+          "conductor": "SP",
+          "side": "top",
+          "unit": 2.389
+        },
+        {
+          "name": "I4N",
+          "conductor": "SN",
+          "side": "top",
+          "unit": 2.833
+        },
+        {
+          "name": "SH",
+          "conductor": "SH",
+          "side": "top",
+          "unit": 3.278
+        },
+        {
+          "name": "P",
+          "conductor": "DCP",
+          "side": "bottom",
+          "unit": 0.5
+        },
+        {
+          "name": "M",
+          "conductor": "DCN",
+          "side": "bottom",
+          "unit": 2.5
+        }
+      ]
+    },
+    "automation-example/plc": {
+      "id": "plc",
+      "kind": "plc",
+      "name": "Controller 8 DI / 8 DO",
+      "widthUnits": 8,
+      "heightMm": 100,
+      "mounting": "both",
+      "poles": 2,
+      "terminals": [
+        {
+          "name": "P",
+          "conductor": "DCP",
+          "side": "top",
+          "unit": 0
+        },
+        {
+          "name": "M",
+          "conductor": "DCN",
+          "side": "top",
+          "unit": 1
+        },
+        {
+          "name": "DI1",
+          "conductor": "C",
+          "side": "top",
+          "unit": 2
+        },
+        {
+          "name": "DI2",
+          "conductor": "C",
+          "side": "top",
+          "unit": 3
+        },
+        {
+          "name": "DI3",
+          "conductor": "C",
+          "side": "top",
+          "unit": 4
+        },
+        {
+          "name": "DI4",
+          "conductor": "C",
+          "side": "top",
+          "unit": 5
+        },
+        {
+          "name": "DI5",
+          "conductor": "C",
+          "side": "top",
+          "unit": 6
+        },
+        {
+          "name": "DI6",
+          "conductor": "C",
+          "side": "top",
+          "unit": 7
+        },
+        {
+          "name": "DO1",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 0
+        },
+        {
+          "name": "DO2",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 1
+        },
+        {
+          "name": "DO3",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 2
+        },
+        {
+          "name": "DO4",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 3
+        },
+        {
+          "name": "DO5",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 4
+        },
+        {
+          "name": "DO6",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 5
+        },
+        {
+          "name": "DO7",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 6
+        },
+        {
+          "name": "DO8",
+          "conductor": "C",
+          "side": "bottom",
+          "unit": 7
+        }
+      ]
+    },
+    "automation-example/soft-starter": {
+      "id": "soft-starter",
+      "kind": "softstarter",
+      "name": "Soft starter 3P 15 kW",
+      "widthUnits": 6.8571,
+      "heightMm": 250,
+      "mounting": "plate",
+      "poles": 3,
+      "terminals": [
+        {
+          "name": "L1",
+          "conductor": "L1",
+          "side": "top",
+          "unit": 0.643
+        },
+        {
+          "name": "L2",
+          "conductor": "L2",
+          "side": "top",
+          "unit": 2.929
+        },
+        {
+          "name": "L3",
+          "conductor": "L3",
+          "side": "top",
+          "unit": 5.214
+        },
+        {
+          "name": "T1",
+          "conductor": "L1",
+          "side": "bottom",
+          "unit": 0.643
+        },
+        {
+          "name": "T2",
+          "conductor": "L2",
+          "side": "bottom",
+          "unit": 2.929
+        },
+        {
+          "name": "T3",
+          "conductor": "L3",
+          "side": "bottom",
+          "unit": 5.214
+        }
+      ]
+    },
+    "automation-example/meter-panel": {
+      "id": "meter-panel",
+      "kind": "meter",
+      "name": "Energy meter 3P for a plate",
+      "widthUnits": 7.4286,
+      "heightMm": 180,
+      "mounting": "plate",
+      "poles": 4
+    },
+    "generic-iec/pilot-light-230": {
+      "id": "pilot-light-230",
+      "kind": "other",
+      "name": "Pilot light 230 V",
+      "widthUnits": 1,
+      "poles": 2,
+      "terminals": [
+        {
+          "name": "L",
+          "conductor": "L",
+          "side": "top"
+        },
+        {
+          "name": "N",
+          "conductor": "N",
+          "side": "top"
+        }
+      ],
+      "heightMm": 90,
+      "mounting": "rail",
+      "resizable": {
+        "minUnits": 1,
+        "maxUnits": 2
+      },
+      "art": [
+        {
+          "kind": "ellipse",
+          "cx": 8.75,
+          "cy": 76,
+          "rx": 4.5,
+          "ry": 4.5,
+          "fill": "#fecaca",
+          "stroke": "#b91c1c",
+          "strokeWidth": 0.6,
+          "anchor": "centre"
+        }
+      ]
+    }
+  }
+}

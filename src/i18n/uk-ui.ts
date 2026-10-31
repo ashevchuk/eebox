@@ -261,6 +261,9 @@ export const UI: Dictionary = {
   'TN-C-S entry with a PEN conductor': `Ввід TN-C-S із PEN-провідником`,
   'Three phase from a PEN supply: the PEN conductor is split into N and PE in one block, an earth electrode is bonded to the PEN, and three RCBO circuits follow.':
     `Три фази від живлення з PEN: PEN-провідник розділено на N і PE в одному блоці, заземлювач приєднано до PEN, далі йдуть три кола з диференційними автоматами.`,
+  'Pump station with automation': `Насосна станція з автоматикою`,
+  'Two plates: on the back plate a main switch, an RCD, breakers and a 24 V supply on rails, two soft starters and a meter on the plate, three cable ducts, a controller, an analog input module and a terminal strip carrying a 4-20 mA pressure signal; the door has the indicator lamps.':
+    `Дві плити: на задній плиті вступний вимикач, УЗО, автомати й блок живлення 24 В на рейках, два пристрої плавного пуску й лічильник на плиті, три кабель-канали, контролер, модуль аналогових входів і клемник із сигналом тиску 4–20 мА; на дверях сигнальні лампи.`,
   // earthing
   'Neutral and protective earth are separate conductors all the way from the source.': `Нульовий і захисний провідники — окремі жили на всьому шляху від джерела.`,
   'The supply is a PEN conductor, split into N and PE where it enters the installation.': `Живлення йде PEN-провідником, який розділяється на N і PE при вході в установку.`,

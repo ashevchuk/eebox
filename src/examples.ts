@@ -3,6 +3,7 @@ import studioText from '../examples/studio-flat.json?raw';
 import workshopText from '../examples/workshop-backup.json?raw';
 import autoBackupText from '../examples/workshop-auto-backup.json?raw';
 import tncsText from '../examples/tn-c-s.json?raw';
+import automationText from '../examples/automation-panel.json?raw';
 
 export interface Example {
   id: string;
@@ -42,5 +43,11 @@ export const EXAMPLES: readonly Example[] = [
     title: 'TN-C-S entry with a PEN conductor',
     description: 'Three phase from a PEN supply: the PEN conductor is split into N and PE in one block, an earth electrode is bonded to the PEN, and three RCBO circuits follow.',
     text: tncsText,
+  },
+  {
+    id: 'automation-panel',
+    title: 'Pump station with automation',
+    description: 'Two plates: on the back plate a main switch, an RCD, breakers and a 24 V supply on rails, two soft starters and a meter on the plate, three cable ducts, a controller, an analog input module and a terminal strip carrying a 4-20 mA pressure signal; the door has the indicator lamps.',
+    text: automationText,
   },
 ];

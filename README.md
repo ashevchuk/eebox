@@ -18,6 +18,18 @@ Find a module, node or wire by what it is called (Ctrl+F); a minimap in the corn
 
 ![Searching for a module, with the minimap](docs/images/find.png)
 
+A pump station with automation (*File > Examples*): the back plate carries rails, two soft starters and a meter fixed to the plate, three cable ducts and the distances from the selected device to its neighbours; a second plate is the door:
+
+![The back plate of a pump station, with a soft starter selected](docs/images/automation-panel.png)
+
+![The door of the same panel, a plate of its own](docs/images/automation-door.png)
+
+The schematic of it joins a controller, an analog input module and a terminal strip to a pressure sensor (signal wires in blue and white), and the terminal schedule lists each way of the strip with where its wires go:
+
+![The wiring of the pump station](docs/images/automation-schematic.png)
+
+![The terminal schedule](docs/images/terminals.png)
+
 A transfer controller and two contactors switch a workshop to the generator when the mains go away (the mains are switched off in this picture):
 
 ![Automatic backup with the mains off](docs/images/auto-backup.png)
@@ -93,7 +105,7 @@ A transfer controller and two contactors switch a workshop to the generator when
 
 ## Quick start
 
-Open the page, drag modules from the palette onto a rail, switch to *Schematic* and wire them. To see a finished design, open [`examples/house-panel.json`](examples/house-panel.json) with *Open...*.
+Open the page, drag modules from the palette onto a rail, switch to *Schematic* and wire them. To see a finished design, open [`examples/house-panel.json`](examples/house-panel.json) with *Open...* or pick one under *File > Examples*; [`examples/automation-panel.json`](examples/automation-panel.json) is the pump station with two plates.
 
 The bundled *Generic IEC modules* library is generated from standard rating series and covers breakers, RCDs, RCBOs, switches, contactors, voltage and phase monitoring relays, lighting relays, changeover switches for a backup input, a transfer controller, meters and small devices. Its widths are typical values and do not come from any manufacturer, so import your own library for real parts.
 
