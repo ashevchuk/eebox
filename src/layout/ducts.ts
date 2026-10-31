@@ -14,6 +14,8 @@ export interface Duct {
   widthMm: number;
   heightMm: number;
   label?: string;
+  /** How far the duct stands off the plate, in mm; only when it is known, for the fill. */
+  depthMm?: number;
 }
 
 export type DuctError = 'unknown-duct' | 'invalid-value' | 'duplicate-id' | 'too-many';
@@ -27,7 +29,7 @@ const validSize = (v: number) => Number.isFinite(v) && v >= MIN_DUCT_SIZE_MM && 
 /** Why a stored duct is not one, or null; the project file uses the same rule. */
 export function ductProblem(duct: Duct): string | null {
   if (!validPosition(duct.x) || !validPosition(duct.y)) return `the position must be 0 to ${MAX_RAIL_POSITION_MM} mm`;
-  if (!validSize(duct.widthMm) || !validSize(duct.heightMm)) return `the size must be ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM} mm`;
+  if (!validSize(duct.widthMm) || !validSize(duct.heightMm) || (duct.depthMm !== undefined && !validSize(duct.depthMm))) return `the size must be ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM} mm`;
   return null;
 }
 
@@ -54,6 +56,16 @@ export function changeDuct(panel: Panel, id: string, change: Partial<Pick<Duct, 
   const current = ductsOf(panel).find((d) => d.id === id);
   if (!current) return { ok: false, error: 'unknown-duct' };
   const next = { ...current, ...change };
+  if (ductProblem(next)) return { ok: false, error: 'invalid-value' };
+  return { ok: true, panel: withDucts(panel, ductsOf(panel).map((d) => (d.id === id ? next : d))) };
+}
+
+/** Sets how deep a duct is, or clears it with 0 so its fill is not worked out. */
+export function setDuctDepth(panel: Panel, id: string, mm: number): DuctResult {
+  const current = ductsOf(panel).find((d) => d.id === id);
+  if (!current) return { ok: false, error: 'unknown-duct' };
+  const { depthMm: _previous, ...rest } = current;
+  const next: Duct = mm === 0 ? rest : { ...rest, depthMm: mm };
   if (ductProblem(next)) return { ok: false, error: 'invalid-value' };
   return { ok: true, panel: withDucts(panel, ductsOf(panel).map((d) => (d.id === id ? next : d))) };
 }

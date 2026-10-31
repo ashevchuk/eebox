@@ -342,7 +342,7 @@ describe('the inspector for devices on the plate and ducts', () => {
   it('describes a duct and edits its label, place and size', () => {
     const view = inspect(ctx({ ductId: 'd1' }))!;
     expect(view.title).toBe('Cable duct');
-    expect(view.fields.map((f) => f.key)).toEqual(['label', 'x', 'y', 'widthMm', 'heightMm', 'id']);
+    expect(view.fields.map((f) => f.key)).toEqual(['label', 'x', 'y', 'widthMm', 'heightMm', 'depthMm', 'id']);
     const sized = applyEdit(ctx({ ductId: 'd1' }), 'widthMm', '350');
     expect(sized.ok && ductsOf(sized.project.panel)[0]).toMatchObject({ widthMm: 350, x: 20 });
     const labelled = applyEdit(ctx({ ductId: 'd1' }), 'label', 'Control');

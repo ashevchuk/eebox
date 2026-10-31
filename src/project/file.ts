@@ -25,6 +25,7 @@ import { railsAreGrouped } from '../layout/plates';
 import type { Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
 import { lookupsOf } from '../layout/lookups';
+import { findDuctFillFindings } from '../electrical/ductFill';
 import { findPlacementFindings } from '../layout/placementFindings';
 import {
   findProblems as findPanelProblems,
@@ -226,6 +227,7 @@ const DUCT_SPEC: FieldSpec = {
   y: { required: true, check: railPositionCheck },
   widthMm: { required: true, check: ductSizeCheck },
   heightMm: { required: true, check: ductSizeCheck },
+  depthMm: { required: false, check: ductSizeCheck },
   label: { required: false, check: labelCheck },
 };
 const SCHEMATIC_SPEC: FieldSpec = {
@@ -262,6 +264,7 @@ const WIRE_SPEC: FieldSpec = {
   b: { required: true, check: terminalRefCheck },
   label: { required: false, check: labelCheck },
   crossSectionMm2: { required: false, check: oneOf(CROSS_SECTIONS_MM2) },
+  duct: { required: false, check: identifier },
   route: { required: false, check: routeProblemCheck },
 };
 
@@ -352,7 +355,7 @@ export function projectWarnings(
   });
   const nets = findConnectionProblems(project, resolve).map((p) => p.message);
   const placed = findPlacementFindings(project, lookupsOf(resolve).sizes, resolve).map((f) => f.message);
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed];
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed, ...findDuctFillFindings(project, resolve).map((f) => f.message)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {
@@ -396,6 +399,8 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
     const known = new Set(plates.map((p) => p.id));
     rails.forEach((r, i) => known.has(r.plate) || errors.push({ path: `project.panel.rails[${i}].plate`, message: `unknown plate "${r.plate}"` }));
     ducts.forEach((d, i) => known.has(d.plate) || errors.push({ path: `project.panel.ducts[${i}].plate`, message: `unknown plate "${d.plate}"` }));
+    const ductIds = new Set(ducts.map((d) => d.id));
+    wires.forEach((w, i) => w.duct === undefined || ductIds.has(w.duct) || errors.push({ path: `project.schematic.wires[${i}].duct`, message: `unknown duct "${w.duct}"` }));
     placements.forEach((p, i) => isFree(p) && !known.has(p.plate) && errors.push({ path: `project.panel.placements[${i}].plate`, message: `unknown plate "${p.plate}"` }));
     if (errors.length === 0 && !railsAreGrouped({ plates, rails } as Panel)) {
       errors.push({ path: 'project.panel.rails', message: 'must be listed plate by plate, in the order of the plates' });

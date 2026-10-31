@@ -1,9 +1,10 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
-import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../layout/ducts';
+import { changeDuct, ductsOf, setDuctDepth, setDuctLabel, type Duct } from '../layout/ducts';
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
 import { ALIGNMENTS, MIN_ITEMS_TO_SPREAD, alignFree, alignableCount, type Alignment } from '../layout/align';
+import { DUCT_FILL_LIMIT_PERCENT, ductFills } from '../electrical/ductFill';
 import { lookupsOf } from '../layout/lookups';
 import { wireRuns } from '../layout/wireLength';
 import {
@@ -64,6 +65,7 @@ import { removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, ty
 import { INFO_LABELS, MAX_NOTES_CHARS, STATUSES, setInfoField } from '../layout/info';
 import { mmFromUnits, roundUnits } from '../layout/units';
 import { MODULE_UNIT_MM } from '../library/types';
+import { deleteDuct } from '../project/delete';
 import { LENGTH_UNITS, type LengthUnit } from '../project/lengthUnitStorage';
 import { terminalsOf } from '../electrical/terminals';
 import { moduleDifferences, planModuleUpdate } from '../project/sync';
@@ -78,6 +80,7 @@ import {
   setSourceOff,
   setSourceProtection,
   setWireRoute,
+  setWireDuct,
   setWireSection,
   setWireLabel,
   type SchematicNode,
@@ -218,6 +221,27 @@ const plateField = (panel: Panel, plateId: string): InspectorField[] =>
   panel.plates.length < 2
     ? []
     : [{ key: 'plate', label: 'Plate', kind: 'select', value: plateById(panel, plateId)?.name ?? '', options: panel.plates.map((p) => p.name), hint: 'moving it to another plate keeps its place on it' }];
+
+/** How a duct is named in the list of the ducts a wire may run in: its label or id, and the id that tells equal labels apart. */
+const ductName = (duct: Duct): string => `${duct.label ?? 'Duct'} (${duct.id})`;
+const ductIdNamed = (panel: Panel, name: string): string | undefined => ductsOf(panel).find((d) => ductName(d) === name)?.id;
+
+/** The fill of a duct whose depth is known, as lines for its inspector. */
+function ductFillFields(ctx: InspectContext, duct: Duct): InspectorField[] {
+  const fill = ductFills(ctx.project, ctx.resolve).find((f) => f.ductId === duct.id);
+  if (!fill) return [];
+  return [
+    readonly('fill', 'Fill', `${Math.round(fill.percent)} % of the ${DUCT_FILL_LIMIT_PERCENT} % allowed`),
+    readonly('fillWires', 'Wires counted', plural(fill.counted.length, 'wire')),
+    ...(fill.uncounted.length > 0 ? [readonly('fillUncounted', 'Without a cross-section', plural(fill.uncounted.length, 'wire'))] : []),
+  ];
+}
+
+/** The choice of the duct a wire runs in; nothing to choose from when the panel has no ducts. */
+const ductFieldOfWire = (panel: Panel, wire: Wire): InspectorField[] =>
+  ductsOf(panel).length === 0
+    ? []
+    : [{ key: 'duct', label: 'Duct', kind: 'select', value: ductsOf(panel).find((d) => d.id === wire.duct) ? ductName(ductsOf(panel).find((d) => d.id === wire.duct)!) : '', options: ['', ...ductsOf(panel).map(ductName)], hint: 'the duct this wire runs in, for its fill' }];
 
 const plateIdNamed = (panel: Panel, name: string): string | undefined => panel.plates.find((p) => p.name === name)?.id;
 
@@ -537,6 +561,8 @@ export function inspect(ctx: InspectContext): InspectorView {
           decimal('y', 'Top edge', duct.y, 0, MAX_RAIL_POSITION_MM, 'mm from the top of the plate'),
           decimal('widthMm', 'Width', duct.widthMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
           decimal('heightMm', 'Height', duct.heightMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
+          decimal('depthMm', 'Depth', duct.depthMm ?? 0, 0, MAX_DUCT_SIZE_MM, 'mm off the plate, for the fill; 0 leaves it out'),
+          ...ductFillFields(ctx, duct),
           ...plateField(project.panel, duct.plate),
           readonly('id', 'Id', duct.id),
         ],
@@ -586,6 +612,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...faultFields(ctx.findings, (p) => p.wires.includes(wire.id)),
           text('label', 'Label', wire.label ?? ''),
           { key: 'section', label: 'Cross-section', kind: 'select', value: wire.crossSectionMm2 === undefined ? '' : String(wire.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2, for the ferrules; empty for the load cable' },
+          ...ductFieldOfWire(project.panel, wire),
           readonly('from', 'From', end(wire.a)),
           readonly('to', 'To', end(wire.b)),
           ...(run === undefined ? [] : [readonly('run', 'Estimated length', `${run} mm`)]),
@@ -888,6 +915,10 @@ export function applyEdit(
       }
       const mm = numberOf(raw);
       if (mm === null) return fail(NOT_A_DECIMAL);
+      if (key === 'depthMm') {
+        const result = setDuctDepth(panel, duct.id, mm);
+        return result.ok ? withPanel(result.panel) : fail(`A depth is ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM} mm, or 0 to leave it out.`);
+      }
       if (key !== 'x' && key !== 'y' && key !== 'widthMm' && key !== 'heightMm') return fail('That property cannot be edited.');
       const result = changeDuct(panel, duct.id, { [key]: mm });
       return result.ok ? withPanel(result.panel) : fail(`Positions are 0 to ${MAX_RAIL_POSITION_MM} mm and sizes ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM} mm.`);
@@ -932,6 +963,12 @@ export function applyEdit(
       if (key === 'section') {
         const section = text.trim() === '' ? undefined : Number(text);
         const result = setWireSection(schematic, target.wire.id, section);
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
+      }
+      if (key === 'duct') {
+        const id = text.trim() === '' ? undefined : ductIdNamed(panel, text);
+        if (text.trim() !== '' && id === undefined) return fail('That duct is gone.');
+        const result = setWireDuct(schematic, target.wire.id, id);
         return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
       }
       if (key !== 'label') return fail('That property cannot be edited.');
@@ -1029,8 +1066,8 @@ export function applyAction(ctx: InspectContext, key: string, options: { confirm
     return fail(result.error === 'last-plate' ? 'A panel keeps at least one plate.' : 'Move or delete what is on the plate first.');
   }
   if (key === 'removeDuct' && target.kind === 'duct') {
-    const result = removeDuct(ctx.project.panel, target.duct.id);
-    return result.ok ? { ok: true, project: { ...ctx.project, panel: result.panel }, selection: {} } : fail('That duct is gone.');
+    const project = deleteDuct(ctx.project, target.duct.id);
+    return project ? { ok: true, project, selection: {} } : fail('That duct is gone.');
   }
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);

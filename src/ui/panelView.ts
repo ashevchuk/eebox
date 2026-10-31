@@ -3,7 +3,7 @@ import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
 import { withNoteBounds } from '../layout/annotations';
 import { moveGroup } from '../layout/group';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
-import { addDuct, ductsOf, nextDuctId, removeDuct, type Duct } from '../layout/ducts';
+import { addDuct, ductsOf, nextDuctId, type Duct } from '../layout/ducts';
 import { addFreePlacement, moveFreeGroup, moveFreePlacement, roundMm } from '../layout/free';
 import { MAX_RAIL_POSITION_MM, MIN_DUCT_SIZE_MM } from '../layout/limits';
 import {
@@ -18,7 +18,7 @@ import {
 } from '../layout/placement';
 import { placeFromShelf, placeFromShelfFree } from '../layout/shelf';
 import type { Project } from '../project';
-import { deletePlacement } from '../project/delete';
+import { deleteDuct, deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
@@ -462,9 +462,9 @@ export class PanelView implements View {
       }
     }
     for (const id of chosen.ducts) {
-      const result = removeDuct(project.panel, id);
-      if (result.ok) {
-        project = { ...project, panel: result.panel };
+      const next = deleteDuct(project, id);
+      if (next) {
+        project = next;
         changed = true;
       }
     }

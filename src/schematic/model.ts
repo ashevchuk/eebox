@@ -47,6 +47,8 @@ export interface Wire {
   label?: string;
   /** Cross-section of the conductor, which decides the size of the ferrules on its ends. */
   crossSectionMm2?: number;
+  /** The cable duct on the panel this wire runs in, for the fill of the duct. */
+  duct?: string;
   /**
    * A route drawn by hand: the coordinates of the interior segments, y first and then x, y, ...,
    * an odd number of them. The ends follow the terminals; see `schematic/manualRoute.ts`.
@@ -367,6 +369,17 @@ export function setWireSection(schematic: Schematic, id: string, sectionMm2: num
     if (w.id !== id) return w;
     const { crossSectionMm2: _previous, ...rest } = w;
     return sectionMm2 === undefined ? rest : { ...rest, crossSectionMm2: sectionMm2 };
+  });
+  return { ok: true, schematic: { ...schematic, wires } };
+}
+
+/** Says which duct a wire runs in, or clears it with `undefined`; whether the duct exists is for the caller to know. */
+export function setWireDuct(schematic: Schematic, id: string, ductId: string | undefined): SchematicResult {
+  if (!schematic.wires.some((w) => w.id === id)) return failure('unknown-wire');
+  const wires = schematic.wires.map((w) => {
+    if (w.id !== id) return w;
+    const { duct: _previous, ...rest } = w;
+    return ductId === undefined ? rest : { ...rest, duct: ductId };
   });
   return { ok: true, schematic: { ...schematic, wires } };
 }

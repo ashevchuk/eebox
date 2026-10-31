@@ -9,6 +9,7 @@ import type { Project } from '../project';
 import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
 import { emptySchematic } from '../schematic/model';
 import { findFindings, type Finding } from '../electrical/problems';
+import { findDuctFillFindings } from '../electrical/ductFill';
 import { findPlacementFindings } from '../layout/placementFindings';
 import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
@@ -107,7 +108,7 @@ export class Session {
     const revision = this.revision;
     const cache = this.findingCache;
     if (!cache || cache.revision !== revision || cache.libraries !== this.libraries || cache.settings !== this.cableSettings) {
-      this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: [...findFindings(this.project, this.resolve, this.cableSettings), ...findPlacementFindings(this.project, this.sizes, this.resolve)] };
+      this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: [...findFindings(this.project, this.resolve, this.cableSettings), ...findPlacementFindings(this.project, this.sizes, this.resolve), ...findDuctFillFindings(this.project, this.resolve)] };
     }
     return this.findingCache!.list;
   }
