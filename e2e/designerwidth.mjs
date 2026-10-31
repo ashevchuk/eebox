@@ -28,7 +28,7 @@ const measure = () =>
   browser.evaluate(`(() => {
     const d = document.querySelector('.designer-dialog[open]');
     const svg = d.querySelector('.designer-svg'); const rail = d.querySelector('canvas'); const slider = d.querySelector('.designer-width input');
-    return { label: d.querySelector('.designer-width span').textContent, step: slider.step, svgHeight: Math.round(svg.getBoundingClientRect().height), railTop: Math.round(rail.getBoundingClientRect().top), railHeight: Math.round(rail.getBoundingClientRect().height), caption: [...svg.querySelectorAll('text')].map((t) => t.textContent).filter((t) => /unit/.test(t)).join('|') };
+    return { label: d.querySelector('.designer-width span').textContent, step: slider.step, svgHeight: Math.round(svg.getBoundingClientRect().height), railTop: Math.round(rail.getBoundingClientRect().top), railHeight: Math.round(rail.getBoundingClientRect().height), sliderLeft: Math.round(slider.getBoundingClientRect().left), sliderWidth: Math.round(slider.getBoundingClientRect().width), caption: [...svg.querySelectorAll('text')].map((t) => t.textContent).filter((t) => /unit/.test(t)).join('|') };
   })()`);
 
 try {
@@ -54,7 +54,7 @@ try {
     expectTrue((await measure()).step === '0.25', 'the slider does not move by a quarter unit');
   });
 
-  await step('dragging the slider shows at most two decimals and keeps the stage and the rail preview where they are', async () => {
+  await step('dragging the slider shows at most two decimals and keeps the slider, the stage and the rail preview where they are', async () => {
     const box = await browser.evaluate(`(() => { const r = document.querySelector('.designer-dialog[open] .designer-width input').getBoundingClientRect(); return [r.left, r.top + r.height / 2, r.width]; })()`);
     const seen = [];
     await browser.mouse('mousePressed', box[0] + 3, box[1]);
@@ -67,6 +67,7 @@ try {
     expectTrue(labels.length > 3, `the slider did not move: ${labels.join(' | ')}`);
     expectTrue(seen.every((m) => !/\d\.\d{3,}/.test(m.label + m.caption)), `long decimals: ${labels.join(' | ')}`);
     expectTrue(new Set(seen.map((m) => m.svgHeight)).size === 1, `the stage changed its height: ${[...new Set(seen.map((m) => m.svgHeight))]}`);
+    expectTrue(new Set(seen.map((m) => `${m.sliderLeft}:${m.sliderWidth}`)).size === 1, `the slider moved under the pointer: ${[...new Set(seen.map((m) => `${m.sliderLeft}:${m.sliderWidth}`))]}`);
     expectTrue(new Set(seen.map((m) => m.railTop)).size === 1 && new Set(seen.map((m) => m.railHeight)).size === 1, 'the rail preview moved or changed its height');
   });
 

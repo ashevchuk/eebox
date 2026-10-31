@@ -345,7 +345,8 @@ export class ModuleDesignerView {
       this.previewWidth = Number(this.widthSlider.value);
       this.renderAll();
     });
-    row.append(this.widthLabel, this.widthSlider);
+    // The slider comes first: the text after it changes its length with the number, and must not push the slider while it is held.
+    row.append(this.widthSlider, this.widthLabel);
     return row;
   }
 
