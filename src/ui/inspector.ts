@@ -3,6 +3,7 @@ import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../lay
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
+import { ALIGNMENTS, MIN_ITEMS_TO_SPREAD, alignFree, alignableCount, type Alignment } from '../layout/align';
 import { lookupsOf } from '../layout/lookups';
 import {
   MAX_CLEARANCE_MM,
@@ -393,6 +394,26 @@ const TAKE_OFF_PLATE: InspectorAction = { key: 'takeOff', label: 'Take off the p
 export const EDIT_MODULE_ACTION = 'editModule';
 const EDIT_MODULE: InspectorAction = { key: EDIT_MODULE_ACTION, label: 'Edit module…' };
 
+const ALIGN_LABELS: Record<Alignment, string> = {
+  left: 'Align left edges',
+  'centre-x': 'Centre horizontally',
+  right: 'Align right edges',
+  top: 'Align top edges',
+  'centre-y': 'Centre vertically',
+  bottom: 'Align bottom edges',
+  'spread-x': 'Space evenly across',
+  'spread-y': 'Space evenly down',
+};
+const ALIGN_PREFIX = 'align:';
+
+/** What can be done to the devices fixed to the plate and the ducts among the chosen things; nothing for fewer than two. */
+function alignActions(ctx: InspectContext): InspectorAction[] {
+  const chosen = selectedIds(ctx.selection);
+  const count = alignableCount(ctx.project.panel, chosen.placements, chosen.ducts);
+  if (count < 2) return [];
+  return ALIGNMENTS.filter((how) => count >= MIN_ITEMS_TO_SPREAD || !how.startsWith('spread')).map((how) => ({ key: `${ALIGN_PREFIX}${how}`, label: ALIGN_LABELS[how] }));
+}
+
 export function inspect(ctx: InspectContext): InspectorView {
   const target = targetOf(ctx);
   const { project, resolve } = ctx;
@@ -520,7 +541,7 @@ export function inspect(ctx: InspectContext): InspectorView {
       return {
         title: `${target.count} items selected`,
         fields: [readonly('count', 'Selected', target.count), REPEAT_FIELD],
-        actions: [],
+        actions: alignActions(ctx),
       };
     case 'rail': {
       const { panel } = project;
@@ -977,6 +998,13 @@ export function applyAction(ctx: InspectContext, key: string, options: { confirm
     if (key === 'removeNote') return { ok: true, project: withNoteList(ctx.project, target.owner, removeAnnotation(list, target.note.id), ctx.plate), selection: {} };
     const result = setAnnotationTarget(list, target.note.id, undefined);
     return result.ok ? { ok: true, project: withNoteList(ctx.project, target.owner, result.list, ctx.plate) } : fail('That note is gone.');
+  }
+  if (key.startsWith(ALIGN_PREFIX) && target.kind === 'group') {
+    const how = ALIGNMENTS.find((a) => a === key.slice(ALIGN_PREFIX.length));
+    if (!how) return fail('That cannot be done.');
+    const chosen = selectedIds(ctx.selection);
+    const result = alignFree(ctx.project.panel, lookupsOf(ctx.resolve).sizes, chosen.placements, chosen.ducts, how);
+    return result.ok ? { ok: true, project: { ...ctx.project, panel: result.panel } } : fail('Nothing was moved: the things on rails stay where they are, and there is no room to space them evenly.');
   }
   if (key === 'fitPlate' && target.kind === 'panel') {
     const result = fitPlate(ctx.project.panel, ctx.plate ?? ctx.project.panel.plates[0]!.id, lookupsOf(ctx.resolve).sizes);
