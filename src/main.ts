@@ -89,6 +89,7 @@ import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
 import { askForText } from './ui/textDialog';
+import { DEFAULT_WIRE_PATTERN, numberWires } from './schematic/numbering';
 import { PlateTabs } from './ui/plateTabs';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
@@ -920,6 +921,22 @@ async function printProject(): Promise<void> {
   window.print();
 }
 
+async function numberTheWires(): Promise<void> {
+  const pattern = await askForText('Number the wires', 'Pattern', DEFAULT_WIRE_PATTERN, 'Apply');
+  if (pattern === null) return;
+  const result = numberWires(session.project.schematic, pattern);
+  if (!result.ok) {
+    showStatus(result.error === 'no-placeholder' ? 'The pattern needs {n} once, where the number goes.' : 'That pattern makes a label that cannot be kept: up to 60 characters, no line breaks.', true);
+    return;
+  }
+  if (result.numbered === 0) {
+    showStatus('Every wire already has a label.');
+    return;
+  }
+  session.commit({ ...session.project, schematic: result.schematic });
+  showStatus(`${result.numbered} wire${result.numbered === 1 ? '' : 's'} numbered.`);
+}
+
 function removeOrphans(): void {
   const { project } = session;
   const { schematic, removed, keptWired } = removeOrphanNodes(project.schematic, project.panel);
@@ -1429,6 +1446,7 @@ byId('sync-modules').addEventListener('click', () => schematicView.syncModules()
 byId('route-automatically').addEventListener('click', () => schematicView.routeAllAutomatically());
 byId('spread-wires').addEventListener('click', () => schematicView.spreadWires());
 byId('remove-orphans').addEventListener('click', removeOrphans);
+byId('number-wires').addEventListener('click', () => void numberTheWires());
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
 new ResizeObserver(resizeCanvas).observe(stageWrap);

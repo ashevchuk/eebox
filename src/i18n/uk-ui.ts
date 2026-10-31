@@ -6,6 +6,10 @@ export const UI: Dictionary = {
   'That note is gone.': `Цієї нотатки вже немає.`,
   'That is too far from the drawing.': `Це надто далеко від креслення.`,
   'Note on the drawing': `Нотатка на кресленні`,
+  'Number the wires': `Нумерація проводів`,
+  Pattern: `Шаблон`,
+  'Every wire already has a label.': `Кожен провід уже має підпис.`,
+  'That pattern makes a label that cannot be kept: up to 60 characters, no line breaks.': `З цього шаблону виходить підпис, який не можна зберегти: до 60 символів, без розривів рядка.`,
   'No enclosure available: import a library that defines one.': `Немає жодного корпусу: імпортуйте бібліотеку, що його описує.`,
   'Discard the current panel and schematic? Its last state stays under File > Projects, in Earlier states.':
     `Відкинути поточний щит і схему? Їхній останній стан залишиться в Файл > Проєкти, серед «Попередніх станів».`,

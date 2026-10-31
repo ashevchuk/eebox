@@ -128,6 +128,8 @@ export const DYNAMIC: Dictionary = {
   '{a} ({b}) is made for the plate, not for a rail.': `{a} ({b}) призначений для плити, а не для рейки.`,
   '{a} ({b}) is made for a DIN rail, not for the plate.': `{a} ({b}) призначений для DIN-рейки, а не для плити.`,
   'Clearance is 0 to {n} mm.': `Зазор — від 0 до {n} мм.`,
+  '{n} wire numbered.': ['{n} провід пронумеровано.', '{n} проводи пронумеровано.', '{n} проводів пронумеровано.'],
+  '{n} wires numbered.': ['{n} провід пронумеровано.', '{n} проводи пронумеровано.', '{n} проводів пронумеровано.'],
   'Wire slack is 0 to {n} mm.': `Запас проводу — від 0 до {n} мм.`,
   'A depth is {a} to {b} mm, or 0 to leave it out.': `Глибина — від {a} до {b} мм, або 0, щоб не вказувати.`,
   '{a} % of the {b} % allowed': `{a} % із допустимих {b} %`,

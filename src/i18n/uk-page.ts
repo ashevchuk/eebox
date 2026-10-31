@@ -58,6 +58,8 @@ export const PAGE: Dictionary = {
   'Separate overlapping wires': 'Розвести проводи, що збігаються',
   'Route all wires automatically': 'Прокласти всі проводи автоматично',
   'Remove orphans': 'Прибрати осиротілі',
+  'Number the wires…': 'Пронумерувати проводи…',
+  'Give the wires that have no label a number from a pattern such as W{n}; labels that are there stay': 'Дати проводам без підпису номер за шаблоном на кшталт W{n}; наявні підписи лишаються',
   'Feed the others from the first': 'Живити інші від першого',
   'Chain the selected nodes': 'Ланцюжок із вибраних вузлів',
   'Arrange nodes': 'Розставити вузли',
