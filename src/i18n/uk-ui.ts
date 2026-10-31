@@ -225,7 +225,7 @@ export const UI: Dictionary = {
   'Unknown wire.': `Невідомий провід.`,
   'A terminal cannot be wired to itself.': `Клему не можна з’єднати саму з собою.`,
   'These terminals are already wired.': `Ці клеми вже з’єднані.`,
-  'Phase, neutral, earth and control conductors cannot be wired to each other.': `Фазні, нульові, заземлювальні й керувальні жили не можна з’єднувати між собою.`,
+  'Phase, neutral, earth, control and signal conductors cannot be wired to each other.': `Фазні, нульові, заземлювальні, керувальні й сигнальні жили не можна з’єднувати між собою.`,
   'No matching terminals to wire between these nodes.': `Між цими вузлами немає клем, які можна з’єднати.`,
   'Only a source or a load has conductors of its own.': `Власні жили мають лише джерело або навантаження.`,
   'A source or load needs at least one conductor, each used once.': `Джерелу чи навантаженню потрібна принаймні одна жила, кожна один раз.`,
