@@ -68,7 +68,7 @@ try {
     dropped = panel.placements.at(-1);
     expectTrue(dropped && typeof dropped.x === 'number' && typeof dropped.y === 'number' && dropped.rail === undefined && dropped.slot === undefined, `the device has no free position: ${JSON.stringify(dropped)}`);
     expectTrue(!(await inspectorText()).includes('Row'), 'the inspector shows a row for a device on the plate');
-    expectTrue(JSON.stringify(Object.keys(dropped).sort()) === JSON.stringify(['id', 'module', 'x', 'y']), `the device carries more than a place: ${JSON.stringify(dropped)}`);
+    expectTrue(JSON.stringify(Object.keys(dropped).sort()) === JSON.stringify(['id', 'module', 'plate', 'x', 'y']), `the device carries more than a place: ${JSON.stringify(dropped)}`);
   });
 
   await step('dragging the device with the mouse moves it on the plate, and one step is one undo', async () => {
@@ -165,12 +165,56 @@ try {
     expectTrue(device !== undefined, 'no device');
   });
 
+  await step('a plate is added from its tab strip, takes what is drawn on it, and a duct is moved to another plate in the inspector', async () => {
+    await browser.evaluate(`document.querySelector('#plate-tabs .plate-add').click()`);
+    await browser.waitFor(`document.querySelector('dialog.app-dialog[open] input')`, 'the name dialog');
+    await browser.evaluate(`(() => { const d = document.querySelector('dialog.app-dialog[open]'); d.querySelector('input').value = 'Left door'; d.querySelector('button.primary').click(); })()`);
+    await browser.waitFor(`document.querySelectorAll('#plate-tabs .plate-tab').length === 2`, 'the second tab');
+    expectTrue(await browser.evaluate(`document.querySelectorAll('#plate-tabs .plate-tab')[1].classList.contains('active')`), 'the new plate is not on view');
+    const [left, top, width, height] = await canvasBox();
+    await browser.evaluate(`document.getElementById('duct-tool').click()`);
+    await browser.mouse('mousePressed', left + width * 0.3, top + height * 0.4);
+    await browser.mouse('mouseMoved', left + width * 0.4, top + height * 0.45);
+    await browser.mouse('mouseMoved', left + width * 0.5, top + height * 0.5);
+    await browser.mouse('mouseReleased', left + width * 0.5, top + height * 0.5);
+    await press('Escape');
+    const panel = await saved();
+    expectTrue(panel.plates.length === 2 && panel.ducts.some((d) => d.plate === panel.plates[1].id), `the duct is not on the new plate: ${JSON.stringify(panel.ducts)}`);
+    await browser.evaluate(`document.querySelectorAll('#plate-tabs .plate-tab')[0].click()`);
+    await wait(300);
+    await browser.mouse('mousePressed', left + width * 0.4, top + height * 0.45);
+    await browser.mouse('mouseReleased', left + width * 0.4, top + height * 0.45);
+    expectTrue(!(await inspectorText()).includes('Cable duct'), `what was drawn on the door shows on the back plate: ${await inspectorText()}`);
+    await browser.evaluate(`document.querySelectorAll('#plate-tabs .plate-tab')[1].click()`);
+    await wait(300);
+    await browser.mouse('mousePressed', left + width * 0.4, top + height * 0.45);
+    await browser.mouse('mouseReleased', left + width * 0.4, top + height * 0.45);
+    await browser.waitFor(`document.getElementById('inspector').innerText.includes('Cable duct')`, 'the duct of the door');
+    await browser.evaluate(`(() => {
+      const row = [...document.querySelectorAll('#inspector .inspector-field')].find((r) => r.innerText.startsWith('Plate'));
+      const select = row.querySelector('select'); select.value = 'Back plate'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    const moved = await saved();
+    expectTrue(moved.ducts.every((d) => d.plate === moved.plates[0].id), `the duct did not go to the back plate: ${JSON.stringify(moved.ducts)}`);
+    await wait(300);
+    const active = await browser.evaluate(`[...document.querySelectorAll('#plate-tabs .plate-tab')].map((t) => t.textContent + (t.classList.contains('active') ? '*' : '')).join(' | ')`);
+    expectTrue(active.startsWith('Back plate*'), `the view did not follow the duct to the back plate: ${active}`);
+  });
+
+  await step('a plate is renamed by a double click on its tab', async () => {
+    await browser.evaluate(`document.querySelectorAll('#plate-tabs .plate-tab')[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+    await browser.waitFor(`document.querySelector('dialog.app-dialog[open] input')`, 'the rename dialog');
+    await browser.evaluate(`(() => { const d = document.querySelector('dialog.app-dialog[open]'); d.querySelector('input').value = 'Right door'; d.querySelector('button.primary').click(); })()`);
+    await browser.waitFor(`[...document.querySelectorAll('#plate-tabs .plate-tab')].some((t) => t.textContent === 'Right door')`, 'the new name on the tab');
+    expectTrue((await saved()).plates[1].name === 'Right door', 'the name was not saved');
+  });
+
   await step('a device dropped on the plate and a duct survive a reload', async () => {
     const before = await saved();
     await browser.goto(page);
     await browser.waitFor(`document.querySelectorAll('#palette summary').length > 0`, 'the palette after reload');
     const after = await saved();
-    expectTrue(JSON.stringify(after.ducts) === JSON.stringify(before.ducts) && JSON.stringify(after.placements) === JSON.stringify(before.placements), 'the plate things did not come back');
+    expectTrue(JSON.stringify(after.ducts) === JSON.stringify(before.ducts) && JSON.stringify(after.placements) === JSON.stringify(before.placements) && JSON.stringify(after.plates) === JSON.stringify(before.plates), 'the plate things did not come back');
   });
 
   expectTrue(browser.problems.length === 0, `the page raised errors: ${JSON.stringify(browser.problems)}`);

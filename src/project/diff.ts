@@ -5,7 +5,7 @@ import type { SchematicNode, TerminalRef, Wire } from '../schematic/model';
 import { canonicalJson } from './canonical';
 import { moduleKey, type ProjectFile } from './file';
 
-export type ChangeArea = 'project' | 'rows' | 'modules' | 'combs' | 'ducts' | 'nodes' | 'wires' | 'notes';
+export type ChangeArea = 'project' | 'plates' | 'rows' | 'modules' | 'combs' | 'ducts' | 'nodes' | 'wires' | 'notes';
 export type ChangeKind = 'added' | 'removed' | 'changed';
 
 export interface Change {
@@ -20,12 +20,13 @@ export const AREA_TITLES: Record<ChangeArea, string> = {
   modules: 'Modules on the panel',
   combs: 'Combs',
   ducts: 'Cable ducts',
+  plates: 'Plates',
   nodes: 'Schematic nodes',
   wires: 'Wires',
   notes: 'Notes on the drawings',
 };
 
-const AREA_ORDER: ChangeArea[] = ['project', 'rows', 'modules', 'combs', 'ducts', 'nodes', 'wires', 'notes'];
+const AREA_ORDER: ChangeArea[] = ['project', 'plates', 'rows', 'modules', 'combs', 'ducts', 'nodes', 'wires', 'notes'];
 const KIND_ORDER: ChangeKind[] = ['added', 'removed', 'changed'];
 const MAX_SHOWN_CHARS = 60;
 
@@ -108,6 +109,16 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     if (a.info?.[key] !== b.info?.[key]) out.push({ area: 'project', kind: 'changed', text: `${INFO_LABELS[key].toLowerCase()} ${show(a.info?.[key])} → ${show(b.info?.[key])}` });
   }
 
+  out.push(
+    ...compareLists(
+      a.plates,
+      b.plates,
+      'plates',
+      (p) => `"${p.name}" (${p.id}), ${p.widthMm} by ${p.heightMm} mm`,
+      (p, q) => fieldChanges(p, q, ['id', 'annotations']),
+    ),
+  );
+
   const rows = Math.max(a.rails.length, b.rails.length);
   if (a.rails.length !== b.rails.length) out.push({ area: 'rows', kind: 'changed', text: `${a.rails.length} rows → ${b.rails.length} rows` });
   for (let i = 0; i < rows; i++) {
@@ -115,6 +126,7 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     if (!railA || !railB) continue;
     if (railA.lengthUnits !== railB.lengthUnits) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: length ${railA.lengthUnits} → ${railB.lengthUnits} units` });
     if (railA.x !== railB.x || railA.y !== railB.y) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: position ${railA.x}, ${railA.y} → ${railB.x}, ${railB.y} mm` });
+    if (railA.plate !== railB.plate) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: plate ${show(railA.plate)} \u2192 ${show(railB.plate)}` });
     if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: label ${show(railA.label)} → ${show(railB.label)}` });
   }
 
@@ -185,10 +197,13 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     ),
   );
 
+  const plateNotes = (panel: typeof a, id: string) => panel.plates.find((p) => p.id === id)?.annotations;
+  const plateNames = (id: string) => (b.plates.find((p) => p.id === id) ?? a.plates.find((p) => p.id === id))?.name ?? id;
+  const plateIds = [...new Set([...a.plates.map((p) => p.id), ...b.plates.map((p) => p.id)])];
   for (const [drawing, list, newer] of [
-    ['panel', a.annotations, b.annotations],
-    ['schematic', before.project.schematic.annotations, after.project.schematic.annotations],
-  ] as const) {
+    ...plateIds.map((id) => [plateIds.length > 1 ? `panel, ${plateNames(id)}` : 'panel', plateNotes(a, id), plateNotes(b, id)] as const),
+    ['schematic', before.project.schematic.annotations, after.project.schematic.annotations] as const,
+  ]) {
     out.push(
       ...compareLists(
         list ?? [],

@@ -51,7 +51,7 @@ export function edgeLines(
     xs.push(r.x, r.x + r.width);
     ys.push(r.y, r.y + r.height);
   };
-  add(frameRect(panel, sizes));
+  add(frameRect(panel));
   panel.rails.forEach((_r, rail) => add(railRect(panel, rail)));
   for (const p of panel.placements) add(placementRect(panel, sizes, p));
   for (const d of ductsOf(panel)) add(ductRect(d));

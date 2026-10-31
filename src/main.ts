@@ -78,6 +78,7 @@ import { PaletteView } from './ui/paletteView';
 import { DEFAULT_PRINT_OPTIONS, pageRule, type PrintOptions } from './project/printOptions';
 import { openPrintDialog } from './ui/printDialog';
 import { fillPrintSheet } from './ui/printSheet';
+import { notesOnPlate, withPlateNotes } from './layout/plates';
 import { MAX_ANNOTATIONS, MAX_NOTE_CHARS, addAnnotation, hitAnnotation, moveAnnotation, removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from './layout/annotations';
 import { centreOf, pinchStep, type Pair } from './view/pinch';
 import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, plateStep, type Arrow } from './ui/keyboardMoves';
@@ -86,6 +87,7 @@ import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
 import { askForText } from './ui/textDialog';
+import { PlateTabs } from './ui/plateTabs';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
 import { fileStem } from './project/names';
@@ -245,10 +247,10 @@ function setNoteTool(on: boolean): void {
 
 function setNotes(list: readonly Annotation[]): void {
   const { project } = session;
-  session.commit(session.mode === 'panel' ? { ...project, panel: withNotes(project.panel, list) } : { ...project, schematic: withNotes(project.schematic, list) });
+  session.commit(session.mode === 'panel' ? { ...project, panel: withPlateNotes(project.panel, session.plateId, list) } : { ...project, schematic: withNotes(project.schematic, list) });
 }
 
-const projectNotes = (): readonly Annotation[] => (session.mode === 'panel' ? session.project.panel.annotations : session.project.schematic.annotations) ?? [];
+const projectNotes = (): readonly Annotation[] => (session.mode === 'panel' ? notesOnPlate(session.project.panel, session.plateId) : session.project.schematic.annotations) ?? [];
 
 async function finishNote(gesture: { from: Point; to: Point }): Promise<void> {
   const scale = activeView().camera.scale;
@@ -610,9 +612,16 @@ async function openSharedHash(): Promise<void> {
   else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, 'Shared project');
 }
 
+/** The name of an exported picture: the panel, the view, and the plate when the panel has several. */
+function exportName(title: string | undefined): string {
+  const { plates } = session.project.panel;
+  const plate = session.mode === 'panel' && plates.length > 1 ? `-${fileStem(session.scope.panel.plates[0]!.name, 'plate')}` : '';
+  return `${fileStem(title, 'panel')}-${session.mode}${plate}`;
+}
+
 async function exportPng(): Promise<void> {
   try {
-    downloadBlob(await renderToPng(activeView(), session, LIGHT_THEME), `${fileStem(session.project.panel.title, 'panel')}-${session.mode}.png`);
+    downloadBlob(await renderToPng(activeView(), session, LIGHT_THEME), `${exportName(session.project.panel.title)}.png`);
   } catch (error) {
     showStatus(`PNG export failed: ${(error as Error).message}`, true);
   }
@@ -788,7 +797,7 @@ async function saveSelectionAsSnippet(): Promise<void> {
 
 function insertSnippetHere(snippet: Snippet): void {
   const { placements } = selectedIds(session.selection);
-  const rail = session.project.panel.placements.find((p) => placements.includes(p.id))?.rail ?? 0;
+  const rail = session.project.panel.placements.find((p) => placements.includes(p.id))?.rail ?? session.scope.offset;
   const result = insertSnippet(session.project, session.snapshot, session.resolve, snippet, { rail, slot: 0 });
   if (!result.ok) return showStatus('There is no room on the rails for this snippet.', true);
   session.commit(result.project, result.snapshot);
@@ -852,6 +861,8 @@ function zoomToSelection(): void {
   session.select(keep);
 }
 
+new PlateTabs(byId('plate-tabs'), session, () => fitView('panel'));
+
 const tourView = new TourView(
   byId('tour'),
   (step) => {
@@ -877,8 +888,8 @@ let overviewCache: { key: unknown[]; value: Overview } | null = null;
 
 function drawMinimap(): void {
   if (!minimap.visible) return;
-  const key = [session.project, session.mode, session.libraries, session.snapshot];
-  if (!overviewCache || overviewCache.key.some((part, i) => part !== key[i])) overviewCache = { key, value: overviewOf(session.project, session.resolve, session.mode) };
+  const key = [session.project, session.mode, session.libraries, session.snapshot, session.plateId];
+  if (!overviewCache || overviewCache.key.some((part, i) => part !== key[i])) overviewCache = { key, value: overviewOf(session.project, session.resolve, session.mode, session.plateId) };
   minimap.draw(overviewCache.value, activeView().camera, stageWrap.clientWidth, stageWrap.clientHeight);
 }
 
@@ -932,8 +943,7 @@ function printLabels(): void {
 }
 
 function exportSvg(): void {
-  const stem = fileStem(session.project.panel.title, 'panel');
-  downloadBlob(new Blob([embedFont(renderToSvg(activeView(), session, LIGHT_THEME))], { type: 'image/svg+xml' }), `${stem}-${session.mode}.svg`);
+  downloadBlob(new Blob([embedFont(renderToSvg(activeView(), session, LIGHT_THEME))], { type: 'image/svg+xml' }), `${exportName(session.project.panel.title)}.svg`);
 }
 
 function exportCircuits(): void {
@@ -1349,6 +1359,7 @@ function editTableCell(table: Table, row: number, column: number, raw: string): 
       cableSettings: session.cableSettings,
       findings: session.findings,
       lengthUnit: session.lengthUnit,
+      plate: session.plateId,
     },
     key,
     raw,

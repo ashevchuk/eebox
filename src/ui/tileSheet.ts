@@ -14,7 +14,7 @@ const element = (tag: string, className: string, text?: string): HTMLElement => 
 };
 
 /**
- * Fills the print sheet with the panel at 1:1, cut into overlapping A4 sheets. World units are
+ * Fills the print sheet with the plate on view at 1:1, cut into overlapping A4 sheets. World units are
  * millimetres, so the drawing is shown at its size in mm and each sheet shows the part of it that
  * lies under the sheet.
  */
@@ -25,7 +25,7 @@ export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: V
     const def = session.resolve(item.module);
     return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
   };
-  const { bounds, rects } = printArea(session.project.panel, session.sizes, combInfo, (text) => measuring.measureText(text).width);
+  const { bounds, rects } = printArea(session.scope.panel, session.sizes, combInfo, (text) => measuring.measureText(text).width);
   const widthMm = bounds.maxX - bounds.minX;
   const heightMm = bounds.maxY - bounds.minY;
   session.bareDrawing = true;
@@ -61,7 +61,8 @@ export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: V
       const lastRow = tile.row === layout.rows - 1;
       if (!lastColumn) page.append(guide('tile-guide-x', TILE_WIDTH_MM - TILE_OVERLAP_MM));
       if (!lastRow) page.append(guide('tile-guide-y', TILE_HEIGHT_MM - TILE_OVERLAP_MM));
-      const title = session.project.panel.title ?? 'Panel';
+      const plates = session.project.panel.plates;
+      const title = `${session.project.panel.title ?? 'Panel'}${plates.length > 1 ? `, ${session.scope.panel.plates[0]!.name}` : ''}`;
       page.append(
         element('div', 'tile-caption', `${title}, 1:1 · sheet ${index + 1} of ${total} · column ${tile.column + 1}, row ${tile.row + 1} · print at 100 %, glue ${TILE_OVERLAP_MM} mm overlaps`),
       );

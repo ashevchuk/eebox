@@ -1,9 +1,10 @@
 import type { Finding } from '../electrical/problems';
 import type { Resolve } from '../electrical/context';
 import type { Project } from '../project';
-import { ductRect, placementRect, railRect, type Rect } from '../view/geometry';
+import { FRAME_PADDING, ductRect, placementRect, railRect, type Rect } from '../view/geometry';
 import { ductsOf } from './ducts';
-import { isFree, isOnRail, type Sizes } from './placement';
+import { scopeToPlate } from './plates';
+import { isFree, isOnRail, type Panel, type Plate, type Sizes } from './placement';
 
 /** Overlaps smaller than this are rounding, not two things on one place. */
 const EPSILON_MM = 0.01;
@@ -41,7 +42,14 @@ const marking = (...bodies: Body[]): Pick<Finding, 'placements' | 'ducts'> => ({
  * Modules next to each other on one rail are the model's business and are not looked at here.
  */
 export function findPlacementFindings(project: Project, sizes: Sizes, resolve: Resolve): Finding[] {
-  const { panel } = project;
+  return project.panel.plates.flatMap((plate) => {
+    const { panel, offset } = scopeToPlate(project.panel, plate.id);
+    return findOnPlate(panel, offset, plate, sizes, resolve);
+  });
+}
+
+/** The same for what stands on one plate, which is looked at as a panel of its own: `offset` is the number of the first of its rows in the whole panel. */
+function findOnPlate(panel: Panel, offset: number, plate: Plate, sizes: Sizes, resolve: Resolve): Finding[] {
   const bodies: Body[] = [
     ...panel.placements.map((p): Body => ({
       id: p.id,
@@ -76,9 +84,16 @@ export function findPlacementFindings(project: Project, sizes: Sizes, resolve: R
   const rails = panel.rails.map((_r, rail) => ({ rail, rect: railRect(panel, rail) }));
   for (const body of bodies.filter((b) => b.rail === undefined)) {
     for (const { rail, rect } of rails) {
-      if (overlapsBy(body.rect, rect)) add('advice', `${body.name} (${body.id}) stands on the rail of row ${rail + 1}.`, body);
+      if (overlapsBy(body.rect, rect)) add('advice', `${body.name} (${body.id}) stands on the rail of row ${rail + offset + 1}.`, body);
     }
   }
+
+  const area: Rect = { x: FRAME_PADDING, y: FRAME_PADDING, width: plate.widthMm, height: plate.heightMm };
+  const within = (r: Rect) => r.x >= area.x - EPSILON_MM && r.y >= area.y - EPSILON_MM && r.x + r.width <= area.x + area.width + EPSILON_MM && r.y + r.height <= area.y + area.height + EPSILON_MM;
+  for (const body of bodies) if (!within(body.rect)) add('error', `${body.name} (${body.id}) reaches outside the plate ${plate.name}.`, body);
+  rails.forEach(({ rail, rect }) => {
+    if (!within(rect)) add('error', `The rail of row ${rail + offset + 1} reaches outside the plate ${plate.name}.`);
+  });
 
   for (const placement of panel.placements) {
     const mounting = resolve(placement.module)?.mounting;

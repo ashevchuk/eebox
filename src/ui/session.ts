@@ -1,6 +1,7 @@
 import { DEFAULT_CABLE_SETTINGS, type CableSettings } from '../electrical/cables';
 import { lookupsOf } from '../layout/lookups';
 import { ductsOf } from '../layout/ducts';
+import { notesOnPlate, plateById, plateOfSelection, scopeToPlate, type PlateScope } from '../layout/plates';
 import { createPanel } from '../layout/panel';
 import type { ModuleRef } from '../layout/placement';
 import type { Library, ModuleDef } from '../library/types';
@@ -71,6 +72,8 @@ export class Session {
   /** The notes of the view that is on while one is being dragged, before the drag is committed. */
   annotationDraft: { mode: Mode; list: Annotation[] } | null = null;
   selection: Selection = {};
+  private plateChosen = '';
+  private scopeCache: { panel: object; plate: string; scope: PlateScope } | null = null;
   /** Whether the drawings mark the faults and the advice; off while exporting, so a drawing for others is not full of red. */
   marksVisible = true;
   private findingCache: { revision: object; libraries: Library[]; settings: CableSettings; list: Finding[] } | null = null;
@@ -128,10 +131,28 @@ export class Session {
   readonly combLookup = this.lookups.combLookup;
   readonly sizes = this.lookups.sizes;
 
+  /** The plate the panel view shows; the first one when the one chosen is gone, as after an undo. */
+  get plateId(): string {
+    const { plates } = this.project.panel;
+    return plateById(this.project.panel, this.plateChosen) ? this.plateChosen : plates[0]!.id;
+  }
+
+  set plateId(id: string) {
+    this.plateChosen = id;
+  }
+
+  /** The plate on view as a panel of its own, found again only when the panel or the plate changes. */
+  get scope(): PlateScope {
+    const { panel } = this.project;
+    const plate = this.plateId;
+    if (!this.scopeCache || this.scopeCache.panel !== panel || this.scopeCache.plate !== plate) this.scopeCache = { panel, plate, scope: scopeToPlate(panel, plate) };
+    return this.scopeCache.scope;
+  }
+
   /** The notes a drawing shows: those being dragged, or those of the project. */
   notesOf(mode: Mode): Annotation[] | undefined {
     if (this.annotationDraft?.mode === mode) return this.annotationDraft.list;
-    return mode === 'panel' ? this.project.panel.annotations : this.project.schematic.annotations;
+    return mode === 'panel' ? notesOnPlate(this.project.panel, this.plateId) : this.project.schematic.annotations;
   }
 
   subscribe(listener: () => void): void {
@@ -144,12 +165,17 @@ export class Session {
 
   select(selection: Selection): void {
     this.selection = selection;
+    const plate = plateOfSelection(this.project.panel, selection);
+    if (plate) this.plateChosen = plate;
     this.changed();
   }
 
   /** Commits a change; pass `snapshot` when the stored module definitions change with it. */
   commit(project: Project, snapshot: Record<string, ModuleDef> = this.snapshot): void {
     this.history.commit({ project, snapshot });
+    // A thing that was moved to another plate is followed there.
+    const plate = plateOfSelection(project.panel, this.selection);
+    if (plate) this.plateChosen = plate;
     this.changed();
   }
 
@@ -175,6 +201,7 @@ export class Session {
 
   private replace(project: Project, modules: Record<string, ModuleDef>): void {
     this.history.reset({ project, snapshot: modules });
+    this.plateChosen = project.panel.plates[0]!.id;
     this.selection = {};
     this.changed();
   }

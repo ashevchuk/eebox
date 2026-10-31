@@ -337,6 +337,10 @@
       button.primary { border-color: var(--accent); color: var(--accent); }
       #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
       #stage-wrap { flex: 1; min-width: 0; position: relative; }
+      .plate-tabs { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; z-index: 3; max-width: calc(100% - 16px); flex-wrap: wrap; }
+      body[data-mode='schematic'] .plate-tabs { display: none; }
+      .plate-tab, .plate-add { padding: 3px 10px; font-size: 12px; background: rgba(20, 22, 29, 0.85); }
+      .plate-tab.active { border-color: #f5c518; color: #f5c518; }
       .app-dialog.projects-dialog { width: min(640px, 96vw); max-width: none; }
       .projects-help { color: var(--text-dim); margin: 4px 0 10px; }
       .projects-list { max-height: 50vh; overflow: auto; }
@@ -577,7 +581,7 @@
         <div id="palette"></div>
       </aside>
       <div id="sidebar-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" tabindex="0" title="Drag to resize, double-click to reset"></div>
-      <div id="stage-wrap"><canvas id="stage"></canvas><canvas id="minimap" title="Click or drag to move the view"></canvas><div id="search" hidden></div><div id="tour" hidden></div><div id="conflict" role="alert" hidden></div><div id="problems" hidden></div></div>
+      <div id="stage-wrap"><canvas id="stage"></canvas><div id="plate-tabs" class="plate-tabs"></div><canvas id="minimap" title="Click or drag to move the view"></canvas><div id="search" hidden></div><div id="tour" hidden></div><div id="conflict" role="alert" hidden></div><div id="problems" hidden></div></div>
       <div id="inspector-resizer" class="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the inspector" tabindex="0" title="Drag to resize, double-click to reset"></div>
       <aside id="inspector"><div id="inspector-content"></div></aside>
     </main>

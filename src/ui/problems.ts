@@ -7,6 +7,7 @@ import { routeWires } from '../schematic/router';
 import type { Bounds } from '../view/Camera';
 import { lookupsOf } from '../layout/lookups';
 import { ductsOf } from '../layout/ducts';
+import { plateOfComb, plateOfPlacement, scopeToPlate } from '../layout/plates';
 import { combRect, ductRect, placementRect } from '../view/geometry';
 import { groupSelection } from './selection';
 import type { Mode, Selection } from './session';
@@ -56,11 +57,17 @@ function panelFocus(project: Project, resolve: Resolve, objects: Objects): Focus
   const combs = project.panel.combs.filter((c) => objects.combs?.includes(c.id));
   const ducts = ductsOf(project.panel).filter((d) => objects.ducts?.includes(d.id));
   if (placements.length + combs.length + ducts.length === 0) return undefined;
+  // The things of a finding may stand on several plates; the view shows the plate of the first one, and only what is on it.
+  const plate = (placements[0] ? plateOfPlacement(project.panel, placements[0]) : undefined) ?? (combs[0] ? plateOfComb(project.panel, combs[0]) : undefined) ?? ducts[0]?.plate;
+  const scope = scopeToPlate(project.panel, plate ?? project.panel.plates[0]!.id);
+  const onPlate = scope.panel;
   const { sizes, widthOf } = lookupsOf(resolve);
+  const shownPlacements = onPlate.placements.filter((p) => placements.some((q) => q.id === p.id));
+  const shownCombs = onPlate.combs.filter((c) => combs.some((q) => q.id === c.id));
   const boxes = [
-    ...placements.map((p) => placementRect(project.panel, sizes, p)),
-    ...combs.map((c) => combRect(project.panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
-    ...ducts.map(ductRect),
+    ...shownPlacements.map((p) => placementRect(onPlate, sizes, p)),
+    ...shownCombs.map((c) => combRect(onPlate, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
+    ...ducts.filter((d) => d.plate === onPlate.plates[0]!.id).map(ductRect),
   ].map((r) => ({ minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height }));
   const selection: Selection =
     placements.length + combs.length + ducts.length === 1

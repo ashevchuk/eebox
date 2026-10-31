@@ -3,14 +3,20 @@ import {
   DEFAULT_RAIL_PITCH_MM,
   FIRST_RAIL_Y_MM,
   MAX_CLEARANCE_MM,
+  MIN_PLATE_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_POSITION_MM,
 } from './limits';
 import { normalizeLabel } from './labels';
+import { DEFAULT_PLATE_ID, DEFAULT_PLATE_NAME } from './plates';
 import { isOnRail, type Panel, type WidthOf } from './placement';
+import { MODULE_UNIT_MM } from '../library/types';
 import type { Rail } from './rail';
 import { LAYOUT_EPSILON_UNITS } from './units';
+
+/** The height of the plate of a panel that has no rail yet. */
+const DEFAULT_EMPTY_PLATE_HEIGHT_MM = 300;
 
 export type PanelEditError = 'invalid-value' | 'unknown-rail' | 'rail-not-empty' | 'modules-do-not-fit';
 
@@ -22,8 +28,19 @@ const inRange = (value: number, min: number, max: number) =>
 
 /** Rails of the given lengths, one under the other, `pitchMm` apart. */
 export function createPanel(railLengthsUnits: number[], pitchMm = DEFAULT_RAIL_PITCH_MM): Panel {
+  const rails = railLengthsUnits.map((lengthUnits, i) => ({ plate: DEFAULT_PLATE_ID, x: 0, y: FIRST_RAIL_Y_MM + i * pitchMm, lengthUnits }));
+  const width = Math.max(0, ...rails.map((r) => r.lengthUnits * MODULE_UNIT_MM));
+  const lowest = rails.length === 0 ? undefined : Math.max(...rails.map((r) => r.y));
   return {
-    rails: railLengthsUnits.map((lengthUnits, i) => ({ x: 0, y: FIRST_RAIL_Y_MM + i * pitchMm, lengthUnits })),
+    plates: [
+      {
+        id: DEFAULT_PLATE_ID,
+        name: DEFAULT_PLATE_NAME,
+        widthMm: Math.max(MIN_PLATE_SIZE_MM, width),
+        heightMm: Math.max(MIN_PLATE_SIZE_MM, lowest === undefined ? DEFAULT_EMPTY_PLATE_HEIGHT_MM : lowest + FIRST_RAIL_Y_MM),
+      },
+    ],
+    rails,
     placements: [],
     combs: [],
     shelf: [],
@@ -44,8 +61,8 @@ export function setRailCount(panel: Panel, count: number): PanelEditResult {
     const above = rails[rails.length - 1];
     rails.push(
       above
-        ? { x: above.x, y: Math.min(above.y + gap, MAX_RAIL_POSITION_MM), lengthUnits: above.lengthUnits }
-        : { x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: DEFAULT_RAIL_LENGTH_UNITS },
+        ? { plate: above.plate, x: above.x, y: Math.min(above.y + gap, MAX_RAIL_POSITION_MM), lengthUnits: above.lengthUnits }
+        : { plate: panel.plates[0]!.id, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: DEFAULT_RAIL_LENGTH_UNITS },
     );
   }
   return { ok: true, panel: { ...panel, rails } };
@@ -76,6 +93,7 @@ export function setRailPosition(panel: Panel, rail: number, x: number, y: number
 export function moveRail(panel: Panel, from: number, to: number): PanelEditResult {
   const last = panel.rails.length - 1;
   if (!inRange(from, 0, last) || !inRange(to, 0, last)) return failure('unknown-rail');
+  if (panel.rails[from]!.plate !== panel.rails[to]!.plate) return failure('invalid-value');
   const order = [...panel.rails];
   order.splice(to, 0, ...order.splice(from, 1));
   const rails: Rail[] = order.map((r, i) => ({ ...r, x: panel.rails[i]!.x, y: panel.rails[i]!.y }));

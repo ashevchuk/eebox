@@ -15,3 +15,7 @@ export const MIN_DUCT_SIZE_MM = 10;
 export const MAX_DUCT_SIZE_MM = 3000;
 /** The clearance kept around devices on the plate and ducts, in mm; none is not checked. */
 export const MAX_CLEARANCE_MM = 200;
+/** Mounting surfaces in one project, and the size one may have, in mm. */
+export const MAX_PLATES = 8;
+export const MIN_PLATE_SIZE_MM = 100;
+export const MAX_PLATE_SIZE_MM = 6000;

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { SWITCHING_KINDS } from '../src/electrical/energy';
 import { lookupsOf } from '../src/layout/lookups';
 import { createPanel } from '../src/layout/panel';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
+import { fitPlate } from '../src/view/plateFit';
+import { FIRST_RAIL_Y_MM } from '../src/layout/limits';
 import type { Panel, RailPlacement } from '../src/layout/placement';
 import { genericModules } from '../src/library/genericSeries';
 import { artToSvg } from '../src/library/svgExport';
@@ -108,22 +111,23 @@ describe('the frame around modules of different heights', () => {
   it('is the same for standard modules as for the rails alone', () => {
     const panel = createPanel([12, 12]);
     const withModule = { ...panel, placements: [standard()] };
-    expect(frameRect(withModule, lookupsOf(resolveBoth).sizes)).toEqual(frameRect(panel, lookupsOf(resolveBoth).sizes));
+    expect(frameRect(withModule)).toEqual(frameRect(panel));
   });
 
-  it('grows above and below a taller module, keeping the room a standard module has', () => {
-    const panel = panelWithTall();
-    const frame = frameRect(panel, sizes);
-    const body = placementRect(panel, sizes, placed());
-    const standardRoom = frameRect(createPanel([12]), sizes).height / 2 - DIN_MODULE_HEIGHT_MM / 2;
-    expect(body.y - frame.y).toBeCloseTo(standardRoom, 6);
-    expect(frame.y + frame.height - (body.y + body.height)).toBeCloseTo(standardRoom, 6);
+  it('gets room below when the plate is fitted, as a standard module does', () => {
+    const fitted = fitPlate(panelWithTall(), DEFAULT_PLATE_ID, sizes);
+    if (!fitted.ok) throw new Error(fitted.error);
+    const body = placementRect(fitted.panel, sizes, placed());
+    const frame = frameRect(fitted.panel);
+    expect(frame.y + frame.height - (body.y + body.height)).toBeGreaterThanOrEqual(FIRST_RAIL_Y_MM - DIN_MODULE_HEIGHT_MM / 2);
   });
 
-  it('does not let a module stick out of the frame, whichever rail it stands on', () => {
+  it('is held by the plate once it is fitted, whichever rail the module stands on', () => {
     const panel = { ...createPanel([12, 12, 12]), placements: [{ ...placed(), rail: 2 }] };
-    const frame = frameRect(panel, sizes);
-    const body = placementRect(panel, sizes, panel.placements[0]!);
+    const fitted = fitPlate(panel, DEFAULT_PLATE_ID, sizes);
+    if (!fitted.ok) throw new Error(fitted.error);
+    const frame = frameRect(fitted.panel);
+    const body = placementRect(fitted.panel, sizes, fitted.panel.placements[0]!);
     expect(body.y).toBeGreaterThanOrEqual(frame.y);
     expect(body.y + body.height).toBeLessThanOrEqual(frame.y + frame.height);
   });

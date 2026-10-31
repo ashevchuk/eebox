@@ -9,7 +9,7 @@ export type ShelfResult = { ok: true; panel: Panel } | { ok: false; error: Shelf
 export function takeOff(panel: Panel, id: string): ShelfResult {
   const placement = panel.placements.find((p) => p.id === id);
   if (!placement) return { ok: false, error: { kind: 'unknown-placement' } };
-  const { rail: _rail, slot: _slot, x: _x, y: _y, ...item } = placement;
+  const { rail: _rail, slot: _slot, x: _x, y: _y, plate: _plate, ...item } = placement;
   return {
     ok: true,
     panel: {
@@ -40,11 +40,11 @@ export function placeFromShelf(
 }
 
 /** Puts a shelved device on the plate at a place. */
-export function placeFromShelfFree(panel: Panel, widthOf: WidthOf, id: string, x: number, y: number): ShelfResult {
+export function placeFromShelfFree(panel: Panel, widthOf: WidthOf, id: string, plate: string, x: number, y: number): ShelfResult {
   const item = panel.shelf.find((s) => s.id === id);
   if (!item) return { ok: false, error: { kind: 'unknown-shelf-item' } };
   const without: Panel = { ...panel, shelf: panel.shelf.filter((s) => s.id !== id) };
-  const result = addFreePlacement(without, widthOf, { ...item, x, y });
+  const result = addFreePlacement(without, widthOf, { ...item, plate, x, y });
   return result.ok ? result : { ok: false, error: result.error };
 }
 

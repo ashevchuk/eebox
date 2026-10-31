@@ -57,6 +57,8 @@ export interface Scene {
   selectedAnnotationId?: string | null;
   /** The kinds of text to draw; all of them when absent. */
   texts?: TextVisibility;
+  /** The name of the plate, written after the title when the panel has several. */
+  plateName?: string;
   /** Lines a dragged item is drawn to, in world coordinates; only while dragging. */
   guides?: readonly Guide[];
   /** A cable duct being drawn, before it is made. */
@@ -415,7 +417,7 @@ export function render(
   ctx.scale(camera.scale, camera.scale);
 
   const { panel } = scene;
-  const frame = frameRect(panel, sizesOf(scene));
+  const frame = frameRect(panel);
   const texts = scene.texts ?? ALL_TEXT;
   if (!scene.bare) {
     fillRect(ctx, frame, theme().frameFill);
@@ -433,10 +435,11 @@ export function render(
         ctx.fillText(stamp, frame.width - 14, 24);
         stampWidth = ctx.measureText(stamp).width + 14;
       }
-      if (panel.title) {
+      const heading = [panel.title, scene.plateName].filter(Boolean).join(' - ');
+      if (heading) {
         ctx.font = `bold 14px ${FONT_FAMILY}`;
         ctx.textAlign = 'left';
-        ctx.fillText(fitText(ctx, panel.title, frame.width - 28 - stampWidth), 14, 24);
+        ctx.fillText(fitText(ctx, heading, frame.width - 28 - stampWidth), 14, 24);
       }
     }
   }
@@ -508,7 +511,7 @@ export function render(
   }
   ctx.globalAlpha = 1;
   drawLabels(ctx, scene, texts);
-  drawAnnotations(ctx, scene.annotations ?? panel.annotations, scene.selectedAnnotationId ?? null, texts.annotations);
+  drawAnnotations(ctx, scene.annotations ?? panel.plates[0]?.annotations, scene.selectedAnnotationId ?? null, texts.annotations);
 
   if (scene.ghost) {
     const { module, widthUnits, rail, slot, x, y, valid } = scene.ghost;

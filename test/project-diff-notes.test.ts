@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { withPlateNotes } from '../src/layout/plates';
 import type { Annotation } from '../src/layout/annotations';
 import type { Project } from '../src/project';
 import { diffProjects } from '../src/project/diff';
@@ -8,7 +9,7 @@ import { panelOf, place, resolve } from './fixtures';
 
 const base = (): Project => ({ panel: panelOf([place('p1', 'breaker16', 0, 0)]), schematic: emptySchematic() });
 const noted = (panel?: Annotation[], schematic?: Annotation[]): Project => ({
-  panel: { ...base().panel, ...(panel ? { annotations: panel } : {}) },
+  panel: panel ? withPlateNotes(base().panel, 'plate1', panel) : base().panel,
   schematic: { ...emptySchematic(), ...(schematic ? { annotations: schematic } : {}) },
 });
 const lines = (a: Project, b: Project) => diffProjects(buildProjectFile(a, resolve), buildProjectFile(b, resolve)).map((c) => `${c.area}/${c.kind}: ${c.text}`);

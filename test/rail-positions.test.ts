@@ -18,6 +18,8 @@ import {
   rowLabelX,
   snapToSlot,
 } from '../src/view/geometry';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
+import { fitPlate } from '../src/view/plateFit';
 import { resolve, sizes } from './fixtures';
 
 const GAP_MM = 40;
@@ -44,10 +46,11 @@ describe('rails with their own position', () => {
     expect(moduleRect(panel, 1, 2, 1, 90).x).toBe(railRect(panel, 1).x + 2 * MODULE_UNIT_MM);
   });
 
-  it('makes the frame as wide as the farthest end of a rail and as tall as the lowest rail', () => {
-    const panel = sideBySide();
-    expect(frameRect(panel, sizes).width).toBe(12 * MODULE_UNIT_MM + GAP_MM + 2 * FRAME_PADDING);
-    expect(frameRect(panel, sizes).height).toBe(FRAME_PADDING + FIRST_RAIL_Y_MM + ROW_MARGIN + FRAME_PADDING);
+  it('fits a plate to the farthest end of a rail and the lowest rail', () => {
+    const fitted = fitPlate(sideBySide(), DEFAULT_PLATE_ID, sizes);
+    if (!fitted.ok) throw new Error(fitted.error);
+    expect(frameRect(fitted.panel).width).toBe(12 * MODULE_UNIT_MM + GAP_MM + 2 * FRAME_PADDING);
+    expect(frameRect(fitted.panel).height).toBe(FRAME_PADDING + FIRST_RAIL_Y_MM + ROW_MARGIN + FRAME_PADDING);
   });
 
   it('puts the label of a row in the margin to the left of that row', () => {

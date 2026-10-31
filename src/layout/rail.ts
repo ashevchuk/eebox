@@ -1,5 +1,7 @@
 /** A DIN rail on the panel; modules and combs refer to it by its index in `Panel.rails`. */
 export interface Rail {
+  /** The plate the rail is fixed to. */
+  plate: string;
   /** Left end of the rail, in mm from the left edge of the working area. */
   x: number;
   /** Centre line of the rail, in mm from the top of the working area. */

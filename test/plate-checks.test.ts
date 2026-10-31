@@ -4,6 +4,7 @@ import { gapBetween, findPlacementFindings } from '../src/layout/placementFindin
 import { MAX_CLEARANCE_MM } from '../src/layout/limits';
 import { lookupsOf } from '../src/layout/lookups';
 import { createPanel, setClearance } from '../src/layout/panel';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
 import type { FreePlacement, Panel, Placement } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 import { buildProjectFile, parseProjectJson, projectWarnings } from '../src/project/file';
@@ -20,13 +21,18 @@ const resolve = (r: { libraryId: string; moduleId: string }): ModuleDef | undefi
   r.moduleId === PLATE_ONLY.id ? PLATE_ONLY : r.moduleId === BOTH.id ? BOTH : fixtureResolve(r);
 const sizes = lookupsOf(resolve).sizes;
 
-const at = (id: string, moduleId: string, x: number, y: number): FreePlacement => ({ id, module: ref(moduleId), x, y });
-const duct = (id: string, x: number, y: number, widthMm: number, heightMm: number) => ({ id, x, y, widthMm, heightMm });
+const at = (id: string, moduleId: string, x: number, y: number): FreePlacement => ({ id, module: ref(moduleId), plate: DEFAULT_PLATE_ID, x, y });
+const duct = (id: string, x: number, y: number, widthMm: number, heightMm: number) => ({ id, plate: DEFAULT_PLATE_ID, x, y, widthMm, heightMm });
 const projectOf = (panel: Panel) => ({ panel, schematic: emptySchematic() });
 const messages = (panel: Panel) => findPlacementFindings(projectOf(panel), sizes, resolve).map((f) => `${f.severity}: ${f.message}`);
 
 /** A panel with one rail row at the top, and what the test puts on the plate below it, where nothing else is. */
-const panelWith = (placements: Placement[], extra: Partial<Panel> = {}): Panel => ({ ...createPanel([12]), placements, ...extra });
+const panelWith = (placements: Placement[], extra: Partial<Panel> = {}): Panel => ({
+  ...createPanel([12]),
+  plates: [{ id: DEFAULT_PLATE_ID, name: 'Back plate', widthMm: 3000, heightMm: 3000 }],
+  placements,
+  ...extra,
+});
 
 describe('two things on one place', () => {
   it('is an error for devices on the plate, and names both and marks both', () => {
@@ -135,7 +141,8 @@ describe('a loose thing on a rail', () => {
 
 describe('a device where it was not made to stand', () => {
   it('is advice for a plate-only device on a rail and a rail-only one on the plate, and none for either', () => {
-    expect(messages(panelWith([place('p1', 'drive', 0, 0)]))).toEqual(['advice: Drive (p1) is made for the plate, not for a rail.']);
+    const lowered = { ...panelWith([place('p1', 'drive', 0, 0)]), rails: [{ ...createPanel([12]).rails[0]!, y: 300 }] };
+    expect(messages(lowered)).toEqual(['advice: Drive (p1) is made for the plate, not for a rail.']);
     expect(messages(panelWith([at('p1', 'mcb1', 100, 400)]))).toEqual(['advice: MCB 1P (p1) is made for a DIN rail, not for the plate.']);
     expect(messages(panelWith([place('p1', 'psu', 0, 0), at('p2', 'psu', 100, 400)]))).toEqual([]);
   });

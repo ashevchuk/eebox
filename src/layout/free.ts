@@ -13,17 +13,20 @@ export function addFreePlacement(panel: Panel, widthOf: WidthOf, placement: Free
     return { ok: false, error: { kind: 'duplicate-id' } };
   }
   if (widthOf(placement) === undefined) return { ok: false, error: { kind: 'unknown-module' } };
+  if (!panel.plates.some((p) => p.id === placement.plate)) return { ok: false, error: { kind: 'unknown-plate' } };
   if (!validPosition(placement.x) || !validPosition(placement.y)) return { ok: false, error: { kind: 'bad-position' } };
   return { ok: true, panel: { ...panel, placements: [...panel.placements, placement] } };
 }
 
 /** Moves a device to a place on the plate; a device that was on a rail leaves it. */
-export function moveFreePlacement(panel: Panel, id: string, x: number, y: number): PlacementResult {
+export function moveFreePlacement(panel: Panel, id: string, x: number, y: number, plate?: string): PlacementResult {
   const current = panel.placements.find((p) => p.id === id);
   if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
   if (!validPosition(x) || !validPosition(y)) return { ok: false, error: { kind: 'bad-position' } };
+  const onPlate = plate ?? (isFree(current) ? current.plate : panel.rails[current.rail]?.plate);
+  if (onPlate === undefined || !panel.plates.some((p) => p.id === onPlate)) return { ok: false, error: { kind: 'unknown-plate' } };
   const { rail: _rail, slot: _slot, ...rest } = current;
-  const moved: FreePlacement = { ...rest, x: roundMm(x), y: roundMm(y) };
+  const moved: FreePlacement = { ...rest, plate: onPlate, x: roundMm(x), y: roundMm(y) };
   return { ok: true, panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? moved : p)) } };
 }
 

@@ -6,6 +6,7 @@ import { routeWires } from '../schematic/router';
 import type { Bounds, Point } from '../view/Camera';
 import { lookupsOf } from '../layout/lookups';
 import { ductsOf } from '../layout/ducts';
+import { scopeToPlate } from '../layout/plates';
 import { combRect, ductRect, frameRect, placementRect } from '../view/geometry';
 import type { Mode } from './session';
 
@@ -30,12 +31,12 @@ const LOAD_COLOR = '#86efac';
 
 const boxOf = (r: { x: number; y: number; width: number; height: number }): Bounds => ({ minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height });
 
-export function overviewOf(project: Project, resolve: Resolve, mode: Mode): Overview {
+export function overviewOf(project: Project, resolve: Resolve, mode: Mode, plate: string): Overview {
   if (mode === 'panel') {
-    const { panel } = project;
+    const { panel } = scopeToPlate(project.panel, plate);
     const { sizes, widthOf } = lookupsOf(resolve);
     return {
-      bounds: boxOf(frameRect(panel, sizes)),
+      bounds: boxOf(frameRect(panel)),
       boxes: [
         ...ductsOf(panel).map((d) => ({ box: boxOf(ductRect(d)), color: DUCT_COLOR })),
         ...panel.placements.map((p) => ({ box: boxOf(placementRect(panel, sizes, p)), color: MODULE_COLOR })),

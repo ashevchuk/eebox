@@ -8,6 +8,9 @@ import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_PO
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
   MAX_CLEARANCE_MM,
+  MAX_PLATES,
+  MAX_PLATE_SIZE_MM,
+  MIN_PLATE_SIZE_MM,
   MAX_DUCTS,
   MAX_DUCT_SIZE_MM,
   MIN_DUCT_SIZE_MM,
@@ -16,13 +19,17 @@ import {
   MAX_RAIL_POSITION_MM,
 } from '../layout/limits';
 import type { Duct } from '../layout/ducts';
+import { railsAreGrouped } from '../layout/plates';
 import type { Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
 import { lookupsOf } from '../layout/lookups';
 import { findPlacementFindings } from '../layout/placementFindings';
 import {
   findProblems as findPanelProblems,
+  isFree,
   type CombPlacement,
+  type Panel,
+  type Plate,
   type ModuleRef,
   type Placement,
   type ShelfItem,
@@ -102,7 +109,17 @@ const conductorsCheck = (v: unknown) =>
   v.every((c) => (CONDUCTORS as readonly unknown[]).includes(c))
     ? null
     : `must list each of 1 to ${CONDUCTORS.length} conductors once, out of: ${CONDUCTORS.join(', ')}`;
+const plateSizeCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= MIN_PLATE_SIZE_MM && v <= MAX_PLATE_SIZE_MM ? null : `must be a number of mm from ${MIN_PLATE_SIZE_MM} to ${MAX_PLATE_SIZE_MM}`;
+const PLATE_SPEC: FieldSpec = {
+  id: { required: true, check: identifier },
+  name: { required: true, check: labelCheck },
+  widthMm: { required: true, check: plateSizeCheck },
+  heightMm: { required: true, check: plateSizeCheck },
+  annotations: { required: false, check: annotationsCheck },
+};
 const RAIL_SPEC: FieldSpec = {
+  plate: { required: true, check: identifier },
   x: { required: true, check: railPositionCheck },
   y: { required: true, check: railPositionCheck },
   lengthUnits: { required: true, check: railLengthCheck },
@@ -140,7 +157,7 @@ const PROJECT_SPEC: FieldSpec = {
 const PANEL_SPEC: FieldSpec = {
   title: { required: false, check: labelCheck },
   info: { required: false, check: infoCheck },
-  annotations: { required: false, check: annotationsCheck },
+  plates: { required: true, check: arrayCheck },
   rails: { required: true, check: arrayCheck },
   ducts: { required: false, check: arrayCheck },
   clearanceMm: { required: false, check: clearanceCheck },
@@ -181,6 +198,7 @@ const PLACEMENT_SPEC: FieldSpec = {
   slot: { required: false, check: slotCheck },
   x: { required: false, check: railPositionCheck },
   y: { required: false, check: railPositionCheck },
+  plate: { required: false, check: identifier },
   label: { required: false, check: labelCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
@@ -191,13 +209,14 @@ const PLACEMENT_SPEC: FieldSpec = {
 function placementPositionCheck(item: Record<string, unknown>, path: string, errors: ValidationError[]): void {
   const onRail = item.rail !== undefined || item.slot !== undefined;
   const onPlate = item.x !== undefined || item.y !== undefined;
-  const complete = onRail ? item.rail !== undefined && item.slot !== undefined : item.x !== undefined && item.y !== undefined;
-  if (onRail === onPlate || !complete) errors.push({ path, message: 'must have a rail and a slot, or an x and a y, and not both' });
+  const complete = onRail ? item.rail !== undefined && item.slot !== undefined && item.plate === undefined : item.x !== undefined && item.y !== undefined && item.plate !== undefined;
+  if (onRail === onPlate || !complete) errors.push({ path, message: 'must have a rail and a slot, or a plate, an x and a y, and not both' });
 }
 const ductSizeCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v >= MIN_DUCT_SIZE_MM && v <= MAX_DUCT_SIZE_MM ? null : `must be a number of mm from ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM}`;
 const DUCT_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
+  plate: { required: true, check: identifier },
   x: { required: true, check: railPositionCheck },
   y: { required: true, check: railPositionCheck },
   widthMm: { required: true, check: ductSizeCheck },
@@ -360,8 +379,22 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const wires = validateList<Wire>(schematicRaw?.wires, WIRE_SPEC, 'project.schematic.wires', errors);
   const modules = validateModules(root?.modules, errors);
   const rails = validateEntries<Rail>(panelRaw?.rails, RAIL_SPEC, 'project.panel.rails', errors);
-  if (panelRaw && Array.isArray(panelRaw.rails) && (panelRaw.rails.length < 1 || panelRaw.rails.length > MAX_RAILS)) {
-    errors.push({ path: 'project.panel.rails', message: `must list 1 to ${MAX_RAILS} rails` });
+  if (panelRaw && Array.isArray(panelRaw.rails) && panelRaw.rails.length > MAX_RAILS) {
+    errors.push({ path: 'project.panel.rails', message: `must list at most ${MAX_RAILS} rails` });
+  }
+  const plates = validateList<Plate>(panelRaw?.plates, PLATE_SPEC, 'project.panel.plates', errors);
+  if (panelRaw && Array.isArray(panelRaw.plates) && (panelRaw.plates.length < 1 || panelRaw.plates.length > MAX_PLATES)) {
+    errors.push({ path: 'project.panel.plates', message: `must list 1 to ${MAX_PLATES} plates` });
+  }
+  plates.forEach((p, i) => plates.findIndex((q) => q.name === p.name) !== i && errors.push({ path: `project.panel.plates[${i}].name`, message: `another plate has the name "${p.name}"` }));
+  if (errors.length === 0) {
+    const known = new Set(plates.map((p) => p.id));
+    rails.forEach((r, i) => known.has(r.plate) || errors.push({ path: `project.panel.rails[${i}].plate`, message: `unknown plate "${r.plate}"` }));
+    ducts.forEach((d, i) => known.has(d.plate) || errors.push({ path: `project.panel.ducts[${i}].plate`, message: `unknown plate "${d.plate}"` }));
+    placements.forEach((p, i) => isFree(p) && !known.has(p.plate) && errors.push({ path: `project.panel.placements[${i}].plate`, message: `unknown plate "${p.plate}"` }));
+    if (errors.length === 0 && !railsAreGrouped({ plates, rails } as Panel)) {
+      errors.push({ path: 'project.panel.rails', message: 'must be listed plate by plate, in the order of the plates' });
+    }
   }
   if (!root || !panelRaw || !schematicRaw || errors.length > 0) return { ok: false, errors };
 
@@ -369,7 +402,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
     panel: {
       ...(panelRaw.title !== undefined ? { title: panelRaw.title as string } : {}),
       ...(panelRaw.info !== undefined ? { info: panelRaw.info as ProjectInfo } : {}),
-      ...(panelRaw.annotations !== undefined ? { annotations: panelRaw.annotations as Annotation[] } : {}),
+      plates,
       rails,
       ...(panelRaw.ducts !== undefined ? { ducts } : {}),
       ...(panelRaw.clearanceMm !== undefined ? { clearanceMm: panelRaw.clearanceMm as number } : {}),

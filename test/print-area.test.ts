@@ -11,7 +11,7 @@ describe('printArea', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)], [], [12]);
     const { bounds } = printArea(panel, sizes, noComb, measure);
     const rail = railRect(panel, 0);
-    const frame = frameRect(panel, sizes);
+    const frame = frameRect(panel);
     expect(bounds.minX).toBe(rail.x - PRINT_MARGIN_MM);
     expect(bounds.maxX).toBe(rail.x + rail.width + PRINT_MARGIN_MM);
     expect(bounds.maxY - bounds.minY).toBeLessThan(frame.height / 2);
@@ -41,7 +41,7 @@ describe('printArea', () => {
     expect(rects.length).toBe(3);
     const empty = panelOf([], [], []);
     const { bounds } = printArea(empty, sizes, noComb, measure);
-    const frame = frameRect(empty, sizes);
+    const frame = frameRect(empty);
     expect(bounds).toEqual({ minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height });
   });
 });

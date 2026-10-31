@@ -6,12 +6,12 @@ import {
 } from '../layout/limits';
 import {
   moveRail,
-  setRailCount,
   setRailLabel,
   setRailLength,
   setRailPosition,
   type PanelEditResult,
 } from '../layout/panel';
+import { setRailCountOnPlate, type PlateResult } from '../layout/plates';
 import type { Panel } from '../layout/placement';
 import type { Session } from './session';
 
@@ -35,6 +35,7 @@ export class PanelEditor {
   private countInput!: HTMLInputElement;
   private rows: RailRow[] = [];
   private built = false;
+  private builtFor = '';
 
   constructor(
     private readonly container: HTMLElement,
@@ -48,8 +49,16 @@ export class PanelEditor {
     return this.session.project.panel;
   }
 
+  /** The rows of the plate on view: the first of them in the panel, and how many there are. */
+  private get plateRows(): { offset: number; count: number; plate: string } {
+    const { offset, panel } = this.session.scope;
+    return { offset, count: panel.rails.length, plate: this.session.plateId };
+  }
+
   private refresh(): void {
-    if (!this.built || this.rows.length !== this.panel.rails.length) this.build();
+    const { offset, count, plate } = this.plateRows;
+    const key = `${plate}:${offset}:${count}`;
+    if (!this.built || this.builtFor !== key) this.build();
     this.sync(false);
   }
 
@@ -58,19 +67,22 @@ export class PanelEditor {
     const set = (input: HTMLInputElement, value: number | string) => {
       if (force || input !== document.activeElement) input.value = String(value);
     };
-    set(this.countInput, this.panel.rails.length);
+    const { offset } = this.plateRows;
+    set(this.countInput, this.rows.length);
     this.rows.forEach((row, i) => {
-      set(row.label, this.panel.rails[i]?.label ?? '');
-      set(row.length, this.panel.rails[i]?.lengthUnits ?? 0);
-      set(row.x, this.panel.rails[i]?.x ?? 0);
-      set(row.y, this.panel.rails[i]?.y ?? 0);
+      const rail = this.panel.rails[offset + i];
+      set(row.label, rail?.label ?? '');
+      set(row.length, rail?.lengthUnits ?? 0);
+      set(row.x, rail?.x ?? 0);
+      set(row.y, rail?.y ?? 0);
       row.up.disabled = i === 0;
       row.down.disabled = i === this.rows.length - 1;
     });
   }
 
-  private apply(compute: (panel: Panel) => PanelEditResult, rangeText: string): void {
-    const result = compute(this.panel);
+  private apply(compute: (panel: Panel) => PanelEditResult | PlateResult, rangeText: string): void {
+    const raw = compute(this.panel);
+    const result: PanelEditResult = raw.ok ? raw : { ok: false, error: raw.error === 'not-empty' ? 'rail-not-empty' : raw.error === 'invalid-value' ? 'invalid-value' : 'unknown-rail' };
     if (result.ok) {
       this.session.commit({ ...this.session.project, panel: result.panel });
       return;
@@ -114,18 +126,20 @@ export class PanelEditor {
 
   private build(): void {
     this.built = true;
+    const { offset, count, plate } = this.plateRows;
+    this.builtFor = `${plate}:${offset}:${count}`;
     this.container.replaceChildren(this.text('h3', 'Panel'));
 
     this.countInput = this.numberInput((value) =>
-      this.apply((panel) => setRailCount(panel, value), `Rows: a whole number from 1 to ${MAX_RAILS}.`),
+      this.apply((panel) => (Number.isInteger(value) && value >= 1 ? setRailCountOnPlate(panel, plate, value) : { ok: false, error: 'invalid-value' }), `Rows: a whole number from 1 to ${MAX_RAILS}.`),
     );
     const countLine = this.text('div', 'Rows ', 'settings-line');
     countLine.append(this.countInput);
     this.container.append(countLine);
 
-    const count = this.panel.rails.length;
     this.rows = [];
-    for (let rail = 0; rail < count; rail++) {
+    for (let local = 0; local < count; local++) {
+      const rail = offset + local;
       const length = this.numberInput((value) =>
         this.apply(
           (panel) => setRailLength(panel, this.session.widthOf, rail, value),
@@ -135,9 +149,11 @@ export class PanelEditor {
       const up = this.button('↑', 'Move row up', () =>
         this.apply((panel) => moveRail(panel, rail, rail - 1), ''),
       );
+      up.disabled = local === 0;
       const down = this.button('↓', 'Move row down', () =>
         this.apply((panel) => moveRail(panel, rail, rail + 1), ''),
       );
+      down.disabled = local === count - 1;
       const line = this.text('div', `Row ${rail + 1} `, 'settings-line');
       line.addEventListener('focusin', () => this.session.select({ rail }));
       line.append(length, this.text('span', ' units '), up, down);

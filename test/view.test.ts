@@ -16,6 +16,8 @@ import {
   snapToSlot,
 } from '../src/view/geometry';
 import { History } from '../src/view/history';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
+import { fitPlate } from '../src/view/plateFit';
 import { sizes, withRailPitches } from './fixtures';
 
 const placement = (id: string, rail: number, slot: number): Placement => ({
@@ -153,9 +155,11 @@ describe('panel geometry with custom pitches', () => {
     expect(module.y + module.height / 2).toBe(rail.y + rail.height / 2);
   });
 
-  it('grows the frame by exactly the added spacing', () => {
-    const base = frameRect(createPanel([10, 10, 10]), sizes).height;
-    expect(frameRect(uneven(), sizes).height).toBe(base + (200 - DEFAULT_RAIL_PITCH_MM) + (120 - DEFAULT_RAIL_PITCH_MM));
+  it('is fitted to the added spacing by exactly that much, the frame being the plate', () => {
+    const base = frameRect(createPanel([10, 10, 10])).height;
+    expect(frameRect(uneven()).height).toBe(base);
+    const fitted = fitPlate(uneven(), DEFAULT_PLATE_ID, sizes);
+    expect(fitted.ok && frameRect(fitted.panel).height).toBe(base + (200 - DEFAULT_RAIL_PITCH_MM) + (120 - DEFAULT_RAIL_PITCH_MM));
   });
 
   it('snaps to the nearest rail and ignores the empty gap between rows', () => {
@@ -167,8 +171,8 @@ describe('panel geometry with custom pitches', () => {
   });
 
   it('keeps the default frame height of the single-pitch layout', () => {
-    expect(frameRect(createPanel([10, 10]), sizes).height).toBe(2 * FRAME_PADDING + 2 * ROW_MARGIN + DEFAULT_RAIL_PITCH_MM);
-    expect(frameRect(createPanel([]), sizes).height).toBe(FRAME_PADDING);
+    expect(frameRect(createPanel([10, 10])).height).toBe(2 * FRAME_PADDING + 2 * ROW_MARGIN + DEFAULT_RAIL_PITCH_MM);
+    expect(frameRect(createPanel([])).height).toBe(2 * FRAME_PADDING + createPanel([]).plates[0]!.heightMm);
   });
 });
 

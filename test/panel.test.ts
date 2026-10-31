@@ -16,6 +16,7 @@ import {
   type PanelEditError,
   type PanelEditResult,
 } from '../src/layout/panel';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
 import type { Panel, Placement, WidthOf } from '../src/layout/placement';
 
 const widthOf: WidthOf = () => 2;
@@ -42,7 +43,7 @@ const heights = (panel: Panel) => panel.rails.map((r) => r.y);
 describe('createPanel', () => {
   it('stacks the rails one pitch apart, the first at the first rail height', () => {
     expect(heights(createPanel([18, 18, 12]))).toEqual([FIRST_RAIL_Y_MM, FIRST_RAIL_Y_MM + DEFAULT_RAIL_PITCH_MM, FIRST_RAIL_Y_MM + 2 * DEFAULT_RAIL_PITCH_MM]);
-    expect(createPanel([12]).rails).toEqual([{ x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 }]);
+    expect(createPanel([12]).rails).toEqual([{ plate: DEFAULT_PLATE_ID, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 }]);
     expect(createPanel([]).rails).toEqual([]);
   });
 });
@@ -135,7 +136,7 @@ describe('setRailPosition', () => {
   it('moves only the chosen rail, in both directions', () => {
     const before = createPanel([12, 12, 12]);
     const panel = unwrap(setRailPosition(before, 1, 30, 220));
-    expect(panel.rails[1]).toEqual({ x: 30, y: 220, lengthUnits: 12 });
+    expect(panel.rails[1]).toEqual({ plate: DEFAULT_PLATE_ID, x: 30, y: 220, lengthUnits: 12 });
     expect(panel.rails[0]).toEqual(before.rails[0]);
     expect(panel.rails[2]).toEqual(before.rails[2]);
   });
@@ -161,7 +162,7 @@ describe('setRailPosition', () => {
   it('does not mutate the input panel', () => {
     const panel = createPanel([12, 12]);
     setRailPosition(panel, 0, 300, 300);
-    expect(panel.rails[0]).toEqual({ x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 });
+    expect(panel.rails[0]).toEqual({ plate: DEFAULT_PLATE_ID, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 });
   });
 });
 

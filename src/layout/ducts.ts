@@ -5,6 +5,8 @@ import type { Panel } from './placement';
 /** A cable duct: a rectangle on the mounting plate that nothing else should stand on. */
 export interface Duct {
   id: string;
+  /** The plate the duct is fixed to. */
+  plate: string;
   /** Left edge, in mm from the left edge of the working area. */
   x: number;
   /** Top edge, in mm from the top of the working area. */

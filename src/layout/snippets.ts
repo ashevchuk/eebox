@@ -39,8 +39,12 @@ export function makeSnippet(
   now: number,
   existing: readonly Snippet[],
 ): MakeSnippetResult {
-  const placements = project.panel.placements.filter(isOnRail).filter((p) => chosen.placementIds.includes(p.id));
-  const combs = project.panel.combs.filter((c) => chosen.combIds.includes(c.id));
+  const chosenPlacements = project.panel.placements.filter(isOnRail).filter((p) => chosen.placementIds.includes(p.id));
+  const chosenCombs = project.panel.combs.filter((c) => chosen.combIds.includes(c.id));
+  // A snippet is made on one plate: the one the first chosen thing stands on.
+  const plateId = project.panel.rails[[...chosenPlacements, ...chosenCombs][0]?.rail ?? -1]?.plate;
+  const placements = chosenPlacements.filter((p) => project.panel.rails[p.rail]?.plate === plateId);
+  const combs = chosenCombs.filter((c) => project.panel.rails[c.rail]?.plate === plateId);
   if (placements.length + combs.length === 0) return { ok: false, error: 'empty' };
   if (existing.length >= MAX_SNIPPETS) return { ok: false, error: 'too-many' };
   const label = normalizeLabel(name);
@@ -53,6 +57,7 @@ export function makeSnippet(
   const moved = <T extends { rail: number; slot: number }>(item: T): T => ({ ...item, rail: item.rail - minRail, slot: roundUnits(item.slot - minSlot) });
   const source = project.panel;
   const panel: Panel = {
+    plates: source.plates.filter((p) => p.id === plateId),
     rails: source.rails.slice(minRail, maxRail + 1),
     placements: placements.map(moved),
     combs: combs.map(moved),

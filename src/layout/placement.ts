@@ -25,6 +25,16 @@ interface PlacementCommon {
   flags?: Record<string, boolean>;
 }
 
+/** A mounting surface, such as the back plate of a cabinet or one of its doors; its things are measured from its top-left corner. */
+export interface Plate {
+  id: string;
+  name: string;
+  widthMm: number;
+  heightMm: number;
+  /** Notes written on the view of this plate; only when there are some. */
+  annotations?: Annotation[];
+}
+
 /** A module clipped on a DIN rail. */
 export interface RailPlacement extends PlacementCommon {
   rail: number;
@@ -32,10 +42,13 @@ export interface RailPlacement extends PlacementCommon {
   slot: number;
   x?: never;
   y?: never;
+  plate?: never;
 }
 
 /** A device fixed straight to the mounting plate. */
 export interface FreePlacement extends PlacementCommon {
+  /** The plate the device is fixed to. */
+  plate: string;
   /** Left edge of the device, in mm from the left edge of the working area. */
   x: number;
   /** Top edge of the device, in mm from the top of the working area. */
@@ -67,8 +80,8 @@ export interface Panel {
   title?: string;
   /** Which version this is and what the people it was passed to decided; only when something is stated. */
   info?: ProjectInfo;
-  /** Notes written on the front view; only when there are some. */
-  annotations?: Annotation[];
+  /** The mounting surfaces: a back plate, doors; at least one. */
+  plates: Plate[];
   /** The rails, copied from the enclosure, so later library edits cannot move placed modules. */
   rails: Rail[];
   /** Cable ducts on the mounting plate; only when there are some. */
@@ -107,6 +120,7 @@ export type PlacementError =
   | { kind: 'unknown-rail' }
   | { kind: 'out-of-rail' }
   | { kind: 'bad-position' }
+  | { kind: 'unknown-plate' }
   | { kind: 'overlap'; with: string }
   | { kind: 'duplicate-id' }
   | { kind: 'unknown-placement' }
@@ -167,7 +181,7 @@ export function movePlacement(
 ): PlacementResult {
   const current = panel.placements.find((p) => p.id === id);
   if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
-  const { x: _x, y: _y, ...rest } = current;
+  const { x: _x, y: _y, plate: _plate, ...rest } = current;
   const moved: RailPlacement = { ...rest, rail, slot };
   const error = checkFit(panel, widthOf, moved, id);
   if (error) return { ok: false, error };

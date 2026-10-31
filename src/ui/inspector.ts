@@ -1,14 +1,18 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../layout/ducts';
 import { moveFreePlacement } from '../layout/free';
+import { fitPlate, fittedPlateSize } from '../view/plateFit';
+import { moveRailToPlate, moveToPlate, plateById, removePlate, renamePlate, resizePlate, setRailCountOnPlate } from '../layout/plates';
 import { lookupsOf } from '../layout/lookups';
 import {
   MAX_CLEARANCE_MM,
   MAX_DUCT_SIZE_MM,
+  MAX_PLATE_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_POSITION_MM,
   MIN_DUCT_SIZE_MM,
+  MIN_PLATE_SIZE_MM,
 } from '../layout/limits';
 import {
   moveRail,
@@ -48,6 +52,7 @@ import {
 } from '../electrical/loads';
 import type { Finding } from '../electrical/problems';
 import { AUTO, energy, positionOf, positionsOf, type Energy } from '../electrical/energy';
+import { notesOnPlate, withPlateNotes } from '../layout/plates';
 import { removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from '../layout/annotations';
 import { INFO_LABELS, MAX_NOTES_CHARS, STATUSES, setInfoField } from '../layout/info';
 import { mmFromUnits, roundUnits } from '../layout/units';
@@ -120,6 +125,8 @@ export interface InspectContext {
   lengthUnit?: LengthUnit;
   /** Faults and advice, so the inspector can say why something is marked. */
   findings?: Finding[];
+  /** The plate on view, whose notes are the notes of the panel; the first one when absent. */
+  plate?: string;
 }
 
 export type EditResult =
@@ -157,9 +164,9 @@ const NOT_A_NUMBER = 'Enter a whole number.';
 const NOT_A_DECIMAL = 'Enter a number.';
 
 /** What the selection points at, given which view is showing: a module node stands for its placement. */
-function targetOf({ project, selection, mode }: InspectContext): Target {
+function targetOf({ project, selection, mode, plate }: InspectContext): Target {
   const { panel, schematic } = project;
-  const note = (mode === 'schematic' ? schematic.annotations : panel.annotations)?.find((n) => n.id === selection.annotationId);
+  const note = (mode === 'schematic' ? schematic.annotations : notesOnPlate(panel, plate ?? panel.plates[0]!.id))?.find((n) => n.id === selection.annotationId);
   if (note) return { kind: 'annotation', note, owner: mode };
   if (mode === 'schematic') {
     const chosen = schematic.wires.filter((w) => selectedWires(selection).includes(w.id));
@@ -198,6 +205,14 @@ const integer = (key: string, label: string, value: number, min: number, max: nu
 const decimal = (key: string, label: string, value: number, min: number, max: number, hint?: string): InspectorField => ({
   key, label, kind: 'number', value, min, max, ...(hint ? { hint } : {}),
 });
+/** Which plate a rail, a device on the plate or a duct is fixed to, by the plate's name; none to choose from when there is a single plate. */
+const plateField = (panel: Panel, plateId: string): InspectorField[] =>
+  panel.plates.length < 2
+    ? []
+    : [{ key: 'plate', label: 'Plate', kind: 'select', value: plateById(panel, plateId)?.name ?? '', options: panel.plates.map((p) => p.name), hint: 'moving it to another plate keeps its place on it' }];
+
+const plateIdNamed = (panel: Panel, name: string): string | undefined => panel.plates.find((p) => p.name === name)?.id;
+
 const NO_EARTHING = 'not stated';
 const readonly = (key: string, label: string, value: string | number): InspectorField => ({
   key, label, kind: 'readonly', value,
@@ -297,10 +312,10 @@ function unitsOf(typed: number | null, unit: LengthUnit = 'units'): number | nul
   return typed === null || unit === 'units' ? typed : roundUnits(typed / MODULE_UNIT_MM);
 }
 
-const notesOf = (project: Project, owner: Mode): Annotation[] => (owner === 'schematic' ? project.schematic.annotations : project.panel.annotations) ?? [];
+const notesOf = (project: Project, owner: Mode, plate?: string): Annotation[] => (owner === 'schematic' ? project.schematic.annotations : notesOnPlate(project.panel, plate ?? project.panel.plates[0]!.id)) ?? [];
 
-function withNoteList(project: Project, owner: Mode, list: readonly Annotation[]): Project {
-  return owner === 'schematic' ? { ...project, schematic: withNotes(project.schematic, list) } : { ...project, panel: withNotes(project.panel, list) };
+function withNoteList(project: Project, owner: Mode, list: readonly Annotation[], plate?: string): Project {
+  return owner === 'schematic' ? { ...project, schematic: withNotes(project.schematic, list) } : { ...project, panel: withPlateNotes(project.panel, plate ?? project.panel.plates[0]!.id, list) };
 }
 
 const INFO_PREFIX = 'info.';
@@ -333,6 +348,7 @@ function positionFields(
     ? [
         decimal('x', 'Left edge', item.x, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge of the plate'),
         decimal('y', 'Top edge', item.y, 0, MAX_RAIL_POSITION_MM, 'mm from the top of the plate'),
+        ...plateField(project.panel, item.plate),
       ]
     : [
         integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
@@ -367,7 +383,9 @@ export function inspect(ctx: InspectContext): InspectorView {
   switch (target.kind) {
     case 'panel': {
       const { panel } = project;
-      const longest = Math.max(0, ...panel.rails.map((r) => r.lengthUnits));
+      const plateOn = plateById(panel, ctx.plate ?? '') ?? panel.plates[0]!;
+      const fitted = fittedPlateSize(panel, plateOn.id, lookupsOf(resolve).sizes);
+      const longest = Math.max(0, ...panel.rails.filter((r) => r.plate === plateOn.id).map((r) => r.lengthUnits));
       const { changed, missing } = moduleDifferences(project, ctx.snapshot, ctx.fromLibraries);
       const differences = [
         changed.length > 0 ? `${changed.length} differ from the libraries` : '',
@@ -375,11 +393,18 @@ export function inspect(ctx: InspectContext): InspectorView {
       ].filter(Boolean);
       return {
         title: 'Panel',
-        actions: changed.length > 0 ? [{ key: 'updateModules', label: 'Update modules from libraries' }] : [],
+        actions: [
+          ...(changed.length > 0 ? [{ key: 'updateModules', label: 'Update modules from libraries' }] : []),
+          ...(fitted.widthMm !== plateOn.widthMm || fitted.heightMm !== plateOn.heightMm ? [{ key: 'fitPlate', label: 'Fit the plate to what is on it' }] : []),
+          ...(panel.plates.length > 1 ? [{ key: 'removePlate', label: 'Remove this plate' }] : []),
+        ],
         fields: [
           text('title', 'Title', panel.title ?? '', 'Untitled panel'),
           ...infoFields(panel),
-          integer('rows', 'Rows', panel.rails.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
+          text('plateName', 'Plate', plateOn.name),
+          decimal('plateWidth', 'Plate width', plateOn.widthMm, MIN_PLATE_SIZE_MM, MAX_PLATE_SIZE_MM, 'mm'),
+          decimal('plateHeight', 'Plate height', plateOn.heightMm, MIN_PLATE_SIZE_MM, MAX_PLATE_SIZE_MM, 'mm'),
+          integer('rows', 'Rows', panel.rails.filter((r) => r.plate === plateOn.id).length, 1, MAX_RAILS, 'a row must be empty to be removed'),
           readonly('size', 'Size', `longest row ${longest} units`),
           decimal('clearance', 'Clearance', panel.clearanceMm ?? 0, 0, MAX_CLEARANCE_MM, 'mm kept clear around devices on the plate and ducts; 0 checks nothing'),
           readonly(
@@ -467,6 +492,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           decimal('y', 'Top edge', duct.y, 0, MAX_RAIL_POSITION_MM, 'mm from the top of the plate'),
           decimal('widthMm', 'Width', duct.widthMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
           decimal('heightMm', 'Height', duct.heightMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
+          ...plateField(project.panel, duct.plate),
           readonly('id', 'Id', duct.id),
         ],
       };
@@ -491,6 +517,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           decimal('length', 'Length', panel.rails[rail]?.lengthUnits ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.rails[rail]?.lengthUnits ?? 0)} mm`),
           decimal('x', 'Left end', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge'),
           decimal('y', 'Height', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top to the middle of the rail'),
+          ...plateField(panel, panel.rails[rail]?.plate ?? ''),
           readonly('contents', 'Contents', `${onRail} module${onRail === 1 ? '' : 's'}, ${combsOnRail} comb${combsOnRail === 1 ? '' : 's'}`),
         ],
       };
@@ -545,6 +572,7 @@ export function inspect(ctx: InspectContext): InspectorView {
 const ERROR_TEXT: Record<string, string> = {
   'out-of-rail': 'Does not fit on the rail.',
   'bad-position': 'The position is outside the plate.',
+  'unknown-plate': 'There is no such plate.',
   'unknown-rail': 'There is no such row.',
   'unknown-module': 'The module is missing from the libraries.',
   'not-resizable': 'This module cannot be resized.',
@@ -671,6 +699,17 @@ export function applyEdit(
         if (result.ok) return withPanel(result.panel);
         return fail(field === 'status' ? `Status: ${STATUSES.join(', ')}.` : field === 'notes' ? `Notes: at most ${MAX_NOTES_CHARS} characters.` : LABEL_MESSAGE);
       }
+      if (key === 'plateName' || key === 'plateWidth' || key === 'plateHeight') {
+        const plateOn = plateById(panel, ctx.plate ?? '') ?? panel.plates[0]!;
+        if (key === 'plateName') {
+          const result = renamePlate(panel, plateOn.id, text);
+          return result.ok ? withPanel(result.panel) : fail(result.error === 'duplicate-name' ? 'Another plate has that name.' : LABEL_MESSAGE);
+        }
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = resizePlate(panel, plateOn.id, key === 'plateWidth' ? mm : plateOn.widthMm, key === 'plateHeight' ? mm : plateOn.heightMm);
+        return result.ok ? withPanel(result.panel) : fail(`A plate is ${MIN_PLATE_SIZE_MM} to ${MAX_PLATE_SIZE_MM} mm each way.`);
+      }
       if (key === 'clearance') {
         const mm = numberOf(raw);
         if (mm === null) return fail(NOT_A_DECIMAL);
@@ -680,8 +719,8 @@ export function applyEdit(
       if (key === 'rows') {
         const value = integerOf(raw);
         if (value === null) return fail(NOT_A_NUMBER);
-        const result = setRailCount(panel, value);
-        return result.ok ? withPanel(result.panel) : fail(result.error === 'invalid-value' ? `Rows: 1 to ${MAX_RAILS}.` : describeError(result.error));
+        const result = value >= 1 ? setRailCountOnPlate(panel, ctx.plate ?? panel.plates[0]!.id, value) : ({ ok: false, error: 'invalid-value' } as const);
+        return result.ok ? withPanel(result.panel) : fail(result.error === 'invalid-value' ? `Rows: 1 to ${MAX_RAILS}.` : describeError(result.error === 'not-empty' ? 'rail-not-empty' : result.error));
       }
       return fail('That property cannot be edited.');
     }
@@ -706,6 +745,11 @@ export function applyEdit(
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if ((key === 'nodeX' || key === 'nodeY') && node) return moveNodeTo(node);
+      if (key === 'plate' && isFree(placement)) {
+        const id = plateIdNamed(panel, text);
+        const result = id ? moveToPlate(panel, placement.id, id) : ({ ok: false, error: 'unknown-plate' } as const);
+        return result.ok ? withPanel(result.panel) : fail(describeError('unknown-plate'));
+      }
       if ((key === 'x' || key === 'y') && isFree(placement)) {
         const mm = numberOf(raw);
         if (mm === null) return fail(NOT_A_DECIMAL);
@@ -764,14 +808,19 @@ export function applyEdit(
     }
     case 'annotation': {
       if (key !== 'noteText') return fail('That property cannot be edited.');
-      const result = setAnnotationText(notesOf(project, target.owner), target.note.id, text);
-      return result.ok ? { ok: true, project: withNoteList(project, target.owner, result.list) } : fail('A note is 1 to 200 characters on one line.');
+      const result = setAnnotationText(notesOf(project, target.owner, ctx.plate), target.note.id, text);
+      return result.ok ? { ok: true, project: withNoteList(project, target.owner, result.list, ctx.plate) } : fail('A note is 1 to 200 characters on one line.');
     }
     case 'duct': {
       const { duct } = target;
       if (key === 'label') {
         const result = setDuctLabel(panel, duct.id, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
+      }
+      if (key === 'plate') {
+        const id = plateIdNamed(panel, text);
+        const result = id ? moveToPlate(panel, duct.id, id) : ({ ok: false, error: 'unknown-plate' } as const);
+        return result.ok ? withPanel(result.panel) : fail(describeError('unknown-plate'));
       }
       const mm = numberOf(raw);
       if (mm === null) return fail(NOT_A_DECIMAL);
@@ -785,6 +834,13 @@ export function applyEdit(
       return fail('That property cannot be edited.');
     case 'rail': {
       const { rail } = target;
+      if (key === 'plate') {
+        const id = plateIdNamed(panel, text);
+        const result = id ? moveRailToPlate(panel, rail, id) : ({ ok: false, error: 'unknown-plate' } as const);
+        if (!result.ok) return fail(describeError('unknown-plate'));
+        const last = result.panel.rails.map((r) => r.plate).lastIndexOf(id!);
+        return { ok: true, project: { ...project, panel: result.panel }, selection: { rail: last } };
+      }
       if (key === 'label') {
         const result = setRailLabel(panel, rail, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
@@ -885,10 +941,19 @@ export function applyAction(ctx: InspectContext, key: string, options: { confirm
     return { ok: true, project: { ...ctx.project, schematic } };
   }
   if (target.kind === 'annotation' && (key === 'removeArrow' || key === 'removeNote')) {
-    const list = notesOf(ctx.project, target.owner);
-    if (key === 'removeNote') return { ok: true, project: withNoteList(ctx.project, target.owner, removeAnnotation(list, target.note.id)), selection: {} };
+    const list = notesOf(ctx.project, target.owner, ctx.plate);
+    if (key === 'removeNote') return { ok: true, project: withNoteList(ctx.project, target.owner, removeAnnotation(list, target.note.id), ctx.plate), selection: {} };
     const result = setAnnotationTarget(list, target.note.id, undefined);
-    return result.ok ? { ok: true, project: withNoteList(ctx.project, target.owner, result.list) } : fail('That note is gone.');
+    return result.ok ? { ok: true, project: withNoteList(ctx.project, target.owner, result.list, ctx.plate) } : fail('That note is gone.');
+  }
+  if (key === 'fitPlate' && target.kind === 'panel') {
+    const result = fitPlate(ctx.project.panel, ctx.plate ?? ctx.project.panel.plates[0]!.id, lookupsOf(ctx.resolve).sizes);
+    return result.ok ? { ok: true, project: { ...ctx.project, panel: result.panel } } : fail(`A plate is ${MIN_PLATE_SIZE_MM} to ${MAX_PLATE_SIZE_MM} mm each way.`);
+  }
+  if (key === 'removePlate' && target.kind === 'panel') {
+    const result = removePlate(ctx.project.panel, ctx.plate ?? ctx.project.panel.plates[0]!.id);
+    if (result.ok) return { ok: true, project: { ...ctx.project, panel: result.panel } };
+    return fail(result.error === 'last-plate' ? 'A panel keeps at least one plate.' : 'Move or delete what is on the plate first.');
   }
   if (key === 'removeDuct' && target.kind === 'duct') {
     const result = removeDuct(ctx.project.panel, target.duct.id);

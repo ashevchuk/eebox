@@ -677,7 +677,7 @@ try {
   });
 
   await step('a note is written on the drawing with an arrow, dragged, shown in an export and deleted', async () => {
-    const notes = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); return JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.annotations ?? []; })()`);
+    const notes = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); return JSON.parse(localStorage.getItem('eebox:autosave')).project.panel.plates[0].annotations ?? []; })()`);
     await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
     await browser.mouse('mousePressed', 260, 120);
     await browser.mouse('mouseReleased', 260, 120);

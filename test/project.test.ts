@@ -221,21 +221,21 @@ describe('panel spacing in the project file', () => {
     expect(errorPaths(file)).toEqual([`project.panel.${field}`]);
   });
 
-  it('rejects a panel without rails and one with too many', () => {
+  it('takes a panel without rails, as a plate may hold only devices, and refuses one with too many', () => {
     const file = validFile();
     file.project.panel.rails = [];
-    expect(errorPaths(file)).toEqual(['project.panel.rails']);
-    file.project.panel.rails = Array.from({ length: 21 }, () => ({ x: 0, y: 110, lengthUnits: 12 }));
+    expect(parseProjectJson(JSON.stringify(file)).ok).toBe(true);
+    file.project.panel.rails = Array.from({ length: 21 }, () => ({ plate: 'plate1', x: 0, y: 110, lengthUnits: 12 }));
     expect(errorPaths(file)).toEqual(['project.panel.rails']);
   });
 
   it('rejects a rail with a position outside the limits or an absurd length', () => {
     const file = validFile();
-    file.project.panel.rails = [{ x: -1, y: 110, lengthUnits: 12 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: -1, y: 110, lengthUnits: 12 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].x']);
-    file.project.panel.rails = [{ x: 0, y: 1_000_000, lengthUnits: 12 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 1_000_000, lengthUnits: 12 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].y']);
-    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 1_000_000_000 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 1_000_000_000 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].lengthUnits']);
   });
 });
@@ -366,11 +366,11 @@ describe('labels in the project file', () => {
 
   it('accepts only a valid label on a rail, and no other field', () => {
     const file = validFile();
-    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, label: 'a\nb' }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, label: 'a\nb' }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
-    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, label: '' }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, label: '' }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
-    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, colour: 'red' } as never];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, colour: 'red' } as never];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].colour']);
   });
 

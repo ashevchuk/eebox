@@ -4,6 +4,8 @@ import { addFreePlacement, moveFreeGroup, moveFreePlacement, roundMm } from '../
 import { copyItems, FREE_PASTE_OFFSET_MM, pasteItems, repeatItems } from '../src/layout/clipboard';
 import { MAX_DUCTS, MAX_DUCT_SIZE_MM, MAX_RAIL_POSITION_MM, MIN_DUCT_SIZE_MM } from '../src/layout/limits';
 import { createPanel } from '../src/layout/panel';
+import { DEFAULT_PLATE_ID } from '../src/layout/plates';
+import { fitPlate } from '../src/view/plateFit';
 import { isFree, isOnRail, type FreePlacement, type Panel } from '../src/layout/placement';
 import { placeFromShelfFree, takeOff } from '../src/layout/shelf';
 import { buildProjectFile, parseProjectJson } from '../src/project/file';
@@ -19,8 +21,8 @@ import { Session } from '../src/ui/session';
 import { SvgContext } from '../src/view/svgContext';
 import { combAt, panelOf, place, ref, resolve, sizes, widthOf } from './fixtures';
 
-const freeAt = (id: string, moduleId: string, x: number, y: number): FreePlacement => ({ id, module: ref(moduleId), x, y });
-const duct = (id: string, x: number, y: number, widthMm = 200, heightMm = 40): Duct => ({ id, x, y, widthMm, heightMm });
+const freeAt = (id: string, moduleId: string, x: number, y: number): FreePlacement => ({ id, module: ref(moduleId), plate: DEFAULT_PLATE_ID, x, y });
+const duct = (id: string, x: number, y: number, widthMm = 200, heightMm = 40): Duct => ({ id, plate: DEFAULT_PLATE_ID, x, y, widthMm, heightMm });
 const unwrap = (result: { ok: boolean; panel?: Panel }): Panel => {
   if (!result.ok || !result.panel) throw new Error(JSON.stringify(result));
   return result.panel;
@@ -59,7 +61,7 @@ describe('devices fixed to the plate', () => {
   it('can be shelved and put back on the plate, keeping their id', () => {
     const shelved = unwrap(takeOff(withFree(), 'p2'));
     expect(shelved.shelf[0]).toEqual({ id: 'p2', module: ref('breaker16') });
-    const back = unwrap(placeFromShelfFree(shelved, widthOf, 'p2', 5, 6));
+    const back = unwrap(placeFromShelfFree(shelved, widthOf, 'p2', DEFAULT_PLATE_ID, 5, 6));
     expect(back.placements.find((p) => p.id === 'p2')).toMatchObject({ x: 5, y: 6 });
     expect(back.shelf).toEqual([]);
   });
@@ -221,15 +223,18 @@ describe('where devices on the plate and ducts are on the drawing', () => {
     expect(found).toEqual({ placements: [], combs: [], ducts: ['d1'] });
   });
 
-  it('makes the frame hold a device on the plate and a duct, with the room a label needs below', () => {
-    const base = frameRect(panelOf([], [], [12]), sizes);
+  it('is held by a plate that is fitted to a device on it and a duct, with the room a label needs below', () => {
+    const base = frameRect(panelOf([], [], [12]));
     const far = { ...panelOf([], [], [12]), ducts: [duct('d1', 800, 500, 100, 40)] };
-    const frame = frameRect(far, sizes);
-    expect(frame.width).toBeGreaterThan(base.width);
-    expect(frame.y + frame.height).toBeGreaterThanOrEqual(FRAME_PADDING + 500 + 40 + FRAME_PADDING);
+    const fittedDuct = fitPlate(far, DEFAULT_PLATE_ID, sizes);
+    if (!fittedDuct.ok) throw new Error(fittedDuct.error);
+    expect(frameRect(fittedDuct.panel).width).toBeGreaterThan(base.width);
+    expect(frameRect(fittedDuct.panel).height).toBeGreaterThanOrEqual(FRAME_PADDING + 500 + 40 + FRAME_PADDING);
     const device = { ...panelOf([], [], [12]), placements: [freeAt('p1', 'mcb1', 900, 700)] };
-    const body = placementRect(device, sizes, device.placements[0]!);
-    const around = frameRect(device, sizes);
+    const fitted = fitPlate(device, DEFAULT_PLATE_ID, sizes);
+    if (!fitted.ok) throw new Error(fitted.error);
+    const body = placementRect(fitted.panel, sizes, fitted.panel.placements[0]!);
+    const around = frameRect(fitted.panel);
     expect(around.x + around.width).toBeGreaterThanOrEqual(body.x + body.width + FRAME_PADDING);
     expect(around.y + around.height).toBeGreaterThan(body.y + body.height);
     expect(around.y).toBe(0);

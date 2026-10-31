@@ -1,5 +1,6 @@
 import { nextCombId } from './combs';
-import { moveRail, setRailCount, setRailLabel, setRailLength, type PanelEditError } from './panel';
+import { addRail } from './plates';
+import { moveRail, setRailLabel, setRailLength, type PanelEditError } from './panel';
 import { findProblems, isOnRail, nextPlacementId, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { roundUnits } from './units';
 
@@ -59,9 +60,9 @@ export type DuplicateRowResult = { ok: true; panel: Panel; placementIds: string[
 export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   const source = panel.rails[rail];
   if (source === undefined) return { ok: false, error: 'unknown-rail' };
-  const added = setRailCount(panel, panel.rails.length + 1);
-  if (!added.ok) return added;
-  const lastIndex = added.panel.rails.length - 1;
+  const added = addRail(panel, source.plate);
+  if (!added.ok) return { ok: false, error: 'invalid-value' };
+  const lastIndex = added.panel.rails.map((r) => r.plate).lastIndexOf(source.plate);
   const sized = setRailLength(added.panel, () => 1, lastIndex, source.lengthUnits);
   if (!sized.ok) return sized;
   const labelled = setRailLabel(sized.panel, lastIndex, source.label ?? '');

@@ -3,8 +3,17 @@
   "version": 1,
   "project": {
     "panel": {
+      "plates": [
+        {
+          "id": "plate1",
+          "name": "Back plate",
+          "widthMm": 420.0,
+          "heightMm": 220
+        }
+      ],
       "rails": [
         {
+          "plate": "plate1",
           "x": 0,
           "y": 110,
           "lengthUnits": 24

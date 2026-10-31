@@ -135,7 +135,19 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   title.textContent = panel.title ?? 'Panel';
   sheet.style.setProperty('--drawing-max-height', `${drawingMaxHeightMm(options, exportTexts.sheetTitle ? titleBlockHeightMm(panel.info) : 0)}mm`);
   const parts: HTMLElement[] = exportTexts.sheetTitle ? [title, ...titleBlock(panel.info)] : [];
-  if (options.parts.panel) parts.push(drawingOf(views.panel, session, exportTexts.captions ? 'Panel layout' : '', 'panel-'));
+  if (options.parts.panel) {
+    // Every plate gets a drawing of its own; the plate on view is put back afterwards.
+    const onView = session.plateId;
+    try {
+      panel.plates.forEach((plate, index) => {
+        session.plateId = plate.id;
+        const caption = panel.plates.length > 1 ? `Panel layout: ${plate.name}` : 'Panel layout';
+        parts.push(drawingOf(views.panel, session, exportTexts.captions ? caption : '', `panel${index}-`));
+      });
+    } finally {
+      session.plateId = onView;
+    }
+  }
   if (options.parts.schematic && schematic.nodes.length > 0) parts.push(drawingOf(views.schematic, session, exportTexts.captions ? 'Wiring schematic' : '', 'schematic-'));
   const rows = buildBom(panel, session.resolve);
   if (options.parts.parts && rows.length > 0) {

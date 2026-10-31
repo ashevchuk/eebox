@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_PLATE_ID, withPlateNotes } from '../src/layout/plates';
 import {
   MAX_ANNOTATIONS,
   MAX_NOTE_CHARS,
@@ -117,7 +118,7 @@ describe('notes in a project file', () => {
     JSON.stringify(
       buildProjectFile(
         {
-          panel: { ...panelOf([place('p1', 'breaker16', 0, 0)]), ...(panelNotes ? { annotations: panelNotes as Annotation[] } : {}) },
+          panel: panelNotes ? withPlateNotes(panelOf([place('p1', 'breaker16', 0, 0)]), DEFAULT_PLATE_ID, panelNotes as Annotation[]) : panelOf([place('p1', 'breaker16', 0, 0)]),
           schematic: { ...emptySchematic(), ...(schematicNotes ? { annotations: schematicNotes as Annotation[] } : {}) },
         },
         resolve,
@@ -126,13 +127,13 @@ describe('notes in a project file', () => {
 
   it('are written for the panel and for the schematic and read back', () => {
     const parsed = parseProjectJson(file([note('a1', 1, 2, 'On the panel')], [note('a1', 3, 4, 'On the schematic', { x: 9, y: 9 })]));
-    expect(parsed.ok && parsed.file.project.panel.annotations?.[0]?.text).toBe('On the panel');
+    expect(parsed.ok && parsed.file.project.panel.plates[0]?.annotations?.[0]?.text).toBe('On the panel');
     expect(parsed.ok && parsed.file.project.schematic.annotations?.[0]?.target).toEqual({ x: 9, y: 9 });
   });
 
   it('are not required', () => {
     const parsed = parseProjectJson(file());
-    expect(parsed.ok && parsed.file.project.panel.annotations).toBeUndefined();
+    expect(parsed.ok && parsed.file.project.panel.plates[0]?.annotations).toBeUndefined();
   });
 
   it('are refused when they are not a list of good notes, and the message says which', () => {

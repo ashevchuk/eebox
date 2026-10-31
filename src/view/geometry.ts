@@ -91,13 +91,13 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
     .map((_r, i) => railRect(panel, i))
     .filter((r, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
     .map((r) => r.y + r.height / 2 - DIN_MODULE_HEIGHT_MM / 2 - COMB_OVERHANG);
-  const limit = below.length > 0 ? Math.min(...below) : bottom + ROOM_AROUND_MODULE;
+  const limit = below.length > 0 ? Math.min(...below) : frameRect(panel).height;
   return Math.max(0, limit - bottom - LABEL_GAP);
 }
 
-/** How far a label under a placed module may run: down to what is below it on its rail, or the room the frame keeps under a device on the plate. */
+/** How far a label under a placed module may run: down to what is below it on its rail, or to the end of the frame for a device on the plate. */
 export function placementLabelRoom(panel: Panel, placement: Placement, body: Rect): number {
-  return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : ROOM_AROUND_MODULE - LABEL_GAP;
+  return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : Math.max(0, frameRect(panel).height - (body.y + body.height) - LABEL_GAP);
 }
 
 export function combAtPoint(
@@ -113,25 +113,10 @@ export function combAtPoint(
   });
 }
 
-/** Room kept above and below a standard module, inside the frame: the labels stand in it. */
-const ROOM_AROUND_MODULE = FRAME_PADDING + ROW_MARGIN - DIN_MODULE_HEIGHT_MM / 2;
-
-/** The frame is as large as the rails and what stands on them need, with the same room around a taller module as around a standard one. */
-export function frameRect(panel: Panel, sizes: Sizes): Rect {
-  const bodies = panel.placements.map((p) => placementRect(panel, sizes, p));
-  const ducts = ductsOf(panel).map(ductRect);
-  const railBodies = panel.placements.flatMap((p, i) => (isOnRail(p) ? [bodies[i]!] : []));
-  const plateBodies = panel.placements.flatMap((p, i) => (isFree(p) ? [bodies[i]!] : []));
-  const right = Math.max(0, ...panel.rails.map((r) => r.x + r.lengthUnits * MODULE_UNIT_MM), ...bodies.map((b) => b.x + b.width - FRAME_PADDING), ...ducts.map((d) => d.x + d.width - FRAME_PADDING));
-  const lowest = panel.rails.length === 0 ? undefined : Math.max(...panel.rails.map((r) => r.y));
-  const railsBottom = lowest === undefined ? FRAME_PADDING : FRAME_PADDING + lowest + ROW_MARGIN + FRAME_PADDING;
-  const top = Math.min(0, ...railBodies.map((b) => b.y - ROOM_AROUND_MODULE));
-  const bottom = Math.max(
-    railsBottom,
-    ...[...railBodies, ...plateBodies].map((b) => b.y + b.height + ROOM_AROUND_MODULE),
-    ...ducts.map((d) => d.y + d.height + FRAME_PADDING),
-  );
-  return { x: 0, y: top, width: right + FRAME_PADDING * 2, height: bottom - top };
+/** The frame is the plate, with a margin around it; a panel of several plates shows its first. */
+export function frameRect(panel: Panel): Rect {
+  const plate = panel.plates[0];
+  return { x: 0, y: 0, width: (plate?.widthMm ?? 0) + 2 * FRAME_PADDING, height: (plate?.heightMm ?? 0) + 2 * FRAME_PADDING };
 }
 
 /**
@@ -278,7 +263,7 @@ export function printArea(
     rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
   });
   if (rects.length === 0) {
-    const frame = frameRect(panel, sizes);
+    const frame = frameRect(panel);
     return { bounds: { minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height }, rects };
   }
   const bounds: Bounds = {
