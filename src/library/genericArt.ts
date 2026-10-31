@@ -49,7 +49,9 @@ const testButton = (width: number): ArtShape[] => [
   { kind: 'text', x: width - CORNER_MM - 1, y: LOWER_ROW_MM - 2, text: 'T', size: 3.6, fill: INK, align: 'centre', bold: true, anchor: 'right' },
 ];
 
-const led = (colour: string, x: number, anchor: 'left' | 'right'): ArtShape => ({ kind: 'ellipse', cx: x, cy: 7, rx: 2, ry: 2, fill: colour, ...stroked, anchor });
+/** Below the terminals, which sit at 7 mm, so that no terminal is drawn over it. */
+const LED_ROW_MM = 12.6;
+const led = (colour: string, x: number, anchor: 'left' | 'right'): ArtShape => ({ kind: 'ellipse', cx: x, cy: LED_ROW_MM, rx: 1.2, ry: 1.2, fill: colour, ...stroked, anchor });
 
 /** A knob with its slot in the lower part of the face. */
 const knob = (cx: number, anchor: 'left' | 'centre' | 'right'): ArtShape[] => [
@@ -90,13 +92,12 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
       case 'contactor':
         return [
           bandWindow(width, INK),
-          { kind: 'line', x1: 4, y1: 9.5, x2: 12, y2: 4.5, stroke: WHITE, strokeWidth: 0.8, anchor: 'left' },
           ...[74, 77.5].map((y): ArtShape => ({ kind: 'line', x1: 3, y1: y, x2: width - 3, y2: y, stroke: STEEL, strokeWidth: 0.6, anchor: 'stretch' })),
         ];
       case 'spd':
         return [
           bandWindow(width, '#16a34a'),
-          { kind: 'polyline', points: [[mid - 3, 72], [mid + 1, 76], [mid - 1, 77], [mid + 3, 82]], stroke: '#dc2626', strokeWidth: 0.9, anchor: 'centre' },
+          { kind: 'polyline', points: [[mid - 3, 72], [mid + 1, 75], [mid - 1, 76], [mid + 3, 79]], stroke: '#dc2626', strokeWidth: 0.9, anchor: 'centre' },
         ];
       case 'meter':
         return [
@@ -105,8 +106,8 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
         ];
       case 'psu':
         return [
-          { kind: 'line', x1: mid - 3.5, y1: 5.5, x2: mid + 3.5, y2: 5.5, stroke: WHITE, strokeWidth: 0.9, anchor: 'centre' },
-          { kind: 'line', x1: mid - 3.5, y1: 8.5, x2: mid + 3.5, y2: 8.5, stroke: WHITE, strokeWidth: 0.9, anchor: 'centre' },
+          { kind: 'line', x1: mid - 3.5, y1: 10.8, x2: mid + 3.5, y2: 10.8, stroke: WHITE, strokeWidth: 0.9, anchor: 'centre' },
+          { kind: 'line', x1: mid - 3.5, y1: 12.8, x2: mid + 3.5, y2: 12.8, stroke: WHITE, strokeWidth: 0.9, anchor: 'centre' },
           { kind: 'ellipse', cx: width - CORNER_MM, cy: LOWER_ROW_MM, rx: 1.8, ry: 1.8, fill: '#22c55e', ...stroked, anchor: 'right' },
           ...knob(CORNER_MM + 1, 'left'),
         ];
@@ -138,9 +139,9 @@ function otherArt(def: ModuleDef, width: number): ArtShape[] {
   if (def.id.startsWith('pilot-light')) return [{ kind: 'ellipse', cx: mid, cy: LOWER_ROW_MM - 1, rx: 4.5, ry: 4.5, fill: '#fecaca', stroke: '#b91c1c', strokeWidth: 0.6, anchor: 'centre' }];
   if (def.id.startsWith('din-socket')) {
     return [
-      { kind: 'ellipse', cx: mid, cy: LOWER_ROW_MM - 2, rx: 6.5, ry: 6.5, fill: PALE, stroke: INK, strokeWidth: 0.6, anchor: 'centre' },
-      { kind: 'ellipse', cx: mid - 2.4, cy: LOWER_ROW_MM - 2, rx: 1, ry: 1, fill: INK, anchor: 'centre' },
-      { kind: 'ellipse', cx: mid + 2.4, cy: LOWER_ROW_MM - 2, rx: 1, ry: 1, fill: INK, anchor: 'centre' },
+      { kind: 'ellipse', cx: mid, cy: LOWER_ROW_MM - 1.6, rx: 5.2, ry: 5.2, fill: PALE, stroke: INK, strokeWidth: 0.6, anchor: 'centre' },
+      { kind: 'ellipse', cx: mid - 2.4, cy: LOWER_ROW_MM - 1.6, rx: 1, ry: 1, fill: INK, anchor: 'centre' },
+      { kind: 'ellipse', cx: mid + 2.4, cy: LOWER_ROW_MM - 1.6, rx: 1, ry: 1, fill: INK, anchor: 'centre' },
     ];
   }
   return [];

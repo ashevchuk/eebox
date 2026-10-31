@@ -22,7 +22,7 @@ describe('the bundled library', () => {
   });
 
   it('is valid and has metadata that says where the numbers come from', () => {
-    expect(library.version).toBe('11');
+    expect(library.version).toBe('12');
     expect(library.description).toMatch(/not taken from any manufacturer/);
   });
 
