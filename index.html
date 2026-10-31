@@ -49,6 +49,14 @@
       }
       button.active { border-color: var(--accent); color: var(--accent); }
       .toolbar-group { display: flex; gap: 4px; }
+      .toolbar-group:empty { display: none; }
+      .toolbar-more[hidden] { display: none; }
+      .toolbar-more .menu-list { left: auto; right: 0; min-width: 180px; }
+      /* A finger needs more than a pointer does. */
+      @media (pointer: coarse) {
+        header button { padding-block: 9px; }
+        .menu-list .menu-item, .context-item { padding-block: 10px; }
+      }
       .toolbar-separator { align-self: stretch; width: 1px; margin: 2px 4px; background: var(--border); }
       .menu { position: relative; }
       .menu-button::after { content: ' \25BE'; color: var(--text-dim); }
@@ -598,6 +606,10 @@
       <button id="check" title="Look for overlaps, orphaned nodes, wrongly joined conductors and design problems">Check</button>
       <button id="help" title="The keys and gestures (?)">?</button>
       <button id="bundle-mode" class="schematic-only" title="While on, drag from a node to another node to wire all poles (same as Shift-drag)">Wire all poles</button>
+      <div class="menu toolbar-more" hidden>
+        <button class="menu-button" id="menu-more" aria-haspopup="menu" aria-expanded="false" title="The buttons that do not fit">More</button>
+        <div class="menu-list" role="menu" hidden></div>
+      </div>
       <div id="status"></div>
       <div class="hint schematic-only">Drag terminal to terminal to wire it. Shift-drag, or switch on Wire all poles, from node to node to wire every pole. Drag a wire to move it; drag its piece at a terminal sideways to bend it.</div>
     </header>

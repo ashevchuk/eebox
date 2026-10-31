@@ -21,6 +21,8 @@ export const PAGE: Dictionary = {
   View: 'Вигляд',
   Minimap: 'Мінікарта',
   'Grid (mm)': 'Сітка (мм)',
+  More: 'Ще',
+  'The buttons that do not fit': 'Кнопки, що не вмістилися',
   'Distances to the neighbours': 'Відстані до сусідів',
   'Import terminal labels (CSV)…': 'Імпорт підписів клем (CSV)…',
   'Name the terminals of the modules from a table of Device, Terminal and Label, such as the file that Export > Inputs and outputs writes, once its Label column is filled in': 'Підписати клеми модулів за таблицею Пристрій, Клема, Підпис, як у файлі, що пише Експорт > Входи й виходи, коли його стовпець Підпис заповнений',

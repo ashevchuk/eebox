@@ -77,6 +77,7 @@ import { chooseExample } from './ui/examplesDialog';
 import { editCableSettings } from './ui/cableSettingsDialog';
 import { chooseColours } from './ui/colourDialog';
 import { initMenus } from './ui/menu';
+import { initToolbarOverflow } from './ui/toolbarOverflow';
 import { PaletteView } from './ui/paletteView';
 import { DEFAULT_PRINT_OPTIONS, pageRule, type PrintOptions } from './project/printOptions';
 import { openPrintDialog } from './ui/printDialog';
@@ -1340,6 +1341,25 @@ window.addEventListener(
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
 initMenus();
+const fitToolbar = initToolbarOverflow(document.querySelector('header')!);
+let toolbarFitQueued = false;
+let toolbarMode = session.mode;
+const queueToolbarFit = (): void => {
+  if (toolbarFitQueued) return;
+  toolbarFitQueued = true;
+  requestAnimationFrame(() => {
+    toolbarFitQueued = false;
+    fitToolbar();
+  });
+};
+window.addEventListener('resize', queueToolbarFit);
+void document.fonts.ready.then(queueToolbarFit);
+session.subscribe(() => {
+  if (session.mode === toolbarMode) return;
+  toolbarMode = session.mode;
+  queueToolbarFit();
+});
+queueToolbarFit();
 byId('cable-settings').addEventListener('click', async () => {
   const edited = await editCableSettings(session.cableSettings);
   if (!edited) return;
