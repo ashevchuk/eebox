@@ -176,13 +176,13 @@ function bars(): DinModule[] {
 }
 
 function combs(): DinModule[] {
-  const comb = (id: string, name: string, poles: 1 | 2 | 3 | 4, pattern: Array<'L' | 'L1' | 'L2' | 'L3' | 'N'>): DinModule => ({
+  const comb = (id: string, name: string, poles: 1 | 2 | 3 | 4, pattern: Array<'L' | 'L1' | 'L2' | 'L3' | 'N'>, side: 'top' | 'bottom' = 'top'): DinModule => ({
     id,
     kind: 'comb',
     name,
     widthUnits: 12,
     poles,
-    comb: { pattern, side: 'top' },
+    comb: { pattern, side },
     resizable: RESIZABLE_COMB,
   });
   return [
@@ -190,6 +190,10 @@ function combs(): DinModule[] {
     comb('comb-3phn-12', 'Comb 3-phase + N, 12 units', 4, ['L1', 'L2', 'L3', 'N']),
     comb('comb-1ph-12', 'Comb 1-phase, 12 units', 1, ['L']),
     comb('comb-lpn-12', 'Comb L+N, 12 units', 2, ['L', 'N']),
+    comb('comb-3ph-12-bottom', 'Comb 3-phase, bottom, 12 units', 3, ['L1', 'L2', 'L3'], 'bottom'),
+    comb('comb-3phn-12-bottom', 'Comb 3-phase + N, bottom, 12 units', 4, ['L1', 'L2', 'L3', 'N'], 'bottom'),
+    comb('comb-1ph-12-bottom', 'Comb 1-phase, bottom, 12 units', 1, ['L'], 'bottom'),
+    comb('comb-lpn-12-bottom', 'Comb L+N, bottom, 12 units', 2, ['L', 'N'], 'bottom'),
   ];
 }
 
@@ -499,7 +503,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '10';
+export const GENERIC_LIBRARY_VERSION = '11';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 
