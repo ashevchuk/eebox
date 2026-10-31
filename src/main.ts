@@ -24,7 +24,7 @@ import { openHelpDialog } from './ui/helpDialog';
 import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
 import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
 import { openProjectsDialog } from './ui/projectsDialog';
-import { summaryTable, tablesOf, ioTable, terminalTable, type Table } from './ui/tables';
+import { cutTable, ioTable, summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
 import { applyEdit } from './ui/inspector';
 import { openTablesDialog } from './ui/tablesDialog';
 import { drawHint } from './view/hint';
@@ -64,6 +64,7 @@ import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, duplicateModule, newLibrary, removeModule, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
+import { cutList, cutListToCsv } from './electrical/cutList';
 import { circuitSchedule, ferruleCounts, scheduleToCsv, ioSchedule, ioScheduleToCsv, terminalSchedule, terminalScheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
 import { LIGHT_THEME, setColourScheme } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
@@ -998,6 +999,16 @@ function exportTerminals(): void {
   downloadBlob(new Blob(['\uFEFF', terminalScheduleToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-terminals.csv`);
 }
 
+function exportCuts(): void {
+  const rows = cutList(session.project, session.resolve);
+  if (rows.length === 0) {
+    showStatus('There is nothing to cut yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', cutListToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-cut-list.csv`);
+}
+
 function exportIo(): void {
   const rows = ioSchedule(session.project, session.resolve);
   if (rows.length === 0) {
@@ -1368,6 +1379,7 @@ byId('export-circuits').addEventListener('click', exportCircuits);
 byId('export-wires').addEventListener('click', exportWires);
 byId('export-terminals').addEventListener('click', exportTerminals);
 byId('export-io').addEventListener('click', exportIo);
+byId('export-cuts').addEventListener('click', exportCuts);
 byId('export-wire-labels').addEventListener('click', exportWireLabels);
 for (const preset of ['source1', 'source3', 'sourcePen1', 'sourcePen', 'load1', 'load3', 'earthElectrode'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => {
@@ -1398,6 +1410,7 @@ const currentTables = () => [
   ...tablesOf(session.project, session.resolve, session.cableSettings),
   ...(terminalSchedule(session.project, session.resolve).length > 0 ? [terminalTable(session.project, session.resolve)] : []),
   ...(ioSchedule(session.project, session.resolve).length > 0 ? [ioTable(session.project, session.resolve)] : []),
+  ...(cutList(session.project, session.resolve).length > 0 ? [cutTable(session.project, session.resolve)] : []),
 ];
 
 /** A typed value in a cell is an edit in the inspector of the object the row stands for. */

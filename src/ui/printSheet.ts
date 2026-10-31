@@ -1,3 +1,4 @@
+import { CUT_HEADER, cutCells, cutList } from '../electrical/cutList';
 import { circuitCells, circuitSchedule, CIRCUIT_HEADER, ferruleCells, ferruleCounts, ioCells, ioSchedule, IO_HEADER, terminalCells, terminalSchedule, TERMINAL_HEADER, wireCells, wireList, WIRE_HEADER } from '../electrical/schedule';
 import { bomTotals, buildBom, lineTotal, type BomRow } from '../project/bom';
 import { INFO_LABELS, infoRows, type ProjectInfo } from '../layout/info';
@@ -168,6 +169,8 @@ export function fillPrintSheet(sheet: HTMLElement, session: Session, views: { pa
   if (options.parts.connections && wires.length > 0) parts.push(...section('Connections', table(WIRE_HEADER, wires.map(wireCells))));
   const terminals = terminalSchedule(session.project, session.resolve);
   if (options.parts.connections && terminals.length > 0) parts.push(...section('Terminals', table([...TERMINAL_HEADER], terminals.map(terminalCells))));
+  const cuts = cutList(session.project, session.resolve);
+  if (options.parts.parts && cuts.length > 0) parts.push(...section('Cut list', table([...CUT_HEADER], cuts.map(cutCells))));
   const io = ioSchedule(session.project, session.resolve);
   if (options.parts.connections && io.length > 0) parts.push(...section('Inputs and outputs', table([...IO_HEADER], io.map(ioCells))));
   const ferrules = ferruleCounts(session.project);

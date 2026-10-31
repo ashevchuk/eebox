@@ -149,6 +149,8 @@ export const PAGE: Dictionary = {
   Duct: `Канал`,
   'Terminal schedule (CSV)': `Розклад клем (CSV)`,
   'Inputs and outputs (CSV)': `Входи й виходи (CSV)`,
+  'Cut list (CSV)': `Відрізний список (CSV)`,
+  'The wires by cross-section with their estimated lengths, the DIN rails and the cable ducts, to cut and buy from': `Проводи за перерізами з їхніми орієнтовними довжинами, DIN-рейки й кабель-канали, щоб відрізати й закупити`,
   'Every terminal of the controllers with where its wires go, to address the channels from': `Кожна клема контролерів із тим, куди йдуть її проводи, щоб адресувати канали`,
   'Every terminal of the terminal blocks with where its wires go, top and bottom': `Кожна клема клемників із тим, куди йдуть її проводи, зверху й знизу`,
   'Draw a cable duct on the panel: press at one corner and drag to the opposite one; Esc stops': `Накреслити кабель-канал на щиті: натисніть в одному куті й тягніть до протилежного; Esc зупиняє`,

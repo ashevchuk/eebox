@@ -1,5 +1,6 @@
 import type { CableSettings } from '../electrical/cables';
 import type { Resolve } from '../electrical/context';
+import { CUT_HEADER, cutCells, cutList } from '../electrical/cutList';
 import { circuitSchedule, ferruleCounts, ioCells, ioSchedule, IO_HEADER, terminalCells, terminalSchedule, TERMINAL_HEADER, wireList } from '../electrical/schedule';
 import type { Project } from '../project';
 import { bomTotals, buildBom, lineTotal } from '../project/bom';
@@ -17,7 +18,7 @@ export interface Column {
 export type Cell = string | number;
 
 export interface Table {
-  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals' | 'io';
+  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals' | 'io' | 'cuts';
   title: string;
   columns: Column[];
   rows: Cell[][];
@@ -157,6 +158,19 @@ export function terminalTable(project: Project, resolve: Resolve): Table {
     rows: rows.map(terminalCells),
     note: rows.length === 0 ? undefined : `${rows.length} terminal${rows.length === 1 ? '' : 's'}. A terminal that is not wired on a side shows nothing there.`,
     empty: 'Place a terminal block and wire it to see where its terminals go.',
+  };
+}
+
+/** What to cut and buy: wires by cross-section, rails and ducts; shown beside the lists of `tablesOf`, not in them. */
+export function cutTable(project: Project, resolve: Resolve): Table {
+  const rows = cutList(project, resolve);
+  return {
+    id: 'cuts',
+    title: 'Cut list',
+    columns: CUT_HEADER.map((label, i) => ({ label, ...(i >= 2 ? { numeric: true } : {}) })),
+    rows: rows.map(cutCells),
+    note: rows.some((r) => r.item === 'Wire') ? 'Wire lengths are estimates from where the terminals stand on the panel, with the slack of the panel and the reserve in the last column.' : undefined,
+    empty: 'There is nothing to cut yet.',
   };
 }
 
