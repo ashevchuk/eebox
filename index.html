@@ -415,6 +415,7 @@
       .tables-body .numeric { text-align: right; font-variant-numeric: tabular-nums; }
       .tables-empty, .tables-note { color: var(--text-dim); margin: 10px 2px; }
       .app-dialog.help-dialog { width: min(640px, 94vw); max-width: none; }
+      .help-dialog .help-build { margin: 12px 0 0; font-size: 11px; color: var(--text-dim); text-align: right; }
       .help-dialog h3 { margin: 14px 0 4px; font-size: 13px; color: var(--accent); }
       .help-dialog table { border-collapse: collapse; width: 100%; }
       .help-dialog td { padding: 3px 6px; vertical-align: top; border-bottom: 1px solid var(--border); }
@@ -463,7 +464,7 @@
   </head>
   <body data-mode="panel">
     <header>
-      <strong>eebox</strong>
+      <strong id="brand" translate="no">eebox</strong>
       <div class="toolbar-group">
         <button id="mode-panel">Panel</button>
         <button id="mode-schematic">Schematic</button>

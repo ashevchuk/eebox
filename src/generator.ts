@@ -1,5 +1,9 @@
 import { version } from '../package.json';
 
+/** The commit this build was made from, set by the build; `dev` when the application is run without it. */
+declare const __BUILD_COMMIT__: string;
+export const BUILD: string = typeof __BUILD_COMMIT__ === 'string' ? __BUILD_COMMIT__ : 'dev';
+
 /** The version of this build, from package.json. */
 export const APP_VERSION: string = version;
 

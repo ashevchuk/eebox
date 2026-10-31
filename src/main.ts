@@ -90,7 +90,7 @@ import { groupSelection, selectedIds, selectedNodes, selectedWires } from './ui/
 import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
-import { versionHint, withoutGenerator } from './generator';
+import { BUILD, GENERATOR, versionHint, withoutGenerator } from './generator';
 import { askForText } from './ui/textDialog';
 import { SKIPPED_SHOWN, importTerminalLabels } from './project/terminalLabelsImport';
 import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
@@ -1371,6 +1371,7 @@ window.addEventListener(
 deleteButton.addEventListener('click', () => activeView().deleteSelection());
 
 initMenus();
+byId('brand').title = `${GENERATOR} · ${BUILD}`;
 const fitToolbar = initToolbarOverflow(document.querySelector('header')!);
 let toolbarFitQueued = false;
 let toolbarMode = session.mode;

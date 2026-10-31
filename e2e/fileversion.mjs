@@ -61,6 +61,14 @@ try {
     expectTrue(JSON.parse(text).generator === `eebox ${version}`, `the project says ${JSON.parse(text).generator}`);
   });
 
+  await step('the build says which release it is, on the logo and in the help dialog', async () => {
+    expectTrue(new RegExp(`^eebox ${version.replaceAll('.', '\\.')} · [0-9a-f]{7,}\\+?$`).test(await browser.evaluate(`document.getElementById('brand').title`)), `the logo says ${await browser.evaluate(`document.getElementById('brand').title`)}`);
+    await browser.evaluate(`document.getElementById('help').click()`);
+    await browser.waitFor(`document.querySelector('dialog[open] .help-build')`, 'the help dialog');
+    expectTrue((await browser.evaluate(`document.querySelector('dialog[open] .help-build').textContent`)) === (await browser.evaluate(`document.getElementById('brand').title`)), 'the help dialog and the logo say different things');
+    await browser.evaluate(`document.querySelector('dialog[open]').close()`);
+  });
+
   await step('the backup says which release wrote it', async () => {
     const text = await download('backup-all');
     expectTrue(JSON.parse(text).generator === `eebox ${version}`, `the backup says ${JSON.parse(text).generator}`);

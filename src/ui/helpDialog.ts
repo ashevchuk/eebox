@@ -1,3 +1,4 @@
+import { BUILD, GENERATOR } from '../generator';
 import { SHORTCUTS } from './help';
 
 /** The list of keys and gestures, in a dialog of its own. */
@@ -20,6 +21,11 @@ export function openHelpDialog(onTour?: () => void): void {
     }
     dialog.append(heading, table);
   }
+  const build = document.createElement('p');
+  build.className = 'help-build';
+  build.setAttribute('translate', 'no');
+  build.textContent = `${GENERATOR} · ${BUILD}`;
+  dialog.append(build);
   const actions = document.createElement('div');
   actions.className = 'app-dialog-actions';
   const close = document.createElement('button');
