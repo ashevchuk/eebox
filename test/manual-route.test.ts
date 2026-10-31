@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WIRE_STUB, type Endpoint } from '../src/schematic/geometry';
+import { LANE_CLEARANCE, WIRE_STUB, type Endpoint } from '../src/schematic/geometry';
 import { fitLanes, insertJog, lanesFromPath, moveLane, pathFromLanes, simplifyLanes, type Lanes } from '../src/schematic/manualRoute';
 import { routeProblem, setWireRoute, emptySchematic } from '../src/schematic/model';
 import type { Point } from '../src/view/Camera';
@@ -32,9 +32,9 @@ function expectValidRoute(path: Point[], a: Endpoint, b: Endpoint) {
   const [first] = segments;
   const last = segments[segments.length - 1]!;
   expect(Math.sign(first![1].y - first![0].y)).toBe(a.side === 'bottom' ? 1 : -1);
-  expect(Math.abs(first![1].y - first![0].y)).toBeGreaterThanOrEqual(WIRE_STUB - 1e-9);
+  expect(Math.abs(first![1].y - first![0].y)).toBeGreaterThanOrEqual(LANE_CLEARANCE - 1e-9);
   expect(Math.sign(last[0].y - last[1].y)).toBe(b.side === 'bottom' ? 1 : -1);
-  expect(Math.abs(last[1].y - last[0].y)).toBeGreaterThanOrEqual(WIRE_STUB - 1e-9);
+  expect(Math.abs(last[1].y - last[0].y)).toBeGreaterThanOrEqual(LANE_CLEARANCE - 1e-9);
 }
 
 describe('pathFromLanes', () => {
@@ -53,9 +53,9 @@ describe('pathFromLanes', () => {
     ]);
   });
 
-  it('keeps the wire off the node: a lane too close to the terminal is moved out to the stub length', () => {
+  it('keeps the wire off the node: a lane too close to the terminal is moved out to the clearance the router keeps', () => {
     const path = pathFromLanes(A, B, [105]);
-    expect(path[1]).toEqual({ x: 100, y: 100 + WIRE_STUB });
+    expect(path[1]).toEqual({ x: 100, y: 100 + LANE_CLEARANCE });
   });
 
   it('goes round when the other terminal is above: a single lane becomes three', () => {
@@ -68,7 +68,7 @@ describe('pathFromLanes', () => {
     const left = end(100, 100, 'bottom');
     const right = end(300, 140, 'bottom');
     const path = pathFromLanes(left, right, [110]);
-    expect(path[1]!.y).toBe(140 + WIRE_STUB);
+    expect(path[1]!.y).toBe(140 + LANE_CLEARANCE);
     expectValidRoute(path, left, right);
   });
 });

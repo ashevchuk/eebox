@@ -1,5 +1,5 @@
 import type { Point } from '../view/Camera';
-import { WIRE_STUB, type Endpoint } from './geometry';
+import { LANE_CLEARANCE, WIRE_STUB, type Endpoint } from './geometry';
 import { MAX_ROUTE_LANES } from './model';
 
 /**
@@ -15,18 +15,22 @@ const SAME_MM = 0.5;
 
 const directionOf = (end: Endpoint): 1 | -1 => (end.side === 'bottom' ? 1 : -1);
 
-/** The nearest y a lane next to this terminal may have: the wire has to leave the terminal first. */
-const bound = (end: Endpoint) => end.point.y + directionOf(end) * WIRE_STUB;
+/**
+ * The nearest y a lane next to this terminal may have: the wire has to leave the terminal first. A lane that is
+ * pulled keeps the length of a stub from the terminal; a lane that is only drawn may be as near as the router
+ * puts one, so that a route can hold a wire exactly where the router drew it.
+ */
+const bound = (end: Endpoint, gap: number) => end.point.y + directionOf(end) * gap;
 
 /** Clamps a lane that touches the terminal so the wire leaves it in the right direction. */
-function clampTo(y: number, end: Endpoint): number {
-  return directionOf(end) === 1 ? Math.max(y, bound(end)) : Math.min(y, bound(end));
+function clampTo(y: number, end: Endpoint, gap: number): number {
+  return directionOf(end) === 1 ? Math.max(y, bound(end, gap)) : Math.min(y, bound(end, gap));
 }
 
 /** The y-range a single lane has to lie in to serve both terminals; empty when there is none. */
-function singleLaneRange(a: Endpoint, b: Endpoint): { lower: number; upper: number } {
-  const lower = Math.max(...[a, b].filter((e) => directionOf(e) === 1).map(bound), -Infinity);
-  const upper = Math.min(...[a, b].filter((e) => directionOf(e) === -1).map(bound), Infinity);
+function singleLaneRange(a: Endpoint, b: Endpoint, gap: number): { lower: number; upper: number } {
+  const lower = Math.max(...[a, b].filter((e) => directionOf(e) === 1).map((e) => bound(e, gap)), -Infinity);
+  const upper = Math.min(...[a, b].filter((e) => directionOf(e) === -1).map((e) => bound(e, gap)), Infinity);
   return { lower, upper };
 }
 
@@ -39,16 +43,16 @@ function sideOf(a: Endpoint, b: Endpoint): number {
 }
 
 /** Lanes that are valid for these terminals: the first and the last lane leave them in the right direction. */
-export function fitLanes(a: Endpoint, b: Endpoint, lanes: Lanes): Lanes {
+export function fitLanes(a: Endpoint, b: Endpoint, lanes: Lanes, gap: number = WIRE_STUB): Lanes {
   const result = [...lanes];
   if (result.length === 1) {
-    const { lower, upper } = singleLaneRange(a, b);
-    if (lower > upper) return [bound(a), sideOf(a, b), bound(b)];
+    const { lower, upper } = singleLaneRange(a, b, gap);
+    if (lower > upper) return [bound(a, gap), sideOf(a, b), bound(b, gap)];
     result[0] = Math.min(Math.max(result[0]!, lower), upper);
     return result;
   }
-  result[0] = clampTo(result[0]!, a);
-  result[result.length - 1] = clampTo(result[result.length - 1]!, b);
+  result[0] = clampTo(result[0]!, a, gap);
+  result[result.length - 1] = clampTo(result[result.length - 1]!, b, gap);
   return result;
 }
 
@@ -59,7 +63,7 @@ export function fitLanes(a: Endpoint, b: Endpoint, lanes: Lanes): Lanes {
 export function simplifyLanes(a: Endpoint, b: Endpoint, lanes: Lanes): Lanes {
   const needsBend = (rest: Lanes) => {
     if (rest.length !== 1) return false;
-    const { lower, upper } = singleLaneRange(a, b);
+    const { lower, upper } = singleLaneRange(a, b, WIRE_STUB);
     return lower > upper;
   };
   let current = [...lanes];
@@ -92,7 +96,7 @@ export function simplifyLanes(a: Endpoint, b: Endpoint, lanes: Lanes): Lanes {
 
 /** The route as a path of points, ports included. */
 export function pathFromLanes(a: Endpoint, b: Endpoint, lanes: Lanes): Point[] {
-  const fitted = fitLanes(a, b, lanes);
+  const fitted = fitLanes(a, b, lanes, LANE_CLEARANCE);
   const points: Point[] = [a.point];
   let at: Point = a.point;
   fitted.forEach((value, i) => {
@@ -156,7 +160,7 @@ export function moveLane(a: Endpoint, b: Endpoint, lanes: Lanes, index: number, 
 export function insertJog(a: Endpoint, b: Endpoint, lanes: Lanes, atStart: boolean, x: number, at?: number): Lanes {
   const end = atStart ? a : b;
   const dir = directionOf(end);
-  const near = bound(end);
+  const near = bound(end, WIRE_STUB);
   const index = atStart ? 0 : lanes.length - 1;
   const next = lanes[index]!;
   const farthest = dir === 1 ? Math.max(next - WIRE_STUB, near) : Math.min(next + WIRE_STUB, near);

@@ -67,16 +67,16 @@ describe('holdOthersStill', () => {
     expect(moved.length).toBeGreaterThan(0);
   });
 
-  it('keeps the other wires where they were, all but those whose path a route cannot draw exactly, and moves the pulled one', () => {
+  it('keeps every other wire where it was, and moves the pulled one', () => {
     const { before, layout, after } = pulled();
     const unmoved = (schematic: Schematic) => {
       const now = routeWires(schematic, layout);
       return schematic.wires.filter((w) => w.id !== 'w3' && samePath(before.get(w.id), now.get(w.id))).length;
     };
     const held = holdOthersStill(after, layout, before, new Set(['w3']));
-    // Before holding, few stay; after it, every wire that a route can draw as it was stays, which is all but one here.
+    // Before holding, few stay; after it, every other wire stays, because a route can draw each of them as the router did.
     expect(unmoved(after)).toBeLessThan(unmoved(held));
-    expect(unmoved(held)).toBeGreaterThanOrEqual(after.wires.length - 1 - 1);
+    expect(unmoved(held)).toBe(after.wires.length - 1);
     expect(samePath(before.get('w3'), routeWires(held, layout).get('w3'))).toBe(false);
   });
 
@@ -87,7 +87,8 @@ describe('holdOthersStill', () => {
     const held = holdOthersStill(after, layout, before, new Set(['w3']));
     const withRoute = held.wires.filter((w) => w.id !== 'w3' && w.route !== undefined).length;
     expect(withRoute).toBeGreaterThan(0);
-    expect(withRoute).toBeLessThanOrEqual(wouldMove + 2);
+    expect(withRoute).toBeGreaterThanOrEqual(wouldMove);
+    expect(withRoute).toBeLessThanOrEqual(held.wires.length - 1);
   });
 
   it('leaves a wire that has a route of its own, and one that was moved, as they are', () => {

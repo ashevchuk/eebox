@@ -18,6 +18,8 @@ const SIDE_MARGIN = 12;
 const MIN_WIDTH = 110;
 const NODE_HEIGHT: Record<NodeKind, number> = { source: 44, load: 44, module: 56 };
 export const WIRE_STUB = 18;
+/** The nearest a wire runs to the edge of a node, for the router and for a route drawn by hand alike: a route that could not go as near as the router does cannot hold a wire where the router put it. */
+export const LANE_CLEARANCE = 8;
 const BOUNDS_PADDING = 40;
 const ROUTE_MARGIN = 10;
 const FREE_SPOT_GAP = 20;

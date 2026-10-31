@@ -1,10 +1,10 @@
 import type { Point } from '../view/Camera';
-import { WIRE_STUB, portOf, wirePath, type Layout, type Rect } from './geometry';
+import { LANE_CLEARANCE, WIRE_STUB, portOf, wirePath, type Layout, type Rect } from './geometry';
 import { pathFromLanes } from './manualRoute';
 import type { Schematic } from './model';
 
 /** Space kept free around every node, so wires do not graze it. */
-const CLEARANCE = 8;
+const CLEARANCE = LANE_CLEARANCE;
 /** Distance between the parallel lanes a wire may take beside a node or in a gap. */
 const LANE = 10;
 const LANES_AROUND_NODE = 3;
