@@ -6,7 +6,7 @@ import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
 import { lookupsOf } from '../layout/lookups';
-import type { ModuleRef, Panel } from '../layout/placement';
+import type { ModuleRef, Panel, Sizes } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
 import type { Annotation } from '../layout/annotations';
@@ -197,7 +197,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);
     if (!comb.label || !texts.combLabels || !def?.comb) continue;
-    const r = combRect(panel, comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
+    const r = combRect(panel, sizesOf(scene), comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
     ctx.textBaseline = def.comb.side === 'top' ? 'bottom' : 'top';
     ctx.fillText(fitText(ctx, comb.label, r.width), r.x + 2, def.comb.side === 'top' ? r.y - 3 : r.y + r.height + 3);
   }
@@ -221,6 +221,7 @@ function drawTerminals(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, w
 function drawComb(
   ctx: CanvasRenderingContext2D,
   panel: Panel,
+  sizes: Sizes,
   def: ModuleDef,
   rail: number,
   slot: number,
@@ -228,7 +229,7 @@ function drawComb(
   color: string,
 ): void {
   if (!def.comb) return;
-  drawCombStrip(ctx, def, combRect(panel, rail, slot, widthUnits, def.comb.side), widthUnits, color);
+  drawCombStrip(ctx, def, combRect(panel, sizes, rail, slot, widthUnits, def.comb.side), widthUnits, color);
 }
 
 function drawCombStrip(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, color: string): void {
@@ -501,9 +502,9 @@ export function render(
     const def = scene.resolve(comb.module);
     if (!def?.comb) continue;
     ctx.globalAlpha = comb.id === movingId('comb') ? 0.35 : 1;
-    drawComb(ctx, panel, def, comb.rail, comb.slot, itemWidth(scene, comb), LEVER_COLORS.comb);
+    drawComb(ctx, panel, sizesOf(scene), def, comb.rail, comb.slot, itemWidth(scene, comb), LEVER_COLORS.comb);
     if (comb.id === scene.selectedCombId || scene.selectedIds?.has(comb.id)) {
-      const r = combRect(panel, comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
+      const r = combRect(panel, sizesOf(scene), comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
       ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
@@ -520,7 +521,7 @@ export function render(
       x !== undefined && y !== undefined
         ? { x: FRAME_PADDING + x, y: FRAME_PADDING + y, width: widthUnits * MODULE_UNIT_MM, height: module.heightMm }
         : module.comb
-          ? combRect(panel, rail ?? 0, slot ?? 0, widthUnits, module.comb.side)
+          ? combRect(panel, sizesOf(scene), rail ?? 0, slot ?? 0, widthUnits, module.comb.side)
           : moduleRect(panel, rail ?? 0, slot ?? 0, widthUnits, module.heightMm);
     fillRect(ctx, area, color);
   }

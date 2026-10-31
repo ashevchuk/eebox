@@ -57,7 +57,7 @@ export function edgeLines(
   for (const d of ductsOf(panel)) add(ductRect(d));
   for (const c of panel.combs) {
     const info = combInfoOf(c);
-    if (info) add(combRect(panel, c.rail, c.slot, info.widthUnits, info.side));
+    if (info) add(combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side));
   }
   return { xs, ys };
 }

@@ -40,7 +40,7 @@ export function overviewOf(project: Project, resolve: Resolve, mode: Mode, plate
       boxes: [
         ...ductsOf(panel).map((d) => ({ box: boxOf(ductRect(d)), color: DUCT_COLOR })),
         ...panel.placements.map((p) => ({ box: boxOf(placementRect(panel, sizes, p)), color: MODULE_COLOR })),
-        ...panel.combs.map((c) => ({ box: boxOf(combRect(panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')), color: COMB_COLOR })),
+        ...panel.combs.map((c) => ({ box: boxOf(combRect(panel, sizes, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')), color: COMB_COLOR })),
       ],
       paths: [],
     };

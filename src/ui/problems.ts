@@ -66,7 +66,7 @@ function panelFocus(project: Project, resolve: Resolve, objects: Objects): Focus
   const shownCombs = onPlate.combs.filter((c) => combs.some((q) => q.id === c.id));
   const boxes = [
     ...shownPlacements.map((p) => placementRect(onPlate, sizes, p)),
-    ...shownCombs.map((c) => combRect(onPlate, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
+    ...shownCombs.map((c) => combRect(onPlate, sizes, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
     ...ducts.filter((d) => d.plate === onPlate.plates[0]!.id).map(ductRect),
   ].map((r) => ({ minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height }));
   const selection: Selection =

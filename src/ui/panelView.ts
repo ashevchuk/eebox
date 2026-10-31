@@ -215,6 +215,7 @@ export class PanelView implements View {
     const panel = this.session.scope.panel;
     const comb = combAtPoint(
       panel,
+      this.session.sizes,
       (item) => {
         const def = this.session.resolve(item.module);
         return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;

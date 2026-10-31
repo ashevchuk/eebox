@@ -67,15 +67,28 @@ export const COMB_HEIGHT = 18;
 export const COMB_OVERHANG = 10;
 const LABEL_GAP = 8;
 
+/** The height of the tallest module that a comb at `slot` covers on its rail; a standard module when it covers none. */
+function heightUnderComb(panel: Panel, sizes: Sizes, rail: number, slot: number, widthUnits: number): number {
+  const heights = panel.placements
+    .filter(isOnRail)
+    .filter((p) => {
+      const width = sizes.widthOf(p) ?? 1;
+      return p.rail === rail && p.slot < slot + widthUnits - LAYOUT_EPSILON_UNITS && slot < p.slot + width - LAYOUT_EPSILON_UNITS;
+    })
+    .map((p) => sizes.heightOf(p) ?? DIN_MODULE_HEIGHT_MM);
+  return heights.length > 0 ? Math.max(...heights) : DIN_MODULE_HEIGHT_MM;
+}
+
 /** A comb lies along the terminal edge of the modules it covers, mostly just outside them. */
 export function combRect(
   panel: Panel,
+  sizes: Sizes,
   rail: number,
   slot: number,
   widthUnits: number,
   side: TerminalSide,
 ): Rect {
-  const module = moduleRect(panel, rail, slot, widthUnits, DIN_MODULE_HEIGHT_MM);
+  const module = moduleRect(panel, rail, slot, widthUnits, heightUnderComb(panel, sizes, rail, slot, widthUnits));
   const y = side === 'top' ? module.y - COMB_OVERHANG : module.y + module.height - (COMB_HEIGHT - COMB_OVERHANG);
   return { x: module.x, y, width: module.width, height: COMB_HEIGHT };
 }
@@ -102,13 +115,14 @@ export function placementLabelRoom(panel: Panel, placement: Placement, body: Rec
 
 export function combAtPoint(
   panel: Panel,
+  sizes: Sizes,
   infoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
   point: Point,
 ): CombPlacement | undefined {
   return [...panel.combs].reverse().find((comb) => {
     const info = infoOf(comb);
     if (!info) return false;
-    const r = combRect(panel, comb.rail, comb.slot, info.widthUnits, info.side);
+    const r = combRect(panel, sizes, comb.rail, comb.slot, info.widthUnits, info.side);
     return point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y && point.y <= r.y + r.height;
   });
 }
@@ -215,7 +229,7 @@ export function itemsInRect(
     combs: panel.combs
       .filter((c) => {
         const info = combInfoOf(c);
-        return info !== undefined && overlaps(combRect(panel, c.rail, c.slot, info.widthUnits, info.side), area);
+        return info !== undefined && overlaps(combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side), area);
       })
       .map((c) => c.id),
     ducts: ductsOf(panel).filter((d) => overlaps(ductRect(d), area)).map((d) => d.id),
@@ -254,7 +268,7 @@ export function printArea(
   }
   for (const c of panel.combs) {
     const info = combInfoOf(c);
-    if (info) rects.push(combRect(panel, c.rail, c.slot, info.widthUnits, info.side));
+    if (info) rects.push(combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side));
   }
   panel.rails.forEach(({ label }, rail) => {
     if (!label) return;
