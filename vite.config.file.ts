@@ -11,7 +11,7 @@ function buildCommit(): string {
     }
   };
   const commit = git('rev-parse --short HEAD');
-  return commit === '' ? 'unknown' : `${commit}${git('status --porcelain') === '' ? '' : '+'}`;
+  return commit === '' ? 'unknown' : `${commit}${git('status --porcelain --untracked-files=no') === '' ? '' : '+'}`;
 }
 
 /**
