@@ -508,18 +508,29 @@ export function render(
   ctx.globalAlpha = 1;
 
   const movingId = (kind: 'placement' | 'comb') => (scene.moving?.kind === kind ? scene.moving.id : null);
+  const sizes = sizesOf(scene);
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
-    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizesOf(scene), placement), itemWidth(scene, placement), texts);
+    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizes, placement), itemWidth(scene, placement), texts);
+  }
+  for (const comb of panel.combs) {
+    const def = scene.resolve(comb.module);
+    if (!def?.comb) continue;
+    ctx.globalAlpha = comb.id === movingId('comb') ? 0.35 : 1;
+    drawComb(ctx, panel, sizes, def, comb.rail, comb.slot, itemWidth(scene, comb), LEVER_COLORS.comb);
+  }
+  // The marks and the frames come after every body, so a module drawn later cannot cover the edge of one beside it.
+  for (const placement of panel.placements) {
+    ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
     const mark = scene.marked?.get(placement.id);
     if (mark) {
-      const r = placementRect(panel, sizesOf(scene), placement);
+      const r = placementRect(panel, sizes, placement);
       ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
     }
     if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
-      const r = placementRect(panel, sizesOf(scene), placement);
+      const r = placementRect(panel, sizes, placement);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
       ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
@@ -527,15 +538,12 @@ export function render(
   }
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);
-    if (!def?.comb) continue;
+    if (!def?.comb || !(comb.id === scene.selectedCombId || scene.selectedIds?.has(comb.id))) continue;
     ctx.globalAlpha = comb.id === movingId('comb') ? 0.35 : 1;
-    drawComb(ctx, panel, sizesOf(scene), def, comb.rail, comb.slot, itemWidth(scene, comb), LEVER_COLORS.comb);
-    if (comb.id === scene.selectedCombId || scene.selectedIds?.has(comb.id)) {
-      const r = combRect(panel, sizesOf(scene), comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
-      ctx.strokeStyle = COLORS.selection;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
-    }
+    const r = combRect(panel, sizes, comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
+    ctx.strokeStyle = COLORS.selection;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
   }
   ctx.globalAlpha = 1;
   drawLabels(ctx, scene, texts);
