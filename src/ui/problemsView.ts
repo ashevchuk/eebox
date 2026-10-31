@@ -6,6 +6,8 @@ const SEVERITY_LABEL: Record<ProblemEntry['severity'], string> = { error: 'Error
 /** The list of what Check found, kept on the drawing's side so a click can take the eye to the thing. */
 export class ProblemsView {
   private shown = false;
+  /** What the list on the screen was made from; the list is not made again while it is the same. */
+  private drawnFrom: string | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -22,18 +24,26 @@ export class ProblemsView {
   toggle(): void {
     this.shown = !this.shown;
     this.root.hidden = !this.shown;
+    this.drawnFrom = null;
     if (this.shown) this.render();
   }
 
   hide(): void {
     this.shown = false;
     this.root.hidden = true;
+    this.drawnFrom = null;
   }
 
-  /** Draws the list again; it does nothing while the list is hidden. */
+  /**
+   * Draws the list again; it does nothing while the list is hidden or what it shows has not changed. Making it
+   * again anyway would replace the button under the pointer between a press and its release, and the click would be lost.
+   */
   render(): void {
     if (!this.shown) return;
     const entries = this.entries();
+    const key = JSON.stringify(entries.map((e) => [e.severity, e.message, e.finding !== undefined]));
+    if (key === this.drawnFrom) return;
+    this.drawnFrom = key;
     const header = document.createElement('div');
     header.className = 'problems-header';
     const title = document.createElement('strong');
