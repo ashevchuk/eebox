@@ -564,7 +564,7 @@ window.addEventListener('keydown', (e) => {
     requestRender();
   } else if (e.code === 'Enter' && !mod && hasSelection() && !modalOpen()) {
     byId('inspector-content').querySelector<HTMLElement>('input, select, textarea')?.focus();
-  } else if (e.code === 'Delete' || e.code === 'Backspace') {
+  } else if ((e.code === 'Delete' || e.code === 'Backspace') && !modalOpen()) {
     if (!removeSelectedNote()) activeView().deleteSelection();
   }
 });

@@ -210,13 +210,26 @@ export class ModuleDesignerView {
       e.preventDefault();
       void this.close();
     });
-    this.dialog.addEventListener('close', () => this.dialog.remove());
-    this.dialog.addEventListener('keydown', (e) => this.onKey(e));
+    this.dialog.addEventListener('close', () => {
+      document.removeEventListener('keydown', this.keyListener);
+      this.dialog.remove();
+    });
   }
+
+  /**
+   * On the document, not on the dialog: a click on a row of the face list draws the list again, the focused row is
+   * gone and the focus falls to the body, outside the dialog, where a listener of the dialog never hears the key.
+   * Another dialog over this one (a question, the SVG import) keeps its own keys.
+   */
+  private readonly keyListener = (e: KeyboardEvent): void => {
+    const open = document.querySelectorAll('dialog[open]');
+    if (open[open.length - 1] === this.dialog) this.onKey(e);
+  };
 
   open(): void {
     document.body.append(this.dialog);
     this.dialog.showModal();
+    document.addEventListener('keydown', this.keyListener);
     this.showMode();
     this.renderAll(true);
   }
