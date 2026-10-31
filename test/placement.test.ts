@@ -8,6 +8,7 @@ import {
   removePlacement,
   type Panel,
   type Placement,
+  type RailPlacement,
   type PlacementError,
   type WidthOf,
 } from '../src/layout/placement';
@@ -15,7 +16,7 @@ import {
 const WIDTHS: Record<string, number> = { one: 1, two: 2, four: 4 };
 const widthOf: WidthOf = (item) => item.widthUnits ?? WIDTHS[item.module.moduleId];
 
-const place = (id: string, moduleId: string, rail: number, slot: number): Placement => ({
+const place = (id: string, moduleId: string, rail: number, slot: number): RailPlacement => ({
   id,
   module: { libraryId: 'lib', moduleId },
   rail,

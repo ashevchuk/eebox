@@ -1,4 +1,5 @@
 import type { Annotation } from './annotations';
+import type { Duct } from './ducts';
 import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
 import type { Rail } from './rail';
@@ -9,12 +10,9 @@ export interface ModuleRef {
   moduleId: string;
 }
 
-export interface Placement {
+interface PlacementCommon {
   id: string;
   module: ModuleRef;
-  rail: number;
-  /** Offset from the rail start in 17.5 mm units. */
-  slot: number;
   /** What the user calls this module on the panel, e.g. the circuit it protects. */
   label?: string;
   /** Own width of this copy; only for modules that are resizable in the library. */
@@ -27,8 +25,32 @@ export interface Placement {
   flags?: Record<string, boolean>;
 }
 
-/** A module taken off its rail: it keeps its id, so a schematic node and wires find it again. */
-export type ShelfItem = Omit<Placement, 'rail' | 'slot'>;
+/** A module clipped on a DIN rail. */
+export interface RailPlacement extends PlacementCommon {
+  rail: number;
+  /** Offset from the rail start in 17.5 mm units. */
+  slot: number;
+  x?: never;
+  y?: never;
+}
+
+/** A device fixed straight to the mounting plate. */
+export interface FreePlacement extends PlacementCommon {
+  /** Left edge of the device, in mm from the left edge of the working area. */
+  x: number;
+  /** Top edge of the device, in mm from the top of the working area. */
+  y: number;
+  rail?: never;
+  slot?: never;
+}
+
+export type Placement = RailPlacement | FreePlacement;
+
+export const isOnRail = (placement: Placement): placement is RailPlacement => placement.rail !== undefined;
+export const isFree = (placement: Placement): placement is FreePlacement => placement.x !== undefined;
+
+/** A module taken off the panel: it keeps its id, so a schematic node and wires find it again. */
+export type ShelfItem = PlacementCommon;
 
 /** A comb bus bar lying over the terminals of the modules on one side of a rail. */
 export interface CombPlacement {
@@ -49,6 +71,8 @@ export interface Panel {
   annotations?: Annotation[];
   /** The rails, copied from the enclosure, so later library edits cannot move placed modules. */
   rails: Rail[];
+  /** Cable ducts on the mounting plate; only when there are some. */
+  ducts?: Duct[];
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */
@@ -80,6 +104,7 @@ export type PlacementError =
   | { kind: 'unknown-module' }
   | { kind: 'unknown-rail' }
   | { kind: 'out-of-rail' }
+  | { kind: 'bad-position' }
   | { kind: 'overlap'; with: string }
   | { kind: 'duplicate-id' }
   | { kind: 'unknown-placement' }
@@ -100,7 +125,7 @@ export interface PanelProblem {
 function checkFit(
   panel: Panel,
   widthOf: WidthOf,
-  candidate: Placement,
+  candidate: RailPlacement,
   ignoreId?: string,
 ): PlacementError | null {
   const width = widthOf(candidate);
@@ -111,7 +136,7 @@ function checkFit(
   if (!Number.isFinite(slot) || slot < 0 || slot + width > railLength + LAYOUT_EPSILON_UNITS) {
     return { kind: 'out-of-rail' };
   }
-  for (const other of panel.placements) {
+  for (const other of panel.placements.filter(isOnRail)) {
     if (other.id === ignoreId || other.rail !== candidate.rail) continue;
     const otherWidth = widthOf(other);
     if (otherWidth === undefined) continue;
@@ -122,7 +147,7 @@ function checkFit(
   return null;
 }
 
-export function addPlacement(panel: Panel, widthOf: WidthOf, placement: Placement): PlacementResult {
+export function addPlacement(panel: Panel, widthOf: WidthOf, placement: RailPlacement): PlacementResult {
   if (panel.placements.some((p) => p.id === placement.id) || panel.shelf.some((s) => s.id === placement.id)) {
     return { ok: false, error: { kind: 'duplicate-id' } };
   }
@@ -140,7 +165,8 @@ export function movePlacement(
 ): PlacementResult {
   const current = panel.placements.find((p) => p.id === id);
   if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
-  const moved: Placement = { ...current, rail, slot };
+  const { x: _x, y: _y, ...rest } = current;
+  const moved: RailPlacement = { ...rest, rail, slot };
   const error = checkFit(panel, widthOf, moved, id);
   if (error) return { ok: false, error };
   return {
@@ -149,7 +175,7 @@ export function movePlacement(
   };
 }
 
-function pushRight(others: { p: Placement; w: number }[], slot: number, width: number, railLength: number) {
+function pushRight(others: { p: RailPlacement; w: number }[], slot: number, width: number, railLength: number) {
   const shifted = new Map<string, number>();
   let frontier = slot + width;
   for (const { p, w } of others) {
@@ -162,7 +188,7 @@ function pushRight(others: { p: Placement; w: number }[], slot: number, width: n
   return shifted;
 }
 
-function pushLeft(others: { p: Placement; w: number }[], slot: number, width: number) {
+function pushLeft(others: { p: RailPlacement; w: number }[], slot: number, width: number) {
   const shifted = new Map<string, number>();
   let frontier = slot;
   for (const { p, w } of [...others].reverse()) {
@@ -183,7 +209,7 @@ function pushLeft(others: { p: Placement; w: number }[], slot: number, width: nu
 export function insertPlacement(
   panel: Panel,
   widthOf: WidthOf,
-  placement: Placement,
+  placement: RailPlacement,
   replaceId?: string,
 ): PlacementResult {
   const strict = replaceId
@@ -194,6 +220,7 @@ export function insertPlacement(
   const width = widthOf(placement) ?? 1;
   const railLength = panel.rails[placement.rail]?.lengthUnits ?? 0;
   const others = panel.placements
+    .filter(isOnRail)
     .filter((p) => p.rail === placement.rail && p.id !== replaceId)
     .map((p) => ({ p, w: widthOf(p) ?? 1 }))
     .sort((a, b) => a.p.slot - b.p.slot);
@@ -202,7 +229,7 @@ export function insertPlacement(
   if (!shifted) return strict;
 
   const moved = panel.placements.map((p) =>
-    p.id === replaceId ? placement : shifted.has(p.id) ? { ...p, slot: shifted.get(p.id)! } : p,
+    p.id === replaceId ? placement : shifted.has(p.id) && isOnRail(p) ? { ...p, slot: shifted.get(p.id)! } : p,
   );
   return { ok: true, panel: { ...panel, placements: replaceId ? moved : [...moved, placement] } };
 }
@@ -224,7 +251,7 @@ export function setPlacementWidth(
   }
   const { widthUnits: _previous, ...rest } = current;
   const next: Placement = units === allowed.baseUnits ? rest : { ...rest, widthUnits: units };
-  const error = checkFit(panel, widthOf, next, id);
+  const error = isOnRail(next) ? checkFit(panel, widthOf, next, id) : null;
   if (error) return { ok: false, error };
   return { ok: true, panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? next : p)) } };
 }
@@ -295,6 +322,7 @@ export function removePlacement(panel: Panel, id: string): PlacementResult {
 export function findProblems(panel: Panel, widthOf: WidthOf): PanelProblem[] {
   const problems: PanelProblem[] = [];
   panel.placements.forEach((placement, index) => {
+    if (!isOnRail(placement)) return;
     const earlier: Panel = { ...panel, placements: panel.placements.slice(0, index) };
     const error = checkFit(earlier, widthOf, placement);
     if (error) problems.push({ placementId: placement.id, error });

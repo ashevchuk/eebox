@@ -80,7 +80,7 @@ import { openPrintDialog } from './ui/printDialog';
 import { fillPrintSheet } from './ui/printSheet';
 import { MAX_ANNOTATIONS, MAX_NOTE_CHARS, addAnnotation, hitAnnotation, moveAnnotation, removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from './layout/annotations';
 import { centreOf, pinchStep, type Pair } from './view/pinch';
-import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, type Arrow } from './ui/keyboardMoves';
+import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, plateStep, type Arrow } from './ui/keyboardMoves';
 import { groupSelection, selectedIds, selectedNodes, selectedWires } from './ui/selection';
 import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
@@ -158,10 +158,11 @@ function syncUi(): void {
   byId('mode-schematic').classList.toggle('active', session.mode === 'schematic');
   byId('bundle-mode').classList.toggle('active', schematicView.bundleMode);
   byId('ruler').classList.toggle('active', session.ruler.on);
-  canvas.style.cursor = session.mode === 'panel' && session.ruler.on ? 'crosshair' : '';
+  byId('duct-tool').classList.toggle('active', session.ductTool);
+  canvas.style.cursor = session.mode === 'panel' && (session.ruler.on || session.ductTool) ? 'crosshair' : '';
   const { nodeId } = session.selection;
   const chosen = selectedIds(session.selection);
-  deleteButton.disabled = !(session.mode === 'panel' ? chosen.placements.length + chosen.combs.length > 0 : nodeId || selectedWires(session.selection).length > 0);
+  deleteButton.disabled = !(session.mode === 'panel' ? chosen.placements.length + chosen.combs.length + chosen.ducts.length > 0 : nodeId || selectedWires(session.selection).length > 0);
 }
 
 session.subscribe(() => {
@@ -235,6 +236,7 @@ const noteButton = byId('note-tool');
 
 function setNoteTool(on: boolean): void {
   session.noteTool = on;
+  if (on) session.ductTool = false;
   noteButton.classList.toggle('active', on);
   canvas.style.cursor = on ? 'crosshair' : '';
   if (!on) noteGesture = null;
@@ -472,9 +474,13 @@ window.addEventListener('keydown', (e) => {
     openHelpDialog(() => tourView.start());
   } else if (e.code === 'KeyR' && !mod && session.mode === 'panel') {
     session.ruler = { on: !session.ruler.on, line: null };
+    if (session.ruler.on) session.ductTool = false;
     session.changed();
   } else if (e.code === 'Escape' && activeView().cancel?.()) {
     e.preventDefault();
+  } else if (e.code === 'Escape' && session.ductTool) {
+    session.ductTool = false;
+    session.changed();
   } else if (e.code === 'Escape' && session.ruler.on) {
     session.ruler = { on: false, line: null };
     session.changed();
@@ -486,7 +492,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (session.mode === 'panel') {
       const step = panelStep(e.code as Arrow, e.altKey);
-      panelView.nudgeSelection(step.rail, step.slot);
+      panelView.nudgeSelection(step, plateStep(e.code as Arrow, e.shiftKey, e.altKey));
     } else {
       const step = nodeStep(e.code as Arrow, e.shiftKey);
       schematicView.nudgeSelected(step.dx, step.dy);
@@ -510,7 +516,7 @@ const modalOpen = (): boolean => document.querySelector('dialog[open]') !== null
 
 /** Something the arrow keys, Tab and Enter act on: a module or comb on the panel, a node on the schematic. */
 function hasSelection(): boolean {
-  return session.mode === 'panel' ? selectedIds(session.selection).placements.length + selectedIds(session.selection).combs.length > 0 : selectedNodes(session.selection).length > 0;
+  return session.mode === 'panel' ? selectedIds(session.selection).placements.length + selectedIds(session.selection).combs.length + selectedIds(session.selection).ducts.length > 0 : selectedNodes(session.selection).length > 0;
 }
 
 window.addEventListener('keyup', (e) => {
@@ -1241,6 +1247,14 @@ byId('new-panel').addEventListener('click', () => void newPanel());
 byId('fit').addEventListener('click', () => fitView());
 byId('zoom-selection').addEventListener('click', zoomToSelection);
 noteButton.addEventListener('click', () => setNoteTool(!session.noteTool));
+byId('duct-tool').addEventListener('click', () => {
+  session.ductTool = !session.ductTool;
+  if (session.ductTool) {
+    setNoteTool(false);
+    session.ruler = { on: false, line: null };
+  }
+  session.changed();
+});
 byId('feed-from-first').addEventListener('click', () => schematicView.feedFromFirst());
 byId('chain-selected').addEventListener('click', () => schematicView.chainSelected());
 
@@ -1279,6 +1293,7 @@ byId<HTMLInputElement>('view-minimap').addEventListener('change', (e) => {
 });
 byId('ruler').addEventListener('click', () => {
   session.ruler = { on: !session.ruler.on, line: null };
+  if (session.ruler.on) session.ductTool = false;
   session.changed();
 });
 byId('save-project').addEventListener('click', () =>

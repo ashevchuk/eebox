@@ -1,26 +1,35 @@
 import type { Selection } from './session';
 
 /** Ids of everything selected on the panel, whether it is one item or a group. */
-export function selectedIds(selection: Selection): { placements: string[]; combs: string[] } {
+export function selectedIds(selection: Selection): { placements: string[]; combs: string[]; ducts: string[] } {
   return {
     placements: selection.placementIds ?? (selection.placementId ? [selection.placementId] : []),
     combs: selection.combIds ?? (selection.combId ? [selection.combId] : []),
+    ducts: selection.ductIds ?? (selection.ductId ? [selection.ductId] : []),
   };
 }
 
 /** Adds the item to the selection, or takes it out if it is in already; one item left becomes a plain selection. */
-export function toggleItem(selection: Selection, kind: 'placement' | 'comb', id: string): Selection {
+export function toggleItem(selection: Selection, kind: 'placement' | 'comb' | 'duct', id: string): Selection {
   const current = selectedIds(selection);
-  const list = kind === 'placement' ? current.placements : current.combs;
+  const list = kind === 'placement' ? current.placements : kind === 'comb' ? current.combs : current.ducts;
   const changed = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-  return groupSelection(kind === 'placement' ? changed : current.placements, kind === 'comb' ? changed : current.combs);
+  return groupSelection(
+    kind === 'placement' ? changed : current.placements,
+    kind === 'comb' ? changed : current.combs,
+    kind === 'duct' ? changed : current.ducts,
+  );
 }
 
-export function groupSelection(placements: string[], combs: string[]): Selection {
-  if (placements.length + combs.length === 0) return {};
-  if (placements.length === 1 && combs.length === 0) return { placementId: placements[0]! };
-  if (placements.length === 0 && combs.length === 1) return { combId: combs[0]! };
-  return { placementIds: placements, combIds: combs };
+export function groupSelection(placements: string[], combs: string[], ducts: string[] = []): Selection {
+  const total = placements.length + combs.length + ducts.length;
+  if (total === 0) return {};
+  if (total === 1) {
+    if (placements.length === 1) return { placementId: placements[0]! };
+    if (combs.length === 1) return { combId: combs[0]! };
+    return { ductId: ducts[0]! };
+  }
+  return { placementIds: placements, combIds: combs, ...(ducts.length > 0 ? { ductIds: ducts } : {}) };
 }
 
 /** Ids of the selected nodes of the schematic, whether it is one or a group. */

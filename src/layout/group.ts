@@ -1,5 +1,5 @@
 import { addComb, type CombLookup } from './combs';
-import { addPlacement, type Panel, type WidthOf } from './placement';
+import { addPlacement, isOnRail, type Panel, type WidthOf } from './placement';
 import { roundUnits } from './units';
 
 export type MoveGroupResult = { ok: true; panel: Panel } | { ok: false };
@@ -17,11 +17,11 @@ export function moveGroup(
   railDelta: number,
   slotDelta: number,
 ): MoveGroupResult {
-  const moving = panel.placements.filter((p) => placementIds.includes(p.id));
+  const moving = panel.placements.filter(isOnRail).filter((p) => placementIds.includes(p.id));
   const movingCombs = panel.combs.filter((c) => combIds.includes(c.id));
   let next: Panel = {
     ...panel,
-    placements: panel.placements.filter((p) => !placementIds.includes(p.id)),
+    placements: panel.placements.filter((p) => !(isOnRail(p) && placementIds.includes(p.id))),
     combs: panel.combs.filter((c) => !combIds.includes(c.id)),
   };
   for (const item of moving) {

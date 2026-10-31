@@ -12,7 +12,7 @@ describe('copy and paste', () => {
   it('places copies to the right of the originals with new ids, keeping labels', () => {
     const labelled = { ...place('p1', 'mcb1', 0, 0), label: 'Kitchen' };
     const panel = panelOf([labelled, place('p2', 'mcb1', 0, 1)]);
-    const clip = copyItems(panel, ['p1', 'p2'], []);
+    const clip = copyItems(panel, ['p1', 'p2'], [], []);
     const result = pasteItems(panel, widthOf, lookup, clip);
     if (!result.ok) throw new Error(result.error);
     expect(result.placementIds).toEqual(['p3', 'p4']);
@@ -23,7 +23,7 @@ describe('copy and paste', () => {
 
   it('keeps the distance between the copied items and their combs', () => {
     const panel = { ...panelOf([place('p1', 'mcb1', 0, 0), place('p2', 'mcb1', 0, 2)]), combs: [combAt('c1', 'comb1', 0, 0)] };
-    const clip = copyItems(panel, ['p1', 'p2'], ['c1']);
+    const clip = copyItems(panel, ['p1', 'p2'], ['c1'], []);
     const result = pasteItems(panel, widthOf, lookup, clip);
     if (!result.ok) throw new Error(result.error);
     expect(result.combIds).toEqual(['c2']);
@@ -33,7 +33,7 @@ describe('copy and paste', () => {
 
   it('goes to the left when the right side is full', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 22), place('p2', 'mcb1', 0, 23)], [], [24]);
-    const clip = copyItems(panel, ['p2'], []);
+    const clip = copyItems(panel, ['p2'], [], []);
     const result = pasteItems(panel, widthOf, lookup, clip);
     if (!result.ok) throw new Error(result.error);
     expect(result.panel.placements[2]?.slot).toBe(21);
@@ -41,13 +41,13 @@ describe('copy and paste', () => {
 
   it('reports no room when the rails are full, and nothing to paste for an empty clip', () => {
     const full = panelOf([place('p1', 'mcb1', 0, 0), place('p2', 'mcb1', 0, 1)], [], [2]);
-    expect(pasteItems(full, widthOf, lookup, copyItems(full, ['p1'], []))).toEqual({ ok: false, error: 'no-room' });
-    expect(pasteItems(full, widthOf, lookup, { placements: [], combs: [] })).toEqual({ ok: false, error: 'nothing-copied' });
+    expect(pasteItems(full, widthOf, lookup, copyItems(full, ['p1'], [], []))).toEqual({ ok: false, error: 'no-room' });
+    expect(pasteItems(full, widthOf, lookup, { placements: [], combs: [], free: [], ducts: [] })).toEqual({ ok: false, error: 'nothing-copied' });
   });
 
   it('does not change the panel it was given', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)]);
-    pasteItems(panel, widthOf, lookup, copyItems(panel, ['p1'], []));
+    pasteItems(panel, widthOf, lookup, copyItems(panel, ['p1'], [], []));
     expect(panel.placements).toHaveLength(1);
   });
 });
@@ -62,9 +62,9 @@ describe('group selection', () => {
   });
 
   it('lists what is selected whether it is one item or several', () => {
-    expect(selectedIds({ combId: 'c1' })).toEqual({ placements: [], combs: ['c1'] });
-    expect(selectedIds(groupSelection(['p1', 'p2'], []))).toEqual({ placements: ['p1', 'p2'], combs: [] });
-    expect(selectedIds({})).toEqual({ placements: [], combs: [] });
+    expect(selectedIds({ combId: 'c1' })).toEqual({ placements: [], combs: ['c1'], ducts: [] });
+    expect(selectedIds(groupSelection(['p1', 'p2'], []))).toEqual({ placements: ['p1', 'p2'], combs: [], ducts: [] });
+    expect(selectedIds({})).toEqual({ placements: [], combs: [], ducts: [] });
   });
 });
 

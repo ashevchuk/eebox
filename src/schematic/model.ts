@@ -5,7 +5,7 @@ import { loadSpecProblem, type LoadSpec } from '../electrical/loads';
 import { freeNodeTerminals } from '../electrical/nodeTerminals';
 import type { Terminal } from '../electrical/terminals';
 import { normalizeLabel } from '../layout/labels';
-import type { ModuleRef, Panel } from '../layout/placement';
+import { isFree, isOnRail, type ModuleRef, type Panel, type Placement } from '../layout/placement';
 import { CONDUCTORS, canJoin, familyOf, type Conductor } from '../library/types';
 
 export type NodeKind = 'source' | 'load' | 'module';
@@ -398,19 +398,19 @@ export function syncModuleNodes(
 ): Schematic {
   const linked = new Set(schematic.nodes.map((n) => n.placementId));
   let result = schematic;
-  panel.rails.forEach((_r, rail) => {
-    const onRail = panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot);
-    onRail.forEach((placement, column) => {
+  const addRow = (row: number, placements: Placement[]) =>
+    placements.forEach((placement, column) => {
       if (linked.has(placement.id)) return;
       result = addNode(result, {
         kind: 'module',
         label: labelOf(placement.module),
         x: column * SKELETON_COLUMN_PITCH,
-        y: (rail + 1) * SKELETON_ROW_PITCH,
+        y: (row + 1) * SKELETON_ROW_PITCH,
         placementId: placement.id,
       }).schematic;
     });
-  });
+  panel.rails.forEach((_r, rail) => addRow(rail, panel.placements.filter(isOnRail).filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot)));
+  addRow(panel.rails.length, panel.placements.filter(isFree).sort((a, b) => a.y - b.y || a.x - b.x));
   return result;
 }
 

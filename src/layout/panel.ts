@@ -7,7 +7,7 @@ import {
   MAX_RAIL_POSITION_MM,
 } from './limits';
 import { normalizeLabel } from './labels';
-import type { Panel, WidthOf } from './placement';
+import { isOnRail, type Panel, type WidthOf } from './placement';
 import type { Rail } from './rail';
 import { LAYOUT_EPSILON_UNITS } from './units';
 
@@ -32,7 +32,7 @@ export function createPanel(railLengthsUnits: number[], pitchMm = DEFAULT_RAIL_P
 /** New rows copy the last row's length and the distance between the last two rows. Rows can only be removed while empty. */
 export function setRailCount(panel: Panel, count: number): PanelEditResult {
   if (!inRange(count, 1, MAX_RAILS)) return failure('invalid-value');
-  if (panel.placements.some((p) => p.rail >= count) || panel.combs.some((c) => c.rail >= count)) {
+  if (panel.placements.some((p) => isOnRail(p) && p.rail >= count) || panel.combs.some((c) => c.rail >= count)) {
     return failure('rail-not-empty');
   }
   const rails = panel.rails.slice(0, count);
@@ -84,7 +84,7 @@ export function moveRail(panel: Panel, from: number, to: number): PanelEditResul
     if (from > to && rail >= to && rail < from) return rail + 1;
     return rail;
   };
-  const placements = panel.placements.map((p) => ({ ...p, rail: newIndex(p.rail) }));
+  const placements = panel.placements.map((p) => (isOnRail(p) ? { ...p, rail: newIndex(p.rail) } : p));
   const combs = panel.combs.map((c) => ({ ...c, rail: newIndex(c.rail) }));
   return { ok: true, panel: { ...panel, rails, placements, combs } };
 }

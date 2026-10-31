@@ -19,7 +19,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       ['Escape', 'Cancel what is being dragged; close a dialog'],
       ['Delete', 'Remove what is selected'],
       ['F', 'Zoom to what is selected, or show everything when nothing is'],
-      ['Arrow keys', 'Move what is selected: modules by a unit along the rail and between rails (Alt: a quarter of a unit), schematic nodes by 10 mm (Shift: 50 mm)'],
+      ['Arrow keys', 'Move what is selected: modules by a unit along the rail and between rails (Alt: a quarter of a unit), devices on the plate and ducts by 1 mm (Shift: 10 mm, Alt: half a millimetre), schematic nodes by 10 mm (Shift: 50 mm)'],
       ['Tab, Shift+Tab', 'With something selected, select the next or previous module (or node); Escape lets go'],
       ['Enter', 'With something selected, go to its fields in the inspector'],
       ['Ctrl+F', 'Find a module, node or wire by its label, name or id'],

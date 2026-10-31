@@ -1,4 +1,5 @@
 import type { Resolve } from '../electrical/context';
+import { isOnRail } from '../layout/placement';
 import type { Project } from '../project';
 import type { Objects } from './problems';
 import type { Mode } from './session';
@@ -36,7 +37,7 @@ export function searchProject(project: Project, resolve: Resolve, query: string)
     const def = resolve(placement.module);
     consider([placement.label, def?.name, def?.sku, placement.id], {
       title: placement.label ?? def?.name ?? placement.id,
-      detail: `${def?.name ?? 'module'} · row ${placement.rail + 1}${rows[placement.rail] ? ` (${rows[placement.rail]})` : ''}`,
+      detail: `${def?.name ?? 'module'} · ${isOnRail(placement) ? `row ${placement.rail + 1}${rows[placement.rail] ? ` (${rows[placement.rail]})` : ''}` : 'on the plate'}`,
       prefer: 'panel',
       objects: { ...none, placements: [placement.id] },
     });

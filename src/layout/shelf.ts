@@ -1,14 +1,15 @@
-import { insertPlacement, type Panel, type Placement, type PlacementError, type PlacementResult, type WidthOf } from './placement';
+import { addFreePlacement } from './free';
+import { insertPlacement, type Panel, type PlacementError, type PlacementResult, type RailPlacement, type WidthOf } from './placement';
 
 export type ShelfError = PlacementError | { kind: 'unknown-shelf-item' };
 
 export type ShelfResult = { ok: true; panel: Panel } | { ok: false; error: ShelfError };
 
-/** Takes a module off its rail and puts it on the shelf, keeping everything about it but the place. */
+/** Takes a module off its rail or plate and puts it on the shelf, keeping everything about it but the place. */
 export function takeOff(panel: Panel, id: string): ShelfResult {
   const placement = panel.placements.find((p) => p.id === id);
   if (!placement) return { ok: false, error: { kind: 'unknown-placement' } };
-  const { rail: _rail, slot: _slot, ...item } = placement;
+  const { rail: _rail, slot: _slot, x: _x, y: _y, ...item } = placement;
   return {
     ok: true,
     panel: {
@@ -33,8 +34,17 @@ export function placeFromShelf(
   const item = panel.shelf.find((s) => s.id === id);
   if (!item) return { ok: false, error: { kind: 'unknown-shelf-item' } };
   const without: Panel = { ...panel, shelf: panel.shelf.filter((s) => s.id !== id) };
-  const placement: Placement = { ...item, rail, slot };
+  const placement: RailPlacement = { ...item, rail, slot };
   const result: PlacementResult = insertPlacement(without, widthOf, placement);
+  return result.ok ? result : { ok: false, error: result.error };
+}
+
+/** Puts a shelved device on the plate at a place. */
+export function placeFromShelfFree(panel: Panel, widthOf: WidthOf, id: string, x: number, y: number): ShelfResult {
+  const item = panel.shelf.find((s) => s.id === id);
+  if (!item) return { ok: false, error: { kind: 'unknown-shelf-item' } };
+  const without: Panel = { ...panel, shelf: panel.shelf.filter((s) => s.id !== id) };
+  const result = addFreePlacement(without, widthOf, { ...item, x, y });
   return result.ok ? result : { ok: false, error: result.error };
 }
 

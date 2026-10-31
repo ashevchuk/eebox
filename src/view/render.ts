@@ -14,15 +14,21 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, combRect, frameRect, labelRoom, moduleRect, placementRect, railRect, rowLabelX, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
+import { ductsOf, type Duct } from '../layout/ducts';
+import type { Guide } from './snap';
 
 export interface Ghost {
   module: ModuleDef;
   /** Width of the item being dragged: a resized copy keeps its own width. */
   widthUnits: number;
-  rail: number;
-  slot: number;
   valid: boolean;
+  /** Where it would stand on a rail, or ... */
+  rail?: number;
+  slot?: number;
+  /** ... where it would stand on the plate, in mm from the top-left of the working area. */
+  x?: number;
+  y?: number;
 }
 
 export interface Scene {
@@ -36,7 +42,7 @@ export interface Scene {
   marked?: ReadonlyMap<string, 'error' | 'advice'>;
   selectedRail: number | null;
   /** The placement or comb being dragged; drawn dimmed at its old position. */
-  moving: { kind: 'placement' | 'comb'; id: string } | null;
+  moving: { kind: 'placement' | 'comb' | 'duct'; id: string } | null;
   ghost: Ghost | null;
   /** A rubber band being dragged to select several items, in world coordinates. */
   band?: Rect | null;
@@ -50,6 +56,10 @@ export interface Scene {
   selectedAnnotationId?: string | null;
   /** The kinds of text to draw; all of them when absent. */
   texts?: TextVisibility;
+  /** Lines a dragged item is drawn to, in world coordinates; only while dragging. */
+  guides?: readonly Guide[];
+  /** A cable duct being drawn, before it is made. */
+  draftDuct?: Rect | null;
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -83,6 +93,10 @@ const COLORS = {
   selection: '#f5c518',
   ghostOk: 'rgba(34, 197, 94, 0.55)',
   ghostBad: 'rgba(239, 68, 68, 0.55)',
+  duct: '#475569',
+  ductSlot: '#334155',
+  ductText: '#e2e8f0',
+  guide: '#e879f9',
 };
 
 function fillRect(ctx: CanvasRenderingContext2D, r: Rect, color: string): void {
@@ -169,7 +183,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
   for (const placement of panel.placements) {
     if (!placement.label || !texts.moduleLabels) continue;
     const r = placementRect(panel, sizesOf(scene), placement);
-    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail, r.height), 'right', theme().label);
+    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
   }
   ctx.font = LABEL_FONT;
   ctx.fillStyle = theme().label;
@@ -223,16 +237,57 @@ function drawCombStrip(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, w
   }
 }
 
-function drawModule(
-  ctx: CanvasRenderingContext2D,
-  panel: Panel,
-  def: ModuleDef | undefined,
-  rail: number,
-  slot: number,
-  widthUnits: number,
-  texts: TextVisibility,
-): void {
-  const r = moduleRect(panel, rail, slot, widthUnits, def?.heightMm ?? DIN_MODULE_HEIGHT_MM);
+const DUCT_SLOT_PITCH_MM = 12;
+const DUCT_SLOT_LENGTH_MM = 3;
+
+/** A duct is a grey bar with slots along it, drawn as plastic ducts look from the front. */
+function drawDuct(ctx: CanvasRenderingContext2D, duct: Duct, labelled: boolean): void {
+  const r = ductRect(duct);
+  fillRect(ctx, r, COLORS.duct);
+  ctx.fillStyle = COLORS.ductSlot;
+  const lengthwise = r.width >= r.height;
+  const along = lengthwise ? r.width : r.height;
+  const across = lengthwise ? r.height : r.width;
+  const slot = Math.min(DUCT_SLOT_LENGTH_MM, across / 3);
+  for (let offset = DUCT_SLOT_PITCH_MM / 2; offset < along - DUCT_SLOT_PITCH_MM / 2; offset += DUCT_SLOT_PITCH_MM) {
+    for (const side of [0.2, 0.8]) {
+      const across0 = across * side - slot / 2;
+      if (lengthwise) ctx.fillRect(r.x + offset, r.y + across0, slot, slot);
+      else ctx.fillRect(r.x + across0, r.y + offset, slot, slot);
+    }
+  }
+  if (!duct.label || !labelled) return;
+  ctx.font = LABEL_FONT;
+  ctx.fillStyle = COLORS.ductText;
+  ctx.textBaseline = 'middle';
+  if (lengthwise) {
+    ctx.textAlign = 'center';
+    ctx.fillText(fitText(ctx, duct.label, r.width - 8), r.x + r.width / 2, r.y + r.height / 2);
+  } else {
+    drawUpwardsLabel(ctx, duct.label, r.x + r.width / 2, r.y + r.height / 2, r.height - 8, 'center', COLORS.ductText);
+  }
+}
+
+function drawGuides(ctx: CanvasRenderingContext2D, guides: readonly Guide[], frame: Rect): void {
+  ctx.save();
+  ctx.strokeStyle = COLORS.guide;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  for (const guide of guides) {
+    ctx.beginPath();
+    if (guide.axis === 'x') {
+      ctx.moveTo(guide.at, frame.y);
+      ctx.lineTo(guide.at, frame.y + frame.height);
+    } else {
+      ctx.moveTo(frame.x, guide.at);
+      ctx.lineTo(frame.x + frame.width, guide.at);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawModule(ctx: CanvasRenderingContext2D, def: ModuleDef | undefined, r: Rect, widthUnits: number, texts: TextVisibility): void {
   if (!def) {
     fillRect(ctx, r, COLORS.missing);
     return;
@@ -368,10 +423,22 @@ export function render(
     ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
   }
 
+  for (const duct of ductsOf(panel)) {
+    ctx.globalAlpha = duct.id === scene.moving?.id && scene.moving.kind === 'duct' ? 0.35 : 1;
+    drawDuct(ctx, duct, texts.moduleLabels);
+    if (scene.selectedIds?.has(duct.id)) {
+      const r = ductRect(duct);
+      ctx.strokeStyle = COLORS.selection;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
+    }
+  }
+  ctx.globalAlpha = 1;
+
   const movingId = (kind: 'placement' | 'comb') => (scene.moving?.kind === kind ? scene.moving.id : null);
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
-    drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement), texts);
+    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizesOf(scene), placement), itemWidth(scene, placement), texts);
     const mark = scene.marked?.get(placement.id);
     if (mark) {
       const r = placementRect(panel, sizesOf(scene), placement);
@@ -403,13 +470,18 @@ export function render(
   drawAnnotations(ctx, scene.annotations ?? panel.annotations, scene.selectedAnnotationId ?? null, texts.annotations);
 
   if (scene.ghost) {
-    const { module, widthUnits, rail, slot, valid } = scene.ghost;
+    const { module, widthUnits, rail, slot, x, y, valid } = scene.ghost;
     const color = valid ? COLORS.ghostOk : COLORS.ghostBad;
-    const area = module.comb
-      ? combRect(panel, rail, slot, widthUnits, module.comb.side)
-      : moduleRect(panel, rail, slot, widthUnits, module.heightMm);
+    const area =
+      x !== undefined && y !== undefined
+        ? { x: FRAME_PADDING + x, y: FRAME_PADDING + y, width: widthUnits * MODULE_UNIT_MM, height: module.heightMm }
+        : module.comb
+          ? combRect(panel, rail ?? 0, slot ?? 0, widthUnits, module.comb.side)
+          : moduleRect(panel, rail ?? 0, slot ?? 0, widthUnits, module.heightMm);
     fillRect(ctx, area, color);
   }
+  if (scene.draftDuct) fillRect(ctx, scene.draftDuct, COLORS.ghostOk);
+  if (scene.guides) drawGuides(ctx, scene.guides, frame);
 
   if (scene.ruler) drawRuler(ctx, scene.ruler, camera.scale);
 

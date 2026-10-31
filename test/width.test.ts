@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addComb, setCombWidth, type CombLookup } from '../src/layout/combs';
 import { setRailLength } from '../src/layout/panel';
-import { insertPlacement, setPlacementWidth, type PlacementResult } from '../src/layout/placement';
+import { insertPlacement, setPlacementWidth, type PlacementResult, type RailPlacement } from '../src/layout/placement';
 import { buildNets } from '../src/electrical/nets';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { bomToCsv, buildBom } from '../src/project/bom';
@@ -76,7 +76,7 @@ describe('setPlacementWidth', () => {
 
   it('keeps the own width when a resized copy is moved with a push', () => {
     const wide = unwrap(setPlacementWidth(panelWith(place('p1', 'nbar', 0, 0), place('p2', 'mcb1', 0, 12)), widthOf, resizeOf, 'p1', 6));
-    const moved = unwrap(insertPlacement(wide, widthOf, { ...wide.placements[0]!, slot: 11 }, 'p1'));
+    const moved = unwrap(insertPlacement(wide, widthOf, { ...(wide.placements[0] as RailPlacement), slot: 11 }, 'p1'));
     expect(moved.placements.find((p) => p.id === 'p1')).toMatchObject({ slot: 11, widthUnits: 6 });
     expect(moved.placements.find((p) => p.id === 'p2')?.slot).toBe(17);
   });

@@ -5,7 +5,7 @@ import type { SchematicNode, TerminalRef, Wire } from '../schematic/model';
 import { canonicalJson } from './canonical';
 import { moduleKey, type ProjectFile } from './file';
 
-export type ChangeArea = 'project' | 'rows' | 'modules' | 'combs' | 'nodes' | 'wires' | 'notes';
+export type ChangeArea = 'project' | 'rows' | 'modules' | 'combs' | 'ducts' | 'nodes' | 'wires' | 'notes';
 export type ChangeKind = 'added' | 'removed' | 'changed';
 
 export interface Change {
@@ -19,12 +19,13 @@ export const AREA_TITLES: Record<ChangeArea, string> = {
   rows: 'Rows',
   modules: 'Modules on the panel',
   combs: 'Combs',
+  ducts: 'Cable ducts',
   nodes: 'Schematic nodes',
   wires: 'Wires',
   notes: 'Notes on the drawings',
 };
 
-const AREA_ORDER: ChangeArea[] = ['project', 'rows', 'modules', 'combs', 'nodes', 'wires', 'notes'];
+const AREA_ORDER: ChangeArea[] = ['project', 'rows', 'modules', 'combs', 'ducts', 'nodes', 'wires', 'notes'];
 const KIND_ORDER: ChangeKind[] = ['added', 'removed', 'changed'];
 const MAX_SHOWN_CHARS = 60;
 
@@ -46,8 +47,10 @@ const FIELD_NAMES: Record<string, string> = {
   shortCircuitKA: 'short-circuit current',
   loopImpedanceMOhm: 'loop impedance',
   off: 'switched off',
+  widthMm: 'width',
+  heightMm: 'height',
 };
-const UNITS: Record<string, string> = { widthUnits: ' units', crossSectionMm2: ' mm2', lengthM: ' m', powerW: ' W', shortCircuitKA: ' kA', loopImpedanceMOhm: ' mOhm' };
+const UNITS: Record<string, string> = { widthMm: ' mm', heightMm: ' mm', widthUnits: ' units', crossSectionMm2: ' mm2', lengthM: ' m', powerW: ' W', shortCircuitKA: ' kA', loopImpedanceMOhm: ' mOhm' };
 
 /** `name before -> after` for every key of two objects whose values differ, except the keys that are told apart some other way. */
 function fieldChanges(before: object, after: object, skip: readonly string[], prefix = ''): string[] {
@@ -63,7 +66,8 @@ function fieldChanges(before: object, after: object, skip: readonly string[], pr
   });
 }
 
-const where = (item: { rail?: number; slot?: number }): string => (item.rail === undefined ? 'on the shelf' : `row ${item.rail + 1}, position ${item.slot}`);
+const where = (item: { rail?: number; slot?: number; x?: number; y?: number }): string =>
+  item.rail !== undefined ? `row ${item.rail + 1}, position ${item.slot}` : item.x !== undefined ? `on the plate at ${item.x}, ${item.y} mm` : 'on the shelf';
 
 function byId<T extends { id: string }>(items: readonly T[]): Map<string, T> {
   return new Map(items.map((item) => [item.id, item]));
@@ -114,7 +118,7 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: label ${show(railA.label)} → ${show(railB.label)}` });
   }
 
-  const placed = (file: ProjectFile) => [...file.project.panel.placements, ...file.project.panel.shelf.map((s: ShelfItem) => ({ ...s, rail: undefined, slot: undefined }))] as Array<Omit<Placement, 'rail' | 'slot'> & { rail?: number; slot?: number }>;
+  const placed = (file: ProjectFile) => [...file.project.panel.placements, ...file.project.panel.shelf.map((s: ShelfItem) => ({ ...s, rail: undefined, slot: undefined }))] as Array<ShelfItem & { rail?: number; slot?: number; x?: number; y?: number }>;
   out.push(
     ...compareLists(
       placed(before),
@@ -124,7 +128,7 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
       (p, q) => [
         ...(where(p) !== where(q) ? [`moved from ${where(p)} to ${where(q)}`] : []),
         ...(!same(p.module, q.module) ? [`module ${moduleName(before, p.module)} → ${moduleName(after, q.module)}`] : []),
-        ...fieldChanges(p, q, ['id', 'module', 'rail', 'slot']),
+        ...fieldChanges(p, q, ['id', 'module', 'rail', 'slot', 'x', 'y']),
       ],
     ),
     ...compareLists(
@@ -137,6 +141,13 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
         ...(!same(p.module, q.module) ? [`module ${moduleName(before, p.module)} → ${moduleName(after, q.module)}`] : []),
         ...fieldChanges(p, q, ['id', 'module', 'rail', 'slot']),
       ],
+    ),
+    ...compareLists(
+      a.ducts ?? [],
+      b.ducts ?? [],
+      'ducts',
+      (d) => `${d.label ? `"${d.label}" ` : ''}duct (${d.id}), ${d.widthMm} by ${d.heightMm} mm at ${d.x}, ${d.y} mm`,
+      (p, q) => fieldChanges(p, q, ['id']),
     ),
   );
 

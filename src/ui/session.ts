@@ -1,5 +1,6 @@
 import { DEFAULT_CABLE_SETTINGS, type CableSettings } from '../electrical/cables';
 import { lookupsOf } from '../layout/lookups';
+import { ductsOf } from '../layout/ducts';
 import { createPanel } from '../layout/panel';
 import type { ModuleRef } from '../layout/placement';
 import type { Library, ModuleDef } from '../library/types';
@@ -25,6 +26,10 @@ export interface Selection {
   /** Set instead of `wireId` when several wires are selected together. */
   wireIds?: string[];
   combId?: string;
+  /** A cable duct on the panel. */
+  ductId?: string;
+  /** Set instead of `ductId` when several items, ducts among them, are selected together. */
+  ductIds?: string[];
   /** A note written on the drawing of the view that is on. */
   annotationId?: string;
   /** Set instead of `placementId` and `combId` when several items are selected together. */
@@ -58,6 +63,8 @@ export class Session {
   /** The kinds of text that PNG, SVG and print show, whatever the screen shows. */
   exportTexts: TextVisibility = ALL_TEXT;
   mode: Mode = 'panel';
+  /** The tool that draws a cable duct on the panel is on: the next press and drag makes one. */
+  ductTool = false;
   /** The tool that puts a note on the drawing is on: the next press and drag on the drawing writes one. */
   noteTool = false;
   /** The notes of the view that is on while one is being dragged, before the drag is committed. */
@@ -179,6 +186,7 @@ export class Session {
       ...groupSelection(
         kept.placements.filter((id) => panel.placements.some((p) => p.id === id)),
         kept.combs.filter((id) => panel.combs.some((c) => c.id === id)),
+        kept.ducts.filter((id) => ductsOf(panel).some((d) => d.id === id)),
       ),
       ...(rail !== undefined && rail < panel.rails.length ? { rail } : {}),
       ...(nodeId && schematic.nodes.some((n) => n.id === nodeId) ? { nodeId } : {}),

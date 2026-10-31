@@ -1,4 +1,4 @@
-import type { ModuleRef, Panel } from '../layout/placement';
+import { isOnRail, type ModuleRef, type Panel } from '../layout/placement';
 import type { ModuleDef } from '../library/types';
 import type { Project } from '../project';
 
@@ -30,7 +30,7 @@ export function labelStrips(
   maxUnits: number = STRIP_LINE_UNITS,
 ): StripLine[] {
   return panel.rails.flatMap((_r, rail): StripLine[] => {
-    const modules = panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot);
+    const modules = panel.placements.filter(isOnRail).filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot);
     const lines: Array<{ start: number; cells: StripCell[] }> = [];
     for (const placement of modules) {
       const def = resolve(placement.module);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SWITCHING_KINDS } from '../src/electrical/energy';
 import { lookupsOf } from '../src/layout/lookups';
 import { createPanel } from '../src/layout/panel';
-import type { Panel, Placement } from '../src/layout/placement';
+import type { Panel, RailPlacement } from '../src/layout/placement';
 import { genericModules } from '../src/library/genericSeries';
 import { artToSvg } from '../src/library/svgExport';
 import {
@@ -23,7 +23,7 @@ import { frameRect, labelRoom, moduleRect, placementAt, placementRect, railCente
 const LIBRARY = 'lib';
 const tall: ModuleDef = { id: 'drive', kind: 'vfd', name: 'Drive', widthUnits: 8, heightMm: 250, mounting: 'plate', poles: 3 };
 const resolve = (ref: { libraryId: string; moduleId: string }) => (ref.moduleId === tall.id ? tall : undefined);
-const placed = (): Placement => ({ id: 'p1', module: { libraryId: LIBRARY, moduleId: tall.id }, rail: 0, slot: 1 });
+const placed = (): RailPlacement => ({ id: 'p1', module: { libraryId: LIBRARY, moduleId: tall.id }, rail: 0, slot: 1 });
 const panelWithTall = (): Panel => ({ ...createPanel([12]), placements: [placed()] });
 
 const libraryWith = (change: (module: Record<string, unknown>) => void): unknown => {
@@ -101,7 +101,7 @@ describe('a module that is not as high as a standard one', () => {
 
 describe('the frame around modules of different heights', () => {
   const sizes = lookupsOf(resolve).sizes;
-  const standard = (): Placement => ({ id: 'p2', module: { libraryId: LIBRARY, moduleId: 'din' }, rail: 0, slot: 1 });
+  const standard = (): RailPlacement => ({ id: 'p2', module: { libraryId: LIBRARY, moduleId: 'din' }, rail: 0, slot: 1 });
   const din: ModuleDef = { id: 'din', kind: 'breaker', name: 'Breaker', widthUnits: 1, heightMm: DIN_MODULE_HEIGHT_MM, mounting: 'rail', poles: 1 };
   const resolveBoth = (ref: { libraryId: string; moduleId: string }) => (ref.moduleId === 'din' ? din : resolve(ref));
 

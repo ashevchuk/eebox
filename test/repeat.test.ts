@@ -3,6 +3,7 @@ import { copyItems, repeatItems } from '../src/layout/clipboard';
 import type { CombLookup } from '../src/layout/combs';
 import { emptySchematic } from '../src/schematic/model';
 import { applyEdit, inspect } from '../src/ui/inspector';
+import { isOnRail } from '../src/layout/placement';
 import { combAt, panelOf, place, resolve, widthOf } from './fixtures';
 
 const lookup: CombLookup = { widthOf, sideOf: (m) => resolve(m)?.comb?.side };
@@ -10,7 +11,7 @@ const lookup: CombLookup = { widthOf, sideOf: (m) => resolve(m)?.comb?.side };
 describe('repeatItems', () => {
   it('places the copies one after another, edge to edge', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)]);
-    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], []), 5);
+    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], [], []), 5);
     if (!result.ok) throw new Error(result.error);
     expect(result.added).toBe(5);
     expect(result.panel.placements.map((p) => p.slot)).toEqual([0, 1, 2, 3, 4, 5]);
@@ -19,26 +20,26 @@ describe('repeatItems', () => {
 
   it('keeps the spacing of a group when it repeats it', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0), place('p2', 'mcb1', 0, 2)]);
-    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1', 'p2'], []), 2);
+    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1', 'p2'], [], []), 2);
     if (!result.ok) throw new Error(result.error);
-    expect(result.panel.placements.map((p) => p.slot).sort((a, b) => a - b)).toEqual([0, 2, 3, 5, 6, 8]);
+    expect(result.panel.placements.filter(isOnRail).map((p) => p.slot).sort((a, b) => a - b)).toEqual([0, 2, 3, 5, 6, 8]);
   });
 
   it('places as many as fit and says how many that was', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)], [], [4]);
-    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], []), 10);
+    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], [], []), 10);
     expect(result).toMatchObject({ ok: true, added: 3 });
   });
 
   it('fails when not even one fits, and does not change the panel', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)], [], [1]);
-    expect(repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], []), 3)).toEqual({ ok: false, error: 'no-room' });
+    expect(repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], [], []), 3)).toEqual({ ok: false, error: 'no-room' });
     expect(panel.placements).toHaveLength(1);
   });
 
   it('is capped, so a typed 1000000 cannot freeze the page', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 0)], [], [144]);
-    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], []), 1_000_000);
+    const result = repeatItems(panel, widthOf, lookup, copyItems(panel, ['p1'], [], []), 1_000_000);
     expect(result.ok && result.added).toBeLessThanOrEqual(100);
   });
 });

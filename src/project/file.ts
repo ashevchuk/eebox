@@ -7,10 +7,14 @@ import { EARTHING_SYSTEM_IDS } from '../electrical/earthing';
 import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
+  MAX_DUCTS,
+  MAX_DUCT_SIZE_MM,
+  MIN_DUCT_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_POSITION_MM,
 } from '../layout/limits';
+import type { Duct } from '../layout/ducts';
 import type { Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
 import {
@@ -133,6 +137,7 @@ const PANEL_SPEC: FieldSpec = {
   info: { required: false, check: infoCheck },
   annotations: { required: false, check: annotationsCheck },
   rails: { required: true, check: arrayCheck },
+  ducts: { required: false, check: arrayCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -164,10 +169,34 @@ const SHELF_ITEM_SPEC: FieldSpec = {
   flags: { required: false, check: flagsCheck },
 };
 const PLACEMENT_SPEC: FieldSpec = {
-  ...COMB_PLACEMENT_SPEC,
+  id: { required: true, check: identifier },
+  module: { required: true, check: moduleRefCheck },
+  rail: { required: false, check: nonNegativeInteger },
+  slot: { required: false, check: slotCheck },
+  x: { required: false, check: railPositionCheck },
+  y: { required: false, check: railPositionCheck },
+  label: { required: false, check: labelCheck },
+  widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
   flags: { required: false, check: flagsCheck },
+};
+/** A device stands on a rail (rail and slot) or on the plate (x and y), and not both. */
+function placementPositionCheck(item: Record<string, unknown>, path: string, errors: ValidationError[]): void {
+  const onRail = item.rail !== undefined || item.slot !== undefined;
+  const onPlate = item.x !== undefined || item.y !== undefined;
+  const complete = onRail ? item.rail !== undefined && item.slot !== undefined : item.x !== undefined && item.y !== undefined;
+  if (onRail === onPlate || !complete) errors.push({ path, message: 'must have a rail and a slot, or an x and a y, and not both' });
+}
+const ductSizeCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= MIN_DUCT_SIZE_MM && v <= MAX_DUCT_SIZE_MM ? null : `must be a number of mm from ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM}`;
+const DUCT_SPEC: FieldSpec = {
+  id: { required: true, check: identifier },
+  x: { required: true, check: railPositionCheck },
+  y: { required: true, check: railPositionCheck },
+  widthMm: { required: true, check: ductSizeCheck },
+  heightMm: { required: true, check: ductSizeCheck },
+  label: { required: false, check: labelCheck },
 };
 const SCHEMATIC_SPEC: FieldSpec = {
   nodes: { required: true, check: arrayCheck },
@@ -301,7 +330,11 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   const project = child(root, 'project', PROJECT_SPEC, 'project', errors);
   const panelRaw = child(project, 'panel', PANEL_SPEC, 'project.panel', errors);
   const schematicRaw = child(project, 'schematic', SCHEMATIC_SPEC, 'project.schematic', errors);
-  const placements = validateList<Placement>(panelRaw?.placements, PLACEMENT_SPEC, 'project.panel.placements', errors);
+  const placements = validateList<Placement>(panelRaw?.placements, PLACEMENT_SPEC, 'project.panel.placements', errors, placementPositionCheck);
+  const ducts = validateList<Duct>(panelRaw?.ducts, DUCT_SPEC, 'project.panel.ducts', errors);
+  if (panelRaw && Array.isArray(panelRaw.ducts) && (panelRaw.ducts.length < 1 || panelRaw.ducts.length > MAX_DUCTS)) {
+    errors.push({ path: 'project.panel.ducts', message: `must list 1 to ${MAX_DUCTS} ducts, or be left out` });
+  }
   const combs = validateList<CombPlacement>(panelRaw?.combs, COMB_PLACEMENT_SPEC, 'project.panel.combs', errors);
   const shelf = validateList<ShelfItem>(panelRaw?.shelf, SHELF_ITEM_SPEC, 'project.panel.shelf', errors);
   const placedIds = new Set(placements.map((p) => p.id));
@@ -331,6 +364,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       ...(panelRaw.info !== undefined ? { info: panelRaw.info as ProjectInfo } : {}),
       ...(panelRaw.annotations !== undefined ? { annotations: panelRaw.annotations as Annotation[] } : {}),
       rails,
+      ...(panelRaw.ducts !== undefined ? { ducts } : {}),
       placements,
       combs,
       shelf,

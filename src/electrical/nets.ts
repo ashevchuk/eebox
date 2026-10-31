@@ -1,4 +1,4 @@
-import type { ModuleRef } from '../layout/placement';
+import { isOnRail, type ModuleRef } from '../layout/placement';
 import { LAYOUT_EPSILON_UNITS } from '../layout/units';
 import { COMBINED_FAMILIES, familiesMayShareNet, familyOf, type Conductor, type ConductorFamily, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
@@ -64,7 +64,7 @@ export function combContacts(panel: Project['panel'], resolve: Resolve): CombCon
     const pins = Math.max(1, Math.floor((comb.widthUnits ?? def.widthUnits) + LAYOUT_EPSILON_UNITS));
     for (let offset = 0; offset < pins; offset++) {
       const pin = pattern[offset % pattern.length]!;
-      for (const placement of panel.placements) {
+      for (const placement of panel.placements.filter(isOnRail)) {
         const placed = placement.rail === comb.rail ? resolve(placement.module) : undefined;
         if (!placed) continue;
         // A pin is one unit of the comb; a terminal belongs to the pin whose unit holds its centre.

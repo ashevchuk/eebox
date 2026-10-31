@@ -5,7 +5,8 @@ import { computeLayout, schematicBounds, boundsWithRoutes } from '../schematic/g
 import { routeWires } from '../schematic/router';
 import type { Bounds, Point } from '../view/Camera';
 import { lookupsOf } from '../layout/lookups';
-import { combRect, frameRect, placementRect } from '../view/geometry';
+import { ductsOf } from '../layout/ducts';
+import { combRect, ductRect, frameRect, placementRect } from '../view/geometry';
 import type { Mode } from './session';
 
 export interface OverviewBox {
@@ -22,6 +23,7 @@ export interface Overview {
 
 const MODULE_COLOR = '#94a3b8';
 const COMB_COLOR = '#f59e0b';
+const DUCT_COLOR = '#475569';
 const NODE_COLOR = '#cbd5e1';
 const SOURCE_COLOR = '#facc15';
 const LOAD_COLOR = '#86efac';
@@ -35,6 +37,7 @@ export function overviewOf(project: Project, resolve: Resolve, mode: Mode): Over
     return {
       bounds: boxOf(frameRect(panel, sizes)),
       boxes: [
+        ...ductsOf(panel).map((d) => ({ box: boxOf(ductRect(d)), color: DUCT_COLOR })),
         ...panel.placements.map((p) => ({ box: boxOf(placementRect(panel, sizes, p)), color: MODULE_COLOR })),
         ...panel.combs.map((c) => ({ box: boxOf(combRect(panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')), color: COMB_COLOR })),
       ],

@@ -1,5 +1,6 @@
 import { MODULE_UNIT_MM } from '../library/types';
-import type { CombPlacement, Panel, Placement, Sizes } from '../layout/placement';
+import { ductsOf, type Duct } from '../layout/ducts';
+import { isFree, isOnRail, type CombPlacement, type Panel, type Placement, type Sizes } from '../layout/placement';
 import { DIN_MODULE_HEIGHT_MM, type TerminalSide } from '../library/types';
 import { FIRST_RAIL_Y_MM } from '../layout/limits';
 import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
@@ -44,7 +45,22 @@ export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits:
 
 /** Where a placed module stands, by the size its module has; a module that is not in any library is drawn standard-sized. */
 export function placementRect(panel: Panel, sizes: Sizes, placement: Placement): Rect {
-  return moduleRect(panel, placement.rail, placement.slot, sizes.widthOf(placement) ?? 1, sizes.heightOf(placement) ?? DIN_MODULE_HEIGHT_MM);
+  const width = sizes.widthOf(placement) ?? 1;
+  const height = sizes.heightOf(placement) ?? DIN_MODULE_HEIGHT_MM;
+  if (isFree(placement)) return { x: FRAME_PADDING + placement.x, y: FRAME_PADDING + placement.y, width: width * MODULE_UNIT_MM, height };
+  return moduleRect(panel, placement.rail, placement.slot, width, height);
+}
+
+export function ductRect(duct: Duct): Rect {
+  return { x: FRAME_PADDING + duct.x, y: FRAME_PADDING + duct.y, width: duct.widthMm, height: duct.heightMm };
+}
+
+/** The cable duct under a point; a later one lies over an earlier one. */
+export function ductAt(panel: Panel, point: Point): Duct | undefined {
+  return [...ductsOf(panel)].reverse().find((duct) => {
+    const r = ductRect(duct);
+    return point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y && point.y <= r.y + r.height;
+  });
 }
 
 export const COMB_HEIGHT = 18;
@@ -79,6 +95,11 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
   return Math.max(0, limit - bottom - LABEL_GAP);
 }
 
+/** How far a label under a placed module may run: down to what is below it on its rail, or the room the frame keeps under a device on the plate. */
+export function placementLabelRoom(panel: Panel, placement: Placement, body: Rect): number {
+  return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : ROOM_AROUND_MODULE - LABEL_GAP;
+}
+
 export function combAtPoint(
   panel: Panel,
   infoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
@@ -98,11 +119,18 @@ const ROOM_AROUND_MODULE = FRAME_PADDING + ROW_MARGIN - DIN_MODULE_HEIGHT_MM / 2
 /** The frame is as large as the rails and what stands on them need, with the same room around a taller module as around a standard one. */
 export function frameRect(panel: Panel, sizes: Sizes): Rect {
   const bodies = panel.placements.map((p) => placementRect(panel, sizes, p));
-  const right = Math.max(0, ...panel.rails.map((r) => r.x + r.lengthUnits * MODULE_UNIT_MM), ...bodies.map((b) => b.x + b.width - FRAME_PADDING));
+  const ducts = ductsOf(panel).map(ductRect);
+  const railBodies = panel.placements.flatMap((p, i) => (isOnRail(p) ? [bodies[i]!] : []));
+  const plateBodies = panel.placements.flatMap((p, i) => (isFree(p) ? [bodies[i]!] : []));
+  const right = Math.max(0, ...panel.rails.map((r) => r.x + r.lengthUnits * MODULE_UNIT_MM), ...bodies.map((b) => b.x + b.width - FRAME_PADDING), ...ducts.map((d) => d.x + d.width - FRAME_PADDING));
   const lowest = panel.rails.length === 0 ? undefined : Math.max(...panel.rails.map((r) => r.y));
   const railsBottom = lowest === undefined ? FRAME_PADDING : FRAME_PADDING + lowest + ROW_MARGIN + FRAME_PADDING;
-  const top = Math.min(0, ...bodies.map((b) => b.y - ROOM_AROUND_MODULE));
-  const bottom = Math.max(railsBottom, ...bodies.map((b) => b.y + b.height + ROOM_AROUND_MODULE));
+  const top = Math.min(0, ...railBodies.map((b) => b.y - ROOM_AROUND_MODULE));
+  const bottom = Math.max(
+    railsBottom,
+    ...[...railBodies, ...plateBodies].map((b) => b.y + b.height + ROOM_AROUND_MODULE),
+    ...ducts.map((d) => d.y + d.height + FRAME_PADDING),
+  );
   return { x: 0, y: top, width: right + FRAME_PADDING * 2, height: bottom - top };
 }
 
@@ -183,12 +211,18 @@ export function rectBetween(a: Point, b: Point): Rect {
 }
 
 /** Ids of the modules and combs whose outline touches the rectangle. */
+export interface ItemsInRect {
+  placements: string[];
+  combs: string[];
+  ducts: string[];
+}
+
 export function itemsInRect(
   panel: Panel,
   sizes: Sizes,
   combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
   area: Rect,
-): { placements: string[]; combs: string[] } {
+): ItemsInRect {
   return {
     placements: panel.placements
       .filter((p) => overlaps(placementRect(panel, sizes, p), area))
@@ -199,6 +233,7 @@ export function itemsInRect(
         return info !== undefined && overlaps(combRect(panel, c.rail, c.slot, info.widthUnits, info.side), area);
       })
       .map((c) => c.id),
+    ducts: ductsOf(panel).filter((d) => overlaps(ductRect(d), area)).map((d) => d.id),
   };
 }
 
@@ -223,11 +258,12 @@ export function printArea(
   measure: (text: string) => number,
 ): { bounds: Bounds; rects: Rect[] } {
   const rects: Rect[] = panel.rails.map((_r, rail) => railRect(panel, rail));
+  rects.push(...ductsOf(panel).map(ductRect));
   for (const p of panel.placements) {
     const r = placementRect(panel, sizes, p);
     rects.push(r);
     if (p.label) {
-      const length = Math.min(measure(p.label), labelRoom(panel, p.rail, r.height));
+      const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
       rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
     }
   }

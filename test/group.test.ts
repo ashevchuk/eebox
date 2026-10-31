@@ -50,11 +50,11 @@ describe('selecting with a rectangle', () => {
     const first = moduleRect(panel, 0, 0, 1, 90);
     const second = moduleRect(panel, 0, 5, 1, 90);
     const area = rectBetween({ x: first.x + 2, y: first.y + 2 }, { x: second.x + 2, y: second.y + 2 });
-    expect(itemsInRect(panel, sizes, combInfo, area)).toEqual({ placements: ['p1', 'p2'], combs: ['c1'] });
+    expect(itemsInRect(panel, sizes, combInfo, area)).toEqual({ placements: ['p1', 'p2'], combs: ['c1'], ducts: [] });
   });
 
   it('works whichever corner the drag starts from, and finds nothing in empty space', () => {
     expect(rectBetween({ x: 10, y: 10 }, { x: 0, y: 4 })).toEqual({ x: 0, y: 4, width: 10, height: 6 });
-    expect(itemsInRect(panel, sizes, combInfo, { x: -500, y: -500, width: 10, height: 10 })).toEqual({ placements: [], combs: [] });
+    expect(itemsInRect(panel, sizes, combInfo, { x: -500, y: -500, width: 10, height: 10 })).toEqual({ placements: [], combs: [], ducts: [] });
   });
 });

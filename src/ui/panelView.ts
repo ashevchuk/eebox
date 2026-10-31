@@ -3,20 +3,27 @@ import { copyItems, pasteItems, type Clip } from '../layout/clipboard';
 import { withNoteBounds } from '../layout/annotations';
 import { moveGroup } from '../layout/group';
 import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
+import { addDuct, ductsOf, nextDuctId, removeDuct, type Duct } from '../layout/ducts';
+import { addFreePlacement, moveFreeGroup, moveFreePlacement, roundMm } from '../layout/free';
+import { MAX_RAIL_POSITION_MM, MIN_DUCT_SIZE_MM } from '../layout/limits';
 import {
   insertPlacement,
+  isFree,
+  isOnRail,
   nextPlacementId,
   type ModuleRef,
   type Panel,
+  type Placement,
   type ShelfItem,
 } from '../layout/placement';
-import { placeFromShelf } from '../layout/shelf';
+import { placeFromShelf, placeFromShelfFree } from '../layout/shelf';
 import type { Project } from '../project';
 import { deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
-import { FRAME_PADDING, combAtPoint, frameRect, itemsInRect, placementAt, railAtPoint, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
+import { FRAME_PADDING, combAtPoint, ductAt, ductRect, frameRect, itemsInRect, placementAt, placementRect, railAtPoint, railRect, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
+import { snapRect, type Guide } from '../view/snap';
 import { render, type Ghost } from '../view/render';
 import { groupSelection, selectedIds, toggleItem } from './selection';
 import { edgeLines, snapToEdges } from '../view/ruler';
@@ -25,6 +32,8 @@ import type { View } from './view';
 
 /** How close, in screen pixels, a ruler end has to come to an edge to be drawn onto it. */
 const RULER_SNAP_PX = 7;
+/** How close, in screen pixels, an item dragged over the plate has to come to an edge or a centre to be drawn to it. */
+const PLATE_SNAP_PX = 8;
 
 interface Drag {
   kind: 'placement' | 'comb';
@@ -33,14 +42,31 @@ interface Drag {
   widthUnits: number;
   module: ModuleRef;
   anchorUnits: number;
+  /** Where the pointer holds the device, in mm from its top-left corner; it decides where a drop on the plate puts it. */
+  grab: Point;
   movingId: string | null;
   /** Set when the drag started on the shelf, so the module keeps its id and properties. */
   shelfId: string | null;
   newId: string;
   ghost: Ghost | null;
   next: Panel | null;
+  /** Lines the dragged device is drawn to over the plate. */
+  guides: Guide[];
   /** Set when the drag moves everything selected together; `origin` is where the grabbed item started. */
   group: { placements: string[]; combs: string[]; origin: { rail: number; slot: number } } | null;
+}
+
+/** Devices fixed to the plate and cable ducts, dragged one by one or together; they never go on a rail. */
+interface PlateDrag {
+  placements: string[];
+  ducts: string[];
+  /** Where the grabbed item started, in plate coordinates. */
+  origin: Point;
+  /** Where the pointer holds it, in mm from its top-left corner. */
+  grab: Point;
+  size: { width: number; height: number };
+  next: Panel | null;
+  guides: Guide[];
 }
 
 export class PanelView implements View {
@@ -49,6 +75,8 @@ export class PanelView implements View {
   private clip: Clip | null = null;
   private band: { from: Point; to: Point } | null = null;
   private measuring = false;
+  private plateDrag: PlateDrag | null = null;
+  private ductDraft: { from: Point; to: Point } | null = null;
 
   constructor(private readonly session: Session) {}
 
@@ -58,19 +86,22 @@ export class PanelView implements View {
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
-    const { drag } = this;
+    const { drag, plateDrag } = this;
+    const chosenIds = selectedIds(this.session.selection);
     render(
       ctx,
       this.camera,
       {
-        panel: drag?.next ?? this.session.project.panel,
+        panel: drag?.next ?? plateDrag?.next ?? this.session.project.panel,
         resolve: this.session.resolve,
         selectedPlacementId: this.session.selection.placementId ?? null,
         selectedCombId: this.session.selection.combId ?? null,
         selectedRail: this.session.selection.rail ?? null,
-        selectedIds: new Set([...selectedIds(this.session.selection).placements, ...selectedIds(this.session.selection).combs]),
+        selectedIds: new Set([...chosenIds.placements, ...chosenIds.combs, ...chosenIds.ducts]),
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
+        guides: drag?.guides ?? plateDrag?.guides ?? [],
+        draftDuct: this.ductDraft ? this.draftRect(this.ductDraft) : null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
         ruler: this.session.ruler.line,
         bare: this.session.bareDrawing,
@@ -113,11 +144,42 @@ export class PanelView implements View {
     return snapToEdges(world, edges, RULER_SNAP_PX / this.camera.scale);
   }
 
+  /** The rectangle between two points of a duct being drawn, in world coordinates. */
+  private draftRect(draft: { from: Point; to: Point }): Rect {
+    return rectBetween(draft.from, draft.to);
+  }
+
+  /** Where a body at `rect` may be drawn to: the edges and centres of everything else on the plate. */
+  private snapTargets(except: { placements: readonly string[]; ducts: readonly string[] }): Rect[] {
+    const { panel } = this.session.project;
+    const { sizes } = this.session;
+    return [
+      { x: FRAME_PADDING, y: FRAME_PADDING, width: 0, height: 0 },
+      ...panel.rails.map((_r, rail) => railRect(panel, rail)),
+      ...panel.placements.filter((p) => !except.placements.includes(p.id)).map((p) => placementRect(panel, sizes, p)),
+      ...ductsOf(panel).filter((d) => !except.ducts.includes(d.id)).map(ductRect),
+    ];
+  }
+
+  /** The place on the plate a body held at `grab` takes when the pointer is at `world`, drawn to the nearby edges. */
+  private plateSpot(world: Point, grab: Point, size: { width: number; height: number }, except: { placements: readonly string[]; ducts: readonly string[] }): { x: number; y: number; guides: Guide[] } {
+    const raw = { x: world.x - grab.x, y: world.y - grab.y, ...size };
+    const snapped = snapRect(raw, this.snapTargets(except), PLATE_SNAP_PX / this.camera.scale);
+    const inside = (v: number) => Math.max(0, Math.min(MAX_RAIL_POSITION_MM, roundMm(v - FRAME_PADDING)));
+    return { x: inside(snapped.x), y: inside(snapped.y), guides: snapped.guides };
+  }
+
   pointerDown(e: PointerEvent, world: Point): boolean {
     if (this.session.ruler.on) {
       const start = this.snapped(world);
       this.session.ruler.line = { a: start, b: start };
       this.measuring = true;
+      this.session.changed();
+      return true;
+    }
+    if (this.session.ductTool) {
+      const start = this.snapped(world);
+      this.ductDraft = { from: start, to: start };
       this.session.changed();
       return true;
     }
@@ -131,9 +193,9 @@ export class PanelView implements View {
       world,
     );
     const chosen = selectedIds(this.session.selection);
-    const inGroup = (kind: 'placement' | 'comb', id: string) =>
+    const inGroup = (kind: 'placement' | 'comb' | 'duct', id: string) =>
       this.session.selection.placementIds !== undefined || this.session.selection.combIds !== undefined
-        ? (kind === 'placement' ? chosen.placements : chosen.combs).includes(id)
+        ? (kind === 'placement' ? chosen.placements : kind === 'comb' ? chosen.combs : chosen.ducts).includes(id)
         : false;
     if (comb && e.shiftKey) {
       this.session.select(toggleItem(this.session.selection, 'comb', comb.id));
@@ -154,8 +216,18 @@ export class PanelView implements View {
       return true;
     }
     const hit = placementAt(panel, this.session.sizes, world);
-    if (!hit && e.shiftKey) {
+    const duct = hit ? undefined : ductAt(panel, world);
+    if (!hit && !duct && e.shiftKey) {
       this.band = { from: world, to: world };
+      return true;
+    }
+    if (!hit && duct) {
+      if (e.shiftKey) {
+        this.session.select(toggleItem(this.session.selection, 'duct', duct.id));
+        return true;
+      }
+      if (!inGroup('duct', duct.id)) this.session.select({ ductId: duct.id });
+      this.startPlateDrag(world, ductRect(duct), { x: duct.x, y: duct.y });
       return true;
     }
     if (!hit) {
@@ -168,16 +240,33 @@ export class PanelView implements View {
       return true;
     }
     if (inGroup('placement', hit.id)) {
-      this.startGroupDrag('placement', hit, this.session.widthOf(hit) ?? 1, world);
+      if (isFree(hit)) this.startPlateDrag(world, placementRect(panel, this.session.sizes, hit), { x: hit.x, y: hit.y });
+      else this.startGroupDrag('placement', hit, this.session.widthOf(hit) ?? 1, world);
       return true;
     }
     this.session.select({ placementId: hit.id });
     const def = this.session.resolve(hit.module);
     if (def) {
       const width = hit.widthUnits ?? def.widthUnits;
-      this.startDrag('placement', def, hit.module, width, this.grabbedUnits(world, hit.slot, width), hit.id);
+      const body = placementRect(panel, this.session.sizes, hit);
+      const grab = { x: world.x - body.x, y: world.y - body.y };
+      this.startDrag('placement', def, hit.module, width, isOnRail(hit) ? this.grabbedUnits(world, hit.slot, width) : width / 2, hit.id, null, grab);
     }
     return true;
+  }
+
+  /** Starts moving the selected devices on the plate and ducts together by the one that was pressed. */
+  private startPlateDrag(world: Point, body: Rect, origin: Point): void {
+    const chosen = selectedIds(this.session.selection);
+    this.plateDrag = {
+      placements: chosen.placements,
+      ducts: chosen.ducts,
+      origin,
+      grab: { x: world.x - body.x, y: world.y - body.y },
+      size: { width: body.width, height: body.height },
+      next: null,
+      guides: [],
+    };
   }
 
   pointerMove(_e: PointerEvent, world: Point, overCanvas: boolean): void {
@@ -186,8 +275,22 @@ export class PanelView implements View {
       this.session.changed();
       return;
     }
+    if (this.ductDraft) {
+      this.ductDraft = { ...this.ductDraft, to: this.snapped(world) };
+      this.session.changed();
+      return;
+    }
     if (this.band) {
       this.band = { ...this.band, to: world };
+      this.session.changed();
+      return;
+    }
+    const plate = this.plateDrag;
+    if (plate) {
+      const spot = this.plateSpot(world, plate.grab, plate.size, plate);
+      const result = moveFreeGroup(this.session.project.panel, plate.placements, plate.ducts, spot.x - plate.origin.x, spot.y - plate.origin.y);
+      plate.next = result.ok ? result.panel : null;
+      plate.guides = spot.guides;
       this.session.changed();
       return;
     }
@@ -196,18 +299,28 @@ export class PanelView implements View {
     const panel = this.session.project.panel;
     drag.ghost = null;
     drag.next = null;
-    const snap = overCanvas ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits, this.neighboursOf(drag, panel)) : null;
+    drag.guides = [];
+    const onRailAllowed = drag.kind === 'comb' || drag.def.mounting !== 'plate';
+    const onPlateAllowed = drag.kind === 'placement' && drag.def.mounting !== 'rail';
+    const snap = overCanvas && onRailAllowed ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits, this.neighboursOf(drag, panel)) : null;
     if (snap) {
       const result = this.tryDrop(drag, panel, snap);
       drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, ...snap, valid: result.ok };
       drag.next = result.ok ? result.panel : null;
+    } else if (overCanvas && onPlateAllowed) {
+      const size = { width: drag.widthUnits * MODULE_UNIT_MM, height: drag.def.heightMm };
+      const spot = this.plateSpot(world, drag.grab, size, { placements: drag.movingId ? [drag.movingId] : [], ducts: [] });
+      const result = this.tryDropOnPlate(drag, panel, spot);
+      drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, x: spot.x, y: spot.y, valid: result.ok };
+      drag.next = result.ok ? result.panel : null;
+      drag.guides = spot.guides;
     }
     this.session.changed();
   }
 
   /** What the dragged item may be drawn up against: the other items of its own kind, not itself. */
   private neighboursOf(drag: Drag, panel: Panel): Neighbour[] {
-    const others = drag.kind === 'comb' ? panel.combs : panel.placements;
+    const others = drag.kind === 'comb' ? panel.combs : panel.placements.filter(isOnRail);
     return others
       .filter((item) => item.id !== drag.movingId && !(drag.group?.placements.includes(item.id) || drag.group?.combs.includes(item.id)))
       .map((item) => ({ rail: item.rail, slot: item.slot, widthUnits: this.session.widthOf(item) ?? 1 }));
@@ -221,6 +334,10 @@ export class PanelView implements View {
       this.session.changed();
       return;
     }
+    if (this.ductDraft) {
+      this.finishDuct();
+      return;
+    }
     if (this.band) {
       const area: Rect = rectBetween(this.band.from, this.band.to);
       this.band = null;
@@ -229,14 +346,21 @@ export class PanelView implements View {
         const def = this.session.resolve(item.module);
         return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
       }, area);
-      this.session.select(groupSelection(found.placements, found.combs));
+      this.session.select(groupSelection(found.placements, found.combs, found.ducts));
+      return;
+    }
+    const plate = this.plateDrag;
+    if (plate) {
+      this.plateDrag = null;
+      if (plate.next && JSON.stringify(plate.next) !== JSON.stringify(this.session.project.panel)) this.session.commit({ ...this.session.project, panel: plate.next });
+      else this.session.changed();
       return;
     }
     const drag = this.drag;
     if (!drag) return;
     this.drag = null;
     const { ghost, next, movingId, newId, kind } = drag;
-    const list = kind === 'comb' ? this.session.project.panel.combs : this.session.project.panel.placements;
+    const list: Array<{ id: string; rail?: number; slot?: number; x?: number; y?: number }> = kind === 'comb' ? this.session.project.panel.combs : this.session.project.panel.placements;
     if (drag.group) {
       const { origin } = drag.group;
       const moved = ghost !== null && (ghost.rail !== origin.rail || ghost.slot !== origin.slot);
@@ -245,7 +369,8 @@ export class PanelView implements View {
       return;
     }
     const unchanged =
-      movingId !== null && list.some((p) => p.id === movingId && p.rail === ghost?.rail && p.slot === ghost?.slot);
+      movingId !== null &&
+      list.some((p) => p.id === movingId && (ghost?.x !== undefined ? p.x === ghost.x && p.y === ghost.y : p.rail === ghost?.rail && p.slot === ghost?.slot));
     if (next && !unchanged) {
       this.session.commit({ ...this.session.project, panel: next });
       const id = movingId ?? newId;
@@ -255,12 +380,56 @@ export class PanelView implements View {
     }
   }
 
+  /** Makes the duct that was drawn, if it came out big enough; the tool stays on for the next one. */
+  private finishDuct(): void {
+    const draft = this.ductDraft;
+    this.ductDraft = null;
+    if (!draft) return;
+    const rect = this.draftRect(draft);
+    if (rect.width < MIN_DUCT_SIZE_MM || rect.height < MIN_DUCT_SIZE_MM) {
+      this.session.changed();
+      return;
+    }
+    const panel = this.session.project.panel;
+    const duct: Duct = {
+      id: nextDuctId(panel),
+      x: Math.max(0, roundMm(rect.x - FRAME_PADDING)),
+      y: Math.max(0, roundMm(rect.y - FRAME_PADDING)),
+      widthMm: roundMm(rect.width),
+      heightMm: roundMm(rect.height),
+    };
+    const result = addDuct(panel, duct);
+    if (!result.ok) {
+      this.session.notify('That duct cannot be made there.', true);
+      return;
+    }
+    this.session.commit({ ...this.session.project, panel: result.panel });
+    this.session.select({ ductId: duct.id });
+  }
+
+  /** Stops what is being drawn or dragged, without changing anything; true if there was something. */
+  cancel(): boolean {
+    const busy = this.ductDraft !== null || this.plateDrag !== null || this.drag !== null;
+    this.ductDraft = null;
+    this.plateDrag = null;
+    this.drag = null;
+    if (busy) this.session.changed();
+    return busy;
+  }
+
   deleteSelection(): void {
     const chosen = selectedIds(this.session.selection);
     let project = this.session.project;
     let changed = false;
     for (const id of chosen.combs) {
       const result = removeComb(project.panel, id);
+      if (result.ok) {
+        project = { ...project, panel: result.panel };
+        changed = true;
+      }
+    }
+    for (const id of chosen.ducts) {
+      const result = removeDuct(project.panel, id);
       if (result.ok) {
         project = { ...project, panel: result.panel };
         changed = true;
@@ -277,26 +446,40 @@ export class PanelView implements View {
     this.session.select({});
   }
 
-  /** Moves the selected modules and combs by whole rows and units; nothing moves if one of them would not fit. */
-  nudgeSelection(railDelta: number, slotDelta: number): void {
+  /**
+   * Moves what is selected: modules and combs by whole rows and units, devices on the plate and ducts
+   * by millimetres. Nothing moves if one of the modules on a rail would not fit.
+   */
+  nudgeSelection(step: { rail: number; slot: number }, mm: { dx: number; dy: number }): void {
     const chosen = selectedIds(this.session.selection);
-    if (chosen.placements.length + chosen.combs.length === 0) return;
-    const result = moveGroup(this.session.project.panel, this.session.widthOf, this.session.combLookup, chosen.placements, chosen.combs, railDelta, slotDelta);
-    if (!result.ok) return this.session.notify('There is no room there: a module or the end of the rail is in the way.', true);
-    this.session.commit({ ...this.session.project, panel: result.panel });
+    let panel = this.session.project.panel;
+    const onRail = chosen.placements.filter((id) => panel.placements.some((p) => p.id === id && isOnRail(p)));
+    const onPlate = chosen.placements.filter((id) => !onRail.includes(id));
+    if (onRail.length + chosen.combs.length + onPlate.length + chosen.ducts.length === 0) return;
+    if (onRail.length + chosen.combs.length > 0) {
+      const result = moveGroup(panel, this.session.widthOf, this.session.combLookup, onRail, chosen.combs, step.rail, step.slot);
+      if (!result.ok) return this.session.notify('There is no room there: a module or the end of the rail is in the way.', true);
+      panel = result.panel;
+    }
+    if (onPlate.length + chosen.ducts.length > 0) {
+      const result = moveFreeGroup(panel, onPlate, chosen.ducts, mm.dx, mm.dy);
+      if (result.ok) panel = result.panel;
+    }
+    this.session.commit({ ...this.session.project, panel });
   }
 
   selectAll(): void {
     const { panel } = this.session.project;
-    this.session.select(groupSelection(panel.placements.map((p) => p.id), panel.combs.map((c) => c.id)));
+    this.session.select(groupSelection(panel.placements.map((p) => p.id), panel.combs.map((c) => c.id), ductsOf(panel).map((d) => d.id)));
   }
 
   copySelection(): void {
     const chosen = selectedIds(this.session.selection);
-    const clip = copyItems(this.session.project.panel, chosen.placements, chosen.combs);
-    if (clip.placements.length + clip.combs.length === 0) return;
+    const clip = copyItems(this.session.project.panel, chosen.placements, chosen.combs, chosen.ducts);
+    const count = clip.placements.length + clip.combs.length + clip.free.length + clip.ducts.length;
+    if (count === 0) return;
     this.clip = clip;
-    this.session.notify(`Copied ${clip.placements.length + clip.combs.length} item(s).`);
+    this.session.notify(`Copied ${count} item(s).`);
   }
 
   paste(): void {
@@ -307,7 +490,7 @@ export class PanelView implements View {
       return;
     }
     this.session.commit({ ...this.session.project, panel: result.panel });
-    this.session.select(groupSelection(result.placementIds, result.combIds));
+    this.session.select(groupSelection(result.placementIds, result.combIds, result.ductIds));
   }
 
   duplicateSelection(): void {
@@ -335,8 +518,15 @@ export class PanelView implements View {
         : addComb(panel, combLookup, { id, module: drag.module, ...snap });
     }
     const moved = panel.placements.find((p) => p.id === drag.movingId);
-    const placement = { ...(moved ?? { id, module: drag.module }), ...snap };
-    return insertPlacement(panel, this.session.widthOf, placement, drag.movingId ?? undefined);
+    const { x: _x, y: _y, ...rest } = moved ?? { id, module: drag.module };
+    return insertPlacement(panel, this.session.widthOf, { ...rest, ...snap }, drag.movingId ?? undefined);
+  }
+
+  /** Puts the dragged device on the plate; it may stand on other things, which the checks flag later. */
+  private tryDropOnPlate(drag: Drag, panel: Panel, spot: { x: number; y: number }) {
+    if (drag.shelfId) return placeFromShelfFree(panel, this.session.widthOf, drag.shelfId, spot.x, spot.y);
+    if (drag.movingId) return moveFreePlacement(panel, drag.movingId, spot.x, spot.y);
+    return addFreePlacement(panel, this.session.widthOf, { id: drag.newId, module: drag.module, x: spot.x, y: spot.y });
   }
 
   private startDrag(
@@ -347,6 +537,7 @@ export class PanelView implements View {
     anchorUnits: number,
     movingId: string | null,
     shelfId: string | null = null,
+    grab: Point = { x: (widthUnits * MODULE_UNIT_MM) / 2, y: def.heightMm / 2 },
   ): void {
     const panel = this.session.project.panel;
     this.drag = {
@@ -355,11 +546,13 @@ export class PanelView implements View {
       widthUnits,
       module,
       anchorUnits,
+      grab,
       movingId,
       shelfId,
       newId: shelfId ?? (kind === 'comb' ? nextCombId(panel) : nextPlacementId(panel)),
       ghost: null,
       next: null,
+      guides: [],
       group: null,
     };
   }

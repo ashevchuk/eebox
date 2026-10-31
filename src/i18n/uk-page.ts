@@ -141,6 +141,8 @@ export const PAGE: Dictionary = {
   'Find a module, node or wire by its label (Ctrl+F)': 'Знайти модуль, вузол чи провід за назвою (Ctrl+F)',
   'Write a note on the drawing: press where it points and drag to where the note goes, or just click; Esc cancels':
     'Написати нотатку на кресленні: натисніть там, на що вона вказує, і потягніть туди, де має стояти, або просто клацніть; Esc скасовує',
+  Duct: `Канал`,
+  'Draw a cable duct on the panel: press at one corner and drag to the opposite one; Esc stops': `Накреслити кабель-канал на щиті: натисніть в одному куті й тягніть до протилежного; Esc зупиняє`,
   'Measure on the panel: drag from point to point; ends snap to edges (R)': 'Міряти на щиті: тягніть від точки до точки; кінці прилипають до країв (R)',
   'Show or hide the module library': 'Показати або сховати бібліотеку модулів',
   'Show or hide the inspector': 'Показати або сховати інспектор',

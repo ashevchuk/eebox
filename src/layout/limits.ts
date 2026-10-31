@@ -9,3 +9,7 @@ export const MAX_RAIL_POSITION_MM = 3000;
 export const MAX_RAILS = 20;
 export const MAX_RAIL_LENGTH_UNITS = 144;
 export const MAX_LABEL_LENGTH = 60;
+/** Cable ducts on one panel, and the size a duct may have. */
+export const MAX_DUCTS = 200;
+export const MIN_DUCT_SIZE_MM = 10;
+export const MAX_DUCT_SIZE_MM = 3000;

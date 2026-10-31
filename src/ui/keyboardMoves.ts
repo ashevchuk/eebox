@@ -1,4 +1,4 @@
-import type { Panel } from '../layout/placement';
+import { isFree, isOnRail, type Panel } from '../layout/placement';
 import type { Schematic } from '../schematic/model';
 
 export type Arrow = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown';
@@ -15,6 +15,12 @@ export function panelStep(key: Arrow, fine: boolean): { rail: number; slot: numb
   return { rail: key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0, slot: key === 'ArrowLeft' ? -unit : key === 'ArrowRight' ? unit : 0 };
 }
 
+/** How far an arrow key moves a device on the plate or a duct, in millimetres: 1, with Shift 10, with Alt 0.5. */
+export function plateStep(key: Arrow, shift: boolean, alt: boolean): { dx: number; dy: number } {
+  const step = alt ? 0.5 : shift ? 10 : 1;
+  return { dx: key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0, dy: key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0 };
+}
+
 /** How far an arrow key moves nodes of the schematic, in millimetres. */
 export function nodeStep(key: Arrow, big: boolean): { dx: number; dy: number } {
   const step = big ? NODE_BIG_STEP_MM : NODE_STEP_MM;
@@ -29,9 +35,11 @@ function around<T extends { id: string }>(ordered: readonly T[], selected: reado
   return ordered[(at + (backwards ? -1 : 1) + ordered.length) % ordered.length]!.id;
 }
 
-/** The module Tab goes to: by row, then by position along the row. */
+/** The module Tab goes to: by row, then by position along the row, and last the devices on the plate from the top down. */
 export function nextModuleId(panel: Panel, selected: readonly string[], backwards: boolean): string | null {
-  const ordered = [...panel.placements].sort((a, b) => a.rail - b.rail || a.slot - b.slot || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const railed = panel.placements.filter(isOnRail).sort((a, b) => a.rail - b.rail || a.slot - b.slot || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const plated = panel.placements.filter(isFree).sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const ordered = [...railed, ...plated];
   return around(ordered, selected, backwards);
 }
 

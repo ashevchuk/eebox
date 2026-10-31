@@ -1,5 +1,5 @@
 import { createPanel } from '../src/layout/panel';
-import type { CombPlacement, ModuleRef, Panel, Placement, Sizes } from '../src/layout/placement';
+import type { CombPlacement, ModuleRef, Panel, Placement, RailPlacement, Sizes } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 
 /** The panel with the given row labels, one per rail; an empty text leaves the row unlabelled. */
@@ -106,7 +106,7 @@ export const resizeOf = (m: ModuleRef) => {
   return def?.resizable ? { ...def.resizable, baseUnits: def.widthUnits } : undefined;
 };
 
-export const place = (id: string, moduleId: string, rail: number, slot: number): Placement => ({
+export const place = (id: string, moduleId: string, rail: number, slot: number): RailPlacement => ({
   id,
   module: ref(moduleId),
   rail,

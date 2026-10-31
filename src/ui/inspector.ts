@@ -1,9 +1,13 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
+import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../layout/ducts';
+import { moveFreePlacement } from '../layout/free';
 import { lookupsOf } from '../layout/lookups';
 import {
+  MAX_DUCT_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_POSITION_MM,
+  MIN_DUCT_SIZE_MM,
 } from '../layout/limits';
 import {
   moveRail,
@@ -15,6 +19,8 @@ import {
 } from '../layout/panel';
 import { takeOff } from '../layout/shelf';
 import {
+  isFree,
+  isOnRail,
   movePlacement,
   setPlacementLabel,
   setPlacementFlag,
@@ -131,6 +137,7 @@ type Target =
   | { kind: 'comb'; comb: CombPlacement }
   | { kind: 'placement'; placement: Placement; node?: SchematicNode }
   | { kind: 'rail'; rail: number }
+  | { kind: 'duct'; duct: Duct }
   | { kind: 'group'; count: number }
   | { kind: 'wire'; wire: Wire }
   | { kind: 'wires'; wires: Wire[] }
@@ -165,8 +172,10 @@ function targetOf({ project, selection, mode }: InspectContext): Target {
   }
   if (selection.placementIds || selection.combIds) {
     const chosen = selectedIds(selection);
-    return { kind: 'group', count: chosen.placements.length + chosen.combs.length };
+    return { kind: 'group', count: chosen.placements.length + chosen.combs.length + chosen.ducts.length };
   }
+  const duct = ductsOf(panel).find((d) => d.id === selection.ductId);
+  if (duct) return { kind: 'duct', duct };
   const comb = panel.combs.find((c) => c.id === selection.combId);
   if (comb) return { kind: 'comb', comb };
   const placement = panel.placements.find((p) => p.id === selection.placementId);
@@ -316,12 +325,19 @@ function positionFields(
   unit: LengthUnit,
 ): InspectorField[] {
   const rails = project.panel.rails;
-  const railLength = rails[item.rail]?.lengthUnits ?? 0;
   const resizable = def?.resizable;
   const named = unit === 'mm' ? 'mm' : 'units';
+  const place: InspectorField[] = isFree(item)
+    ? [
+        decimal('x', 'Left edge', item.x, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge of the plate'),
+        decimal('y', 'Top edge', item.y, 0, MAX_RAIL_POSITION_MM, 'mm from the top of the plate'),
+      ]
+    : [
+        integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
+        decimal('slot', 'Position', lengthIn(unit, item.slot), 0, lengthIn(unit, Math.max(0, (rails[item.rail]?.lengthUnits ?? 0) - width)), `${named} from the start of the rail, ${lengthText(unit, item.slot)}`),
+      ];
   return [
-    integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
-    decimal('slot', 'Position', lengthIn(unit, item.slot), 0, lengthIn(unit, Math.max(0, railLength - width)), `${named} from the start of the rail, ${lengthText(unit, item.slot)}`),
+    ...place,
     resizable
       ? decimal('width', 'Width', lengthIn(unit, width), lengthIn(unit, resizable.minUnits), lengthIn(unit, resizable.maxUnits), `${lengthIn(unit, resizable.minUnits)}-${lengthIn(unit, resizable.maxUnits)} ${named}, ${lengthText(unit, width)}`)
       : readonly('width', 'Width', `${width} units (${mmFromUnits(width)} mm)`),
@@ -337,6 +353,7 @@ function terminalLabelFields(placement: Placement, def: ModuleDef | undefined, w
 }
 
 const TAKE_OFF: InspectorAction = { key: 'takeOff', label: 'Take off the rail' };
+const TAKE_OFF_PLATE: InspectorAction = { key: 'takeOff', label: 'Take off the plate' };
 export const EDIT_MODULE_ACTION = 'editModule';
 const EDIT_MODULE: InspectorAction = { key: EDIT_MODULE_ACTION, label: 'Edit module…' };
 
@@ -380,7 +397,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         : [];
       return {
         title: node ? 'Module node' : 'Module',
-        actions: def ? [EDIT_MODULE, TAKE_OFF] : [TAKE_OFF],
+        actions: def ? [EDIT_MODULE, isFree(placement) ? TAKE_OFF_PLATE : TAKE_OFF] : [isFree(placement) ? TAKE_OFF_PLATE : TAKE_OFF],
         fields: [
           ...faultFields(ctx.findings, (p) => p.placements.includes(placement.id)),
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
@@ -436,6 +453,21 @@ export function inspect(ctx: InspectContext): InspectorView {
         ],
         actions: [...(target.note.target ? [{ key: 'removeArrow', label: 'Take the arrow away' }] : []), { key: 'removeNote', label: 'Delete the note' }],
       };
+    case 'duct': {
+      const { duct } = target;
+      return {
+        title: 'Cable duct',
+        actions: [{ key: 'removeDuct', label: 'Delete the duct' }],
+        fields: [
+          text('label', 'Label', duct.label ?? '', 'Duct'),
+          decimal('x', 'Left edge', duct.x, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge of the plate'),
+          decimal('y', 'Top edge', duct.y, 0, MAX_RAIL_POSITION_MM, 'mm from the top of the plate'),
+          decimal('widthMm', 'Width', duct.widthMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
+          decimal('heightMm', 'Height', duct.heightMm, MIN_DUCT_SIZE_MM, MAX_DUCT_SIZE_MM, 'mm'),
+          readonly('id', 'Id', duct.id),
+        ],
+      };
+    }
     case 'group':
       return {
         title: `${target.count} items selected`,
@@ -509,6 +541,7 @@ export function inspect(ctx: InspectContext): InspectorView {
 
 const ERROR_TEXT: Record<string, string> = {
   'out-of-rail': 'Does not fit on the rail.',
+  'bad-position': 'The position is outside the plate.',
   'unknown-rail': 'There is no such row.',
   'unknown-module': 'The module is missing from the libraries.',
   'not-resizable': 'This module cannot be resized.',
@@ -608,17 +641,17 @@ export function applyEdit(
     return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
   };
 
-  if (key === 'repeat' && (target.kind === 'group' || target.kind === 'comb' || (target.kind === 'placement' && !target.node))) {
+  if (key === 'repeat' && (target.kind === 'group' || target.kind === 'comb' || target.kind === 'duct' || (target.kind === 'placement' && !target.node))) {
     const copies = integerOf(raw);
     if (copies === null || copies < 1 || copies > MAX_REPEAT_COPIES) return fail(`Enter a number from 1 to ${MAX_REPEAT_COPIES}.`);
     const chosen = selectedIds(ctx.selection);
-    const clip = copyItems(panel, chosen.placements, chosen.combs);
+    const clip = copyItems(panel, chosen.placements, chosen.combs, chosen.ducts);
     const repeated = repeatItems(panel, widthOf, combLookup, clip, copies);
     if (!repeated.ok) return fail('There is no room on the rails for a copy.');
     return {
       ok: true,
       project: { ...project, panel: repeated.panel },
-      selection: groupSelection(repeated.placementIds, repeated.combIds),
+      selection: groupSelection(repeated.placementIds, repeated.combIds, repeated.ductIds),
       message: repeated.added < copies ? `Only ${repeated.added} of ${copies} copies fit.` : `Added ${repeated.added} ${repeated.added === 1 ? 'copy' : 'copies'}.`,
     };
   }
@@ -664,8 +697,14 @@ export function applyEdit(
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if ((key === 'nodeX' || key === 'nodeY') && node) return moveNodeTo(node);
+      if ((key === 'x' || key === 'y') && isFree(placement)) {
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = moveFreePlacement(panel, placement.id, key === 'x' ? mm : placement.x, key === 'y' ? mm : placement.y);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
       const value = key === 'slot' || key === 'width' ? unitsOf(numberOf(raw), ctx.lengthUnit) : integerOf(raw);
-      if (key === 'row' || key === 'slot') {
+      if ((key === 'row' || key === 'slot') && isOnRail(placement)) {
         if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
         const result = movePlacement(
           panel,
@@ -718,6 +757,18 @@ export function applyEdit(
       if (key !== 'noteText') return fail('That property cannot be edited.');
       const result = setAnnotationText(notesOf(project, target.owner), target.note.id, text);
       return result.ok ? { ok: true, project: withNoteList(project, target.owner, result.list) } : fail('A note is 1 to 200 characters on one line.');
+    }
+    case 'duct': {
+      const { duct } = target;
+      if (key === 'label') {
+        const result = setDuctLabel(panel, duct.id, text);
+        return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
+      }
+      const mm = numberOf(raw);
+      if (mm === null) return fail(NOT_A_DECIMAL);
+      if (key !== 'x' && key !== 'y' && key !== 'widthMm' && key !== 'heightMm') return fail('That property cannot be edited.');
+      const result = changeDuct(panel, duct.id, { [key]: mm });
+      return result.ok ? withPanel(result.panel) : fail(`Positions are 0 to ${MAX_RAIL_POSITION_MM} mm and sizes ${MIN_DUCT_SIZE_MM} to ${MAX_DUCT_SIZE_MM} mm.`);
     }
     case 'wires':
     case 'nodes':
@@ -829,6 +880,10 @@ export function applyAction(ctx: InspectContext, key: string, options: { confirm
     if (key === 'removeNote') return { ok: true, project: withNoteList(ctx.project, target.owner, removeAnnotation(list, target.note.id)), selection: {} };
     const result = setAnnotationTarget(list, target.note.id, undefined);
     return result.ok ? { ok: true, project: withNoteList(ctx.project, target.owner, result.list) } : fail('That note is gone.');
+  }
+  if (key === 'removeDuct' && target.kind === 'duct') {
+    const result = removeDuct(ctx.project.panel, target.duct.id);
+    return result.ok ? { ok: true, project: { ...ctx.project, panel: result.panel }, selection: {} } : fail('That duct is gone.');
   }
   if (key === 'takeOff' && target.kind === 'placement') {
     const result = takeOff(ctx.project.panel, target.placement.id);

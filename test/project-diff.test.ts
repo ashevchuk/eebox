@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { setInfoField } from '../src/layout/info';
 import { createPanel } from '../src/layout/panel';
-import type { Panel } from '../src/layout/placement';
+import type { Panel, RailPlacement } from '../src/layout/placement';
 import { diffProjects, summarize } from '../src/project/diff';
 import { buildProjectFile, type ProjectFile } from '../src/project/file';
 import type { Project } from '../src/project';
@@ -45,7 +45,7 @@ describe('comparing two projects', () => {
 
   it('reports a module that was added, removed and moved, with its row and position', () => {
     const a = project();
-    const panel = { ...a.panel, placements: [{ ...a.panel.placements[0]!, slot: 5 }, place('p9', 'mcb1', 1, 3)] };
+    const panel = { ...a.panel, placements: [{ ...(a.panel.placements[0] as RailPlacement), slot: 5 }, place('p9', 'mcb1', 1, 3)] };
     const lines = texts(a, { ...a, panel });
     expect(lines.some((l) => l.startsWith('modules/added:') && l.includes('(p9)') && l.includes('row 2, position 3'))).toBe(true);
     expect(lines.some((l) => l.startsWith('modules/removed:') && l.includes('(p2)'))).toBe(true);

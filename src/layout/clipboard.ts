@@ -1,23 +1,36 @@
 import { addComb, nextCombId, type CombLookup } from './combs';
-import { addPlacement, nextPlacementId, type CombPlacement, type Panel, type Placement, type WidthOf } from './placement';
+import { addDuct, ductsOf, nextDuctId, type Duct } from './ducts';
+import { addFreePlacement, roundMm } from './free';
+import { addPlacement, isFree, isOnRail, nextPlacementId, type CombPlacement, type FreePlacement, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { LAYOUT_EPSILON_UNITS, roundUnits } from './units';
 
 /** Modules and combs taken from a panel, to be placed again with new ids. */
 export interface Clip {
-  placements: Placement[];
+  placements: RailPlacement[];
   combs: CombPlacement[];
+  /** Devices fixed to the plate, and the cable ducts: they are pasted a little aside, not along a rail. */
+  free: FreePlacement[];
+  ducts: Duct[];
 }
 
+/** How far from the original a pasted device or duct stands, in both directions, in mm. */
+export const FREE_PASTE_OFFSET_MM = 20;
+
+const isEmpty = (clip: Clip) => clip.placements.length + clip.combs.length + clip.free.length + clip.ducts.length === 0;
+const hasRailItems = (clip: Clip) => clip.placements.length + clip.combs.length > 0;
+
 export type PasteResult =
-  | { ok: true; panel: Panel; placementIds: string[]; combIds: string[] }
+  | { ok: true; panel: Panel; placementIds: string[]; combIds: string[]; ductIds: string[] }
   | { ok: false; error: 'nothing-copied' | 'no-room' };
 
 const GRID_UNITS = 0.25;
 
-export function copyItems(panel: Panel, placementIds: readonly string[], combIds: readonly string[]): Clip {
+export function copyItems(panel: Panel, placementIds: readonly string[], combIds: readonly string[], ductIds: readonly string[]): Clip {
   return {
-    placements: panel.placements.filter((p) => placementIds.includes(p.id)),
+    placements: panel.placements.filter(isOnRail).filter((p) => placementIds.includes(p.id)),
     combs: panel.combs.filter((c) => combIds.includes(c.id)),
+    free: panel.placements.filter(isFree).filter((p) => placementIds.includes(p.id)),
+    ducts: ductsOf(panel).filter((d) => ductIds.includes(d.id)),
   };
 }
 
@@ -25,6 +38,7 @@ function tryPaste(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: 
   let next = panel;
   const placementIds: string[] = [];
   const combIds: string[] = [];
+  const ductIds: string[] = [];
   for (const source of clip.placements) {
     const id = nextPlacementId(next);
     const result = addPlacement(next, widthOf, { ...source, id, slot: roundUnits(source.slot + dx) });
@@ -39,7 +53,21 @@ function tryPaste(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: 
     next = result.panel;
     combIds.push(id);
   }
-  return { ok: true, panel: next, placementIds, combIds };
+  for (const source of clip.free) {
+    const id = nextPlacementId(next);
+    const result = addFreePlacement(next, widthOf, { ...source, id, x: roundMm(source.x + FREE_PASTE_OFFSET_MM), y: roundMm(source.y + FREE_PASTE_OFFSET_MM) });
+    if (!result.ok) return { ok: false, error: 'no-room' };
+    next = result.panel;
+    placementIds.push(id);
+  }
+  for (const source of clip.ducts) {
+    const id = nextDuctId(next);
+    const result = addDuct(next, { ...source, id, x: roundMm(source.x + FREE_PASTE_OFFSET_MM), y: roundMm(source.y + FREE_PASTE_OFFSET_MM) });
+    if (!result.ok) return { ok: false, error: 'no-room' };
+    next = result.panel;
+    ductIds.push(id);
+  }
+  return { ok: true, panel: next, placementIds, combIds, ductIds };
 }
 
 /**
@@ -48,12 +76,13 @@ function tryPaste(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: 
  * grid, so 22.5 mm relays can be pasted edge to edge.
  */
 export function pasteItems(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: Clip): PasteResult {
-  if (clip.placements.length === 0 && clip.combs.length === 0) return { ok: false, error: 'nothing-copied' };
+  if (isEmpty(clip)) return { ok: false, error: 'nothing-copied' };
+  if (!hasRailItems(clip)) return tryPaste(panel, widthOf, combLookup, clip, 0);
   const clipEdges = [...clip.placements, ...clip.combs].map((item) => {
     const width = widthOf(item) ?? 1;
     return { left: item.slot, right: item.slot + width };
   });
-  const panelEdges = panel.placements.map((item) => ({ left: item.slot, right: item.slot + (widthOf(item) ?? 1) }));
+  const panelEdges = panel.placements.filter(isOnRail).map((item) => ({ left: item.slot, right: item.slot + (widthOf(item) ?? 1) }));
   const railLength = Math.max(0, ...panel.rails.map((r) => r.lengthUnits));
 
   const offsets = new Set<number>([0]);
@@ -80,7 +109,7 @@ export function pasteItems(panel: Panel, widthOf: WidthOf, combLookup: CombLooku
 export const MAX_REPEAT_COPIES = 100;
 
 export type RepeatResult =
-  | { ok: true; panel: Panel; placementIds: string[]; combIds: string[]; added: number }
+  | { ok: true; panel: Panel; placementIds: string[]; combIds: string[]; ductIds: string[]; added: number }
   | { ok: false; error: 'nothing-copied' | 'no-room' };
 
 /**
@@ -92,6 +121,7 @@ export function repeatItems(panel: Panel, widthOf: WidthOf, combLookup: CombLook
   let next = panel;
   const placementIds: string[] = [];
   const combIds: string[] = [];
+  const ductIds: string[] = [];
   let added = 0;
   let source = clip;
   for (let i = 0; i < Math.min(count, MAX_REPEAT_COPIES); i++) {
@@ -103,8 +133,9 @@ export function repeatItems(panel: Panel, widthOf: WidthOf, combLookup: CombLook
     next = result.panel;
     placementIds.push(...result.placementIds);
     combIds.push(...result.combIds);
-    source = copyItems(next, result.placementIds, result.combIds);
+    ductIds.push(...result.ductIds);
+    source = copyItems(next, result.placementIds, result.combIds, result.ductIds);
     added++;
   }
-  return { ok: true, panel: next, placementIds, combIds, added };
+  return { ok: true, panel: next, placementIds, combIds, ductIds, added };
 }

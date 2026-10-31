@@ -1,6 +1,6 @@
 import { nextCombId } from './combs';
 import { moveRail, setRailCount, setRailLabel, setRailLength, type PanelEditError } from './panel';
-import { findProblems, nextPlacementId, type Panel, type Placement, type WidthOf } from './placement';
+import { findProblems, isOnRail, nextPlacementId, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { roundUnits } from './units';
 
 export type ArrangeHow = 'pack-left' | 'pack-right' | 'spread' | 'row-start' | 'row-end';
@@ -10,7 +10,7 @@ export type ArrangeResult =
   | { ok: false; error: 'nothing-to-do' | 'blocked' | 'too-few' };
 
 /** Where the chosen modules of one rail go, in the order they stand in. */
-function slotsFor(rail: Placement[], widths: number[], railLength: number, how: ArrangeHow): number[] {
+function slotsFor(rail: RailPlacement[], widths: number[], railLength: number, how: ArrangeHow): number[] {
   const slots: number[] = [];
   const total = widths.reduce((sum, w) => sum + w, 0);
   const first = rail[0]!.slot;
@@ -30,9 +30,9 @@ function slotsFor(rail: Placement[], widths: number[], railLength: number, how: 
  * Nothing changes if the result would put a module on another one.
  */
 export function arrangeModules(panel: Panel, widthOf: WidthOf, ids: readonly string[], how: ArrangeHow): ArrangeResult {
-  const chosen = panel.placements.filter((p) => ids.includes(p.id));
+  const chosen = panel.placements.filter(isOnRail).filter((p) => ids.includes(p.id));
   if (chosen.length === 0) return { ok: false, error: 'nothing-to-do' };
-  const byRail = new Map<number, Placement[]>();
+  const byRail = new Map<number, RailPlacement[]>();
   for (const placement of chosen) byRail.set(placement.rail, [...(byRail.get(placement.rail) ?? []), placement]);
   const moved = new Map<string, number>();
   let spreadable = false;
@@ -48,7 +48,7 @@ export function arrangeModules(panel: Panel, widthOf: WidthOf, ids: readonly str
   }
   if (how === 'spread' && !spreadable) return { ok: false, error: 'too-few' };
   if (moved.size === 0) return { ok: false, error: 'nothing-to-do' };
-  const next: Panel = { ...panel, placements: panel.placements.map((p) => (moved.has(p.id) ? { ...p, slot: moved.get(p.id)! } : p)) };
+  const next: Panel = { ...panel, placements: panel.placements.map((p) => (isOnRail(p) && moved.has(p.id) ? { ...p, slot: moved.get(p.id)! } : p)) };
   if (findProblems(next, widthOf).length > findProblems(panel, widthOf).length) return { ok: false, error: 'blocked' };
   return { ok: true, panel: next };
 }
@@ -68,7 +68,7 @@ export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   if (!labelled.ok) return labelled;
   let next: Panel = labelled.panel;
   const placementIds: string[] = [];
-  for (const source of panel.placements.filter((p) => p.rail === rail)) {
+  for (const source of panel.placements.filter(isOnRail).filter((p) => p.rail === rail)) {
     const id = nextPlacementId(next);
     next = { ...next, placements: [...next.placements, { ...source, id, rail: lastIndex }] };
     placementIds.push(id);

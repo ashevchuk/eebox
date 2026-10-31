@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
-import type { ModuleRef } from '../src/layout/placement';
+import type { ModuleRef, RailPlacement } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 import type { Project } from '../src/project';
 import { moduleDifferences, planModuleUpdate } from '../src/project/sync';
@@ -150,7 +150,7 @@ describe('planModuleUpdate', () => {
 
   it('does not report problems the project already had', () => {
     const base = project();
-    const crowded: Project = { ...base, panel: { ...base.panel, placements: [base.panel.placements[0]!, { ...base.panel.placements[1]!, slot: 1 }] } };
+    const crowded: Project = { ...base, panel: { ...base.panel, placements: [base.panel.placements[0]!, { ...(base.panel.placements[1] as RailPlacement), slot: 1 }] } };
     const plan = planModuleUpdate(crowded, snapshotOf('nbar'), library({ nbar: { ...NBAR, name: 'N2' } }));
     expect(plan.newProblems).toEqual([]);
   });

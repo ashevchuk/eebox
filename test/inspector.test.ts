@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
+import { isOnRail } from '../src/layout/placement';
 import type { Project } from '../src/project';
 import {
   addNode,
@@ -468,7 +469,7 @@ describe('updating modules from the libraries', () => {
 
   it('asks first when the new definitions cause problems, and names them', () => {
     const base = build();
-    const crowded: Project = { ...base, panel: { ...base.panel, placements: base.panel.placements.map((p) => (p.id === 'p3' ? { ...p, slot: 1 } : p)) } };
+    const crowded: Project = { ...base, panel: { ...base.panel, placements: base.panel.placements.map((p) => (p.id === 'p3' && isOnRail(p) ? { ...p, slot: 1 } : p)) } };
     const c = ctx({}, 'panel', crowded, { snapshot: stored, fromLibraries: widerBar });
     expect(applyAction(c, 'updateModules')).toMatchObject({ ok: false, needsConfirm: { message: expect.stringContaining('causes') } });
   });

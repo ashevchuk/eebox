@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { arrangeModules, duplicateRow } from '../src/layout/arrangeModules';
 import { MAX_RAILS } from '../src/layout/limits';
 import { findProblems } from '../src/layout/placement';
+import { isOnRail } from '../src/layout/placement';
 import { combAt, panelOf, place, widthOf, withRailLabels } from './fixtures';
 
-const slots = (panel: ReturnType<typeof panelOf>, rail = 0) => panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot).map((p) => [p.id, p.slot]);
+const slots = (panel: ReturnType<typeof panelOf>, rail = 0) => panel.placements.filter(isOnRail).filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot).map((p) => [p.id, p.slot]);
 
 describe('arranging modules along a rail', () => {
   // breaker16 is 1 unit wide

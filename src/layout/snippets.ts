@@ -6,7 +6,7 @@ import { nextId, type Schematic, type SchematicNode, type Wire } from '../schema
 import { pasteItems } from './clipboard';
 import { lookupsOf } from './lookups';
 import { normalizeLabel } from './labels';
-import type { Panel } from './placement';
+import { isOnRail, type Panel } from './placement';
 import { roundUnits } from './units';
 
 /** A group of modules, with the wires between them, kept to be put on a panel again. */
@@ -39,7 +39,7 @@ export function makeSnippet(
   now: number,
   existing: readonly Snippet[],
 ): MakeSnippetResult {
-  const placements = project.panel.placements.filter((p) => chosen.placementIds.includes(p.id));
+  const placements = project.panel.placements.filter(isOnRail).filter((p) => chosen.placementIds.includes(p.id));
   const combs = project.panel.combs.filter((c) => chosen.combIds.includes(c.id));
   if (placements.length + combs.length === 0) return { ok: false, error: 'empty' };
   if (existing.length >= MAX_SNIPPETS) return { ok: false, error: 'too-many' };
@@ -100,10 +100,11 @@ export function insertSnippet(
   const lookups = lookupsOf(knowing);
 
   const shifted = <T extends { rail: number; slot: number }>(item: T): T => ({ ...item, rail: item.rail + at.rail, slot: roundUnits(item.slot + at.slot) });
-  const pasted = pasteItems(project.panel, lookups.widthOf, lookups.combLookup, { placements: part.placements.map(shifted), combs: part.combs.map(shifted) });
+  const railed = part.placements.filter(isOnRail);
+  const pasted = pasteItems(project.panel, lookups.widthOf, lookups.combLookup, { placements: railed.map(shifted), combs: part.combs.map(shifted), free: [], ducts: [] });
   if (!pasted.ok) return { ok: false, error: 'no-room' };
 
-  const placementOf = new Map(part.placements.map((p, i) => [p.id, pasted.placementIds[i]!]));
+  const placementOf = new Map(railed.map((p, i) => [p.id, pasted.placementIds[i]!]));
   const right = project.schematic.nodes.length > 0 ? Math.max(...project.schematic.nodes.map((n) => n.x)) + NODE_GAP_MM : 0;
   const top = project.schematic.nodes.length > 0 ? Math.min(...project.schematic.nodes.map((n) => n.y)) : 0;
   let nodeNumber = Number(nextId('n', project.schematic.nodes).slice(1));
