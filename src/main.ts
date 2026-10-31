@@ -225,6 +225,25 @@ function isOverCanvas(e: PointerEvent): boolean {
 const touches = new Map<number, Point>();
 let pinchPair: Pair | null = null;
 let pinchLocked = false;
+/** A finger held still on the drawing opens the context menu, as a right click does; not every browser sends the event itself. */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP_PX = 10;
+let longPress: { pointerId: number; x: number; y: number; timer: number } | null = null;
+let menuOpenedAt = 0;
+function cancelLongPress(): void {
+  if (longPress) window.clearTimeout(longPress.timer);
+  longPress = null;
+}
+function fireLongPress(): void {
+  const press = longPress;
+  longPress = null;
+  if (!press) return;
+  activeView().cancel?.();
+  panFrom = null;
+  const rect = canvas.getBoundingClientRect();
+  const world = activeView().camera.screenToWorld({ x: press.x - rect.left, y: press.y - rect.top }, stageWrap.clientWidth, stageWrap.clientHeight);
+  openContextMenu(press.x, press.y, world);
+}
 
 function currentPair(): Pair | null {
   const [a, b] = [...touches.values()];
@@ -317,6 +336,8 @@ function drawNotePreview(context: CanvasRenderingContext2D, dpr: number): void {
 
 canvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  // A long press already opened the menu; the browser's own event for the same press must not open it again.
+  if (performance.now() - menuOpenedAt < 800) return;
   if (session.ductTool || session.noteTool || (session.mode === 'panel' && session.ruler.on)) return;
   openContextMenu(e.clientX, e.clientY, worldPoint(e));
 });
@@ -329,6 +350,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (touches.size >= 2) {
+      cancelLongPress();
       activeView().cancel?.();
       panFrom = null;
       pinchLocked = true;
@@ -336,6 +358,10 @@ canvas.addEventListener('pointerdown', (e) => {
       return;
     }
     if (pinchLocked) return;
+    cancelLongPress();
+    if (!session.ductTool && !session.noteTool && !(session.mode === 'panel' && session.ruler.on)) {
+      longPress = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, timer: window.setTimeout(fireLongPress, LONG_PRESS_MS) };
+    }
   }
   if (e.button === 1 || (e.button === 0 && spaceHeld)) {
     panFrom = { x: e.clientX, y: e.clientY };
@@ -365,6 +391,7 @@ canvas.addEventListener('dblclick', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
+  if (longPress && longPress.pointerId === e.pointerId && Math.hypot(e.clientX - longPress.x, e.clientY - longPress.y) > LONG_PRESS_SLOP_PX) cancelLongPress();
   if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const next = currentPair();
@@ -412,6 +439,7 @@ window.addEventListener('pointermove', (e) => {
 
 function endTouch(e: PointerEvent): boolean {
   if (e.pointerType !== 'touch') return false;
+  cancelLongPress();
   touches.delete(e.pointerId);
   pinchPair = touches.size >= 2 ? currentPair() : null;
   const wasPinching = pinchLocked;
@@ -565,6 +593,7 @@ function runContextItem(item: MenuItem): void {
 
 /** Opens the menu at a screen point; `world` is where to select first, or null to act on what is selected. */
 function openContextMenu(x: number, y: number, world: Point | null): void {
+  menuOpenedAt = performance.now();
   activeView().cancel?.();
   if (world) activeView().selectAt(world);
   const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = session;

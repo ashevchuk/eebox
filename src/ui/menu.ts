@@ -16,6 +16,17 @@ export function nextFocusIndex(current: number, count: number, key: NavigationKe
 }
 
 const ITEM_SELECTOR = '.menu-item:not(:disabled)';
+const WINDOW_MARGIN_PX = 6;
+
+/**
+ * How far a box at `left` and `width` must move sideways to lie inside a window of `windowWidth` with a margin; the left
+ * edge wins when the box is wider than the window.
+ */
+export function shiftIntoWindow(left: number, width: number, windowWidth: number, margin: number = WINDOW_MARGIN_PX): number {
+  const overRight = left + width - (windowWidth - margin);
+  const shifted = overRight > 0 ? left - overRight : left;
+  return Math.max(shifted, margin) - left;
+}
 
 /**
  * Turns every `.menu` (a `.menu-button` followed by a `.menu-list`) into a dropdown. A menu closes
@@ -33,6 +44,13 @@ export function initMenus(root: ParentNode = document): void {
     const { button, list } = partsOf(menu);
     list.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
+    if (open) {
+      // A list that starts at its button runs off the edge of a narrow window; it is moved back in.
+      list.style.transform = '';
+      const box = list.getBoundingClientRect();
+      const shift = shiftIntoWindow(box.left, box.width, window.innerWidth);
+      if (shift !== 0) list.style.transform = `translateX(${Math.round(shift)}px)`;
+    }
   };
   const closeAll = () => menus.forEach((menu) => setOpen(menu, false));
   const itemsOf = (menu: HTMLElement) => [...partsOf(menu).list.querySelectorAll<HTMLElement>(ITEM_SELECTOR)];

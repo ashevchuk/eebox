@@ -86,6 +86,23 @@ try {
     expectTrue(await browser.evaluate(`!document.getElementById('fit').classList.contains('menu-item')`), 'Fit still looks like a menu item');
   });
 
+  await step('at the width of a phone every menu opens inside the window', async () => {
+    await resizeTo(390);
+    const labels = await browser.evaluate(`[...document.querySelectorAll('header .menu:not(.toolbar-more) .menu-button')].filter((b) => b.offsetParent !== null).map((b) => b.textContent.replace(/\\s*\\u25BE$/, '').trim())`);
+    expectTrue(labels.length >= 3, `only ${labels.length} menus on the toolbar`);
+    for (const label of labels.concat(['More'])) {
+      const outside = await browser.evaluate(`(() => {
+        const button = [...document.querySelectorAll('header .menu-button')].find((b) => b.offsetParent !== null && b.textContent.replace(/\\s*\\u25BE$/, '').trim() === ${JSON.stringify(label)});
+        button.click();
+        const list = button.parentElement.querySelector('.menu-list');
+        const r = list.getBoundingClientRect();
+        button.click();
+        return r.left < 0 || r.right > window.innerWidth ? [Math.round(r.left), Math.round(r.right)] : null;
+      })()`);
+      expectTrue(outside === null, `the ${label} menu lies at ${outside} in a window ${390} px wide`);
+    }
+  });
+
   await step('the toolbar is fitted again when the mode changes', async () => {
     await resizeTo(1000);
     await browser.evaluate(`document.getElementById('mode-schematic').click()`);
