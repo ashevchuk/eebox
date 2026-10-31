@@ -104,13 +104,14 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     if (a.info?.[key] !== b.info?.[key]) out.push({ area: 'project', kind: 'changed', text: `${INFO_LABELS[key].toLowerCase()} ${show(a.info?.[key])} → ${show(b.info?.[key])}` });
   }
 
-  const rows = Math.max(a.railLengthsUnits.length, b.railLengthsUnits.length);
-  if (a.railLengthsUnits.length !== b.railLengthsUnits.length) out.push({ area: 'rows', kind: 'changed', text: `${a.railLengthsUnits.length} rows → ${b.railLengthsUnits.length} rows` });
+  const rows = Math.max(a.rails.length, b.rails.length);
+  if (a.rails.length !== b.rails.length) out.push({ area: 'rows', kind: 'changed', text: `${a.rails.length} rows → ${b.rails.length} rows` });
   for (let i = 0; i < rows; i++) {
-    const [lengthA, lengthB] = [a.railLengthsUnits[i], b.railLengthsUnits[i]];
-    if (lengthA !== undefined && lengthB !== undefined && lengthA !== lengthB) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: length ${lengthA} → ${lengthB} units` });
-    const [labelA, labelB] = [a.railLabels[i] ?? '', b.railLabels[i] ?? ''];
-    if (a.railLabels[i] !== undefined && b.railLabels[i] !== undefined && labelA !== labelB) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: label ${show(labelA || undefined)} → ${show(labelB || undefined)}` });
+    const [railA, railB] = [a.rails[i], b.rails[i]];
+    if (!railA || !railB) continue;
+    if (railA.lengthUnits !== railB.lengthUnits) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: length ${railA.lengthUnits} → ${railB.lengthUnits} units` });
+    if (railA.x !== railB.x || railA.y !== railB.y) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: position ${railA.x}, ${railA.y} → ${railB.x}, ${railB.y} mm` });
+    if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: label ${show(railA.label)} → ${show(railB.label)}` });
   }
 
   const placed = (file: ProjectFile) => [...file.project.panel.placements, ...file.project.panel.shelf.map((s: ShelfItem) => ({ ...s, rail: undefined, slot: undefined }))] as Array<Omit<Placement, 'rail' | 'slot'> & { rail?: number; slot?: number }>;

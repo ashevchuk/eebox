@@ -508,6 +508,15 @@ export function validateObject(
   return errors.length === before ? raw : undefined;
 }
 
+/** A list of objects that have no id, such as the rails of a panel, which are told apart by their place in the list. */
+export function validateEntries<T>(raw: unknown, spec: FieldSpec, path: string, errors: ValidationError[]): T[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry, index) => {
+    const item = validateObject(entry, spec, `${path}[${index}]`, errors);
+    return item ? [item as T] : [];
+  });
+}
+
 export function validateList<T>(
   raw: unknown,
   spec: FieldSpec,

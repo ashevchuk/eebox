@@ -2,15 +2,14 @@ import {
   MAX_LABEL_LENGTH,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
-  MAX_RAIL_PITCH_MM,
-  MIN_RAIL_PITCH_MM,
+  MAX_RAIL_POSITION_MM,
 } from '../layout/limits';
 import {
   moveRail,
   setRailCount,
   setRailLabel,
   setRailLength,
-  setRailPitch,
+  setRailPosition,
   type PanelEditResult,
 } from '../layout/panel';
 import type { Panel } from '../layout/placement';
@@ -19,7 +18,8 @@ import type { Session } from './session';
 interface RailRow {
   label: HTMLInputElement;
   length: HTMLInputElement;
-  pitch: HTMLInputElement | null;
+  x: HTMLInputElement;
+  y: HTMLInputElement;
   up: HTMLButtonElement;
   down: HTMLButtonElement;
 }
@@ -49,7 +49,7 @@ export class PanelEditor {
   }
 
   private refresh(): void {
-    if (!this.built || this.rows.length !== this.panel.railLengthsUnits.length) this.build();
+    if (!this.built || this.rows.length !== this.panel.rails.length) this.build();
     this.sync(false);
   }
 
@@ -58,11 +58,12 @@ export class PanelEditor {
     const set = (input: HTMLInputElement, value: number | string) => {
       if (force || input !== document.activeElement) input.value = String(value);
     };
-    set(this.countInput, this.panel.railLengthsUnits.length);
+    set(this.countInput, this.panel.rails.length);
     this.rows.forEach((row, i) => {
-      set(row.label, this.panel.railLabels[i] ?? '');
-      set(row.length, this.panel.railLengthsUnits[i] ?? 0);
-      if (row.pitch) set(row.pitch, this.panel.railPitchesMm[i] ?? 0);
+      set(row.label, this.panel.rails[i]?.label ?? '');
+      set(row.length, this.panel.rails[i]?.lengthUnits ?? 0);
+      set(row.x, this.panel.rails[i]?.x ?? 0);
+      set(row.y, this.panel.rails[i]?.y ?? 0);
       row.up.disabled = i === 0;
       row.down.disabled = i === this.rows.length - 1;
     });
@@ -122,7 +123,7 @@ export class PanelEditor {
     countLine.append(this.countInput);
     this.container.append(countLine);
 
-    const count = this.panel.railLengthsUnits.length;
+    const count = this.panel.rails.length;
     this.rows = [];
     for (let rail = 0; rail < count; rail++) {
       const length = this.numberInput((value) =>
@@ -151,19 +152,20 @@ export class PanelEditor {
       labelLine.append(label);
       this.container.append(line, labelLine);
 
-      let pitch: HTMLInputElement | null = null;
-      if (rail < count - 1) {
-        pitch = this.numberInput((value) =>
+      const place = (axis: 'x' | 'y') =>
+        this.numberInput((value) =>
           this.apply(
-            (panel) => setRailPitch(panel, rail, value),
-            `Spacing: a whole number from ${MIN_RAIL_PITCH_MM} to ${MAX_RAIL_PITCH_MM} mm.`,
+            (panel) => setRailPosition(panel, rail, axis === 'x' ? value : panel.rails[rail]?.x ?? 0, axis === 'y' ? value : panel.rails[rail]?.y ?? 0),
+            `Position: a number from 0 to ${MAX_RAIL_POSITION_MM} mm.`,
           ),
         );
-        const gap = this.text('div', '↕ ', 'settings-line settings-gap');
-        gap.append(pitch, this.text('span', ' mm between rails'));
-        this.container.append(gap);
-      }
-      this.rows.push({ label, length, pitch, up, down });
+      const x = place('x');
+      const y = place('y');
+      const positionLine = this.text('div', '', 'settings-line settings-gap');
+      positionLine.addEventListener('focusin', () => this.session.select({ rail }));
+      positionLine.append(this.text('span', 'x '), x, this.text('span', ' y '), y, this.text('span', ' mm'));
+      this.container.append(positionLine);
+      this.rows.push({ label, length, x, y, up, down });
     }
   }
 }

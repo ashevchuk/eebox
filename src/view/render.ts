@@ -13,7 +13,7 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, rowLabelX, type Rect } from './geometry';
 
 export interface Ghost {
   module: ModuleDef;
@@ -154,10 +154,10 @@ function drawUpwardsLabel(
 
 function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisibility): void {
   const { panel } = scene;
-  panel.railLabels.forEach((label, rail) => {
+  panel.rails.forEach(({ label }, rail) => {
     if (!label || !texts.rowLabels) return;
     const r = railRect(panel, rail);
-    drawUpwardsLabel(ctx, label, FRAME_PADDING / 2, r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
+    drawUpwardsLabel(ctx, label, rowLabelX(panel, rail), r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
   });
   for (const placement of panel.placements) {
     if (!placement.label || !texts.moduleLabels) continue;
@@ -345,7 +345,7 @@ export function render(
     }
   }
 
-  panel.railLengthsUnits.forEach((_length, rail) => {
+  panel.rails.forEach((_r, rail) => {
     const r = railRect(panel, rail);
     fillRect(ctx, r, COLORS.rail);
     ctx.fillStyle = theme().frameFill;
@@ -354,7 +354,7 @@ export function render(
     }
   });
 
-  if (scene.selectedRail !== null && scene.selectedRail < panel.railLengthsUnits.length) {
+  if (scene.selectedRail !== null && scene.selectedRail < panel.rails.length) {
     const r = railRect(panel, scene.selectedRail);
     ctx.strokeStyle = COLORS.selection;
     ctx.lineWidth = 2;

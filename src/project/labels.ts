@@ -29,7 +29,7 @@ export function labelStrips(
   resolve: (ref: ModuleRef) => ModuleDef | undefined,
   maxUnits: number = STRIP_LINE_UNITS,
 ): StripLine[] {
-  return panel.railLengthsUnits.flatMap((_length, rail): StripLine[] => {
+  return panel.rails.flatMap((_r, rail): StripLine[] => {
     const modules = panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot);
     const lines: Array<{ start: number; cells: StripCell[] }> = [];
     for (const placement of modules) {
@@ -46,7 +46,7 @@ export function labelStrips(
         text: placement.label ?? def?.name ?? placement.module.moduleId,
       });
     }
-    const railLabel = panel.railLabels[rail];
+    const railLabel = panel.rails[rail]?.label;
     return lines.map((line) => ({ rail, ...(railLabel ? { railLabel } : {}), cells: line.cells }));
   });
 }

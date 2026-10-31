@@ -53,9 +53,7 @@ export function makeSnippet(
   const moved = <T extends { rail: number; slot: number }>(item: T): T => ({ ...item, rail: item.rail - minRail, slot: roundUnits(item.slot - minSlot) });
   const source = project.panel;
   const panel: Panel = {
-    railLengthsUnits: source.railLengthsUnits.slice(minRail, maxRail + 1),
-    railPitchesMm: source.railPitchesMm.slice(minRail, maxRail),
-    railLabels: source.railLabels.slice(minRail, maxRail + 1),
+    rails: source.rails.slice(minRail, maxRail + 1),
     placements: placements.map(moved),
     combs: combs.map(moved),
     shelf: [],

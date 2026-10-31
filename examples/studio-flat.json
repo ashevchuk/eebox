@@ -3,16 +3,19 @@
   "version": 1,
   "project": {
     "panel": {
-      "railLengthsUnits": [
-        12,
-        12
-      ],
-      "railPitchesMm": [
-        150
-      ],
-      "railLabels": [
-        "Incoming",
-        "Final circuits"
+      "rails": [
+        {
+          "x": 0,
+          "y": 110,
+          "lengthUnits": 12,
+          "label": "Incoming"
+        },
+        {
+          "x": 0,
+          "y": 260,
+          "lengthUnits": 12,
+          "label": "Final circuits"
+        }
       ],
       "placements": [
         {

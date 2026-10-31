@@ -3,7 +3,7 @@ import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { setPanelTitle } from '../src/layout/panel';
 import { cableMarkers, labelStrips } from '../src/project/labels';
 import { addNode, connect, emptySchematic, setNodeLoad, setWireLabel, type Schematic } from '../src/schematic/model';
-import { panelOf, place, resolve } from './fixtures';
+import { panelOf, place, resolve, withRailLabels } from './fixtures';
 
 describe('labelStrips', () => {
   const texts = (lines: ReturnType<typeof labelStrips>) => lines.map((l) => l.cells.map((c) => c.text));
@@ -33,7 +33,7 @@ describe('labelStrips', () => {
   });
 
   it('starts every rail on its own line and carries the row label', () => {
-    const panel = { ...panelOf([place('p1', 'mcb1', 0, 0), place('p2', 'mcb1', 1, 0)], [], [12, 12]), railLabels: ['Incoming', ''] };
+    const panel = withRailLabels(panelOf([place('p1', 'mcb1', 0, 0), place('p2', 'mcb1', 1, 0)], [], [12, 12]), ['Incoming', '']);
     const lines = labelStrips(panel, resolve);
     expect(lines.map((l) => l.rail)).toEqual([0, 1]);
     expect(lines[0]!.railLabel).toBe('Incoming');

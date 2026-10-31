@@ -31,7 +31,7 @@ export function searchProject(project: Project, resolve: Resolve, query: string)
     hits.push({ rank, result });
   };
 
-  const rows = project.panel.railLabels;
+  const rows = project.panel.rails.map((r) => r.label ?? '');
   project.panel.placements.forEach((placement) => {
     const def = resolve(placement.module);
     consider([placement.label, def?.name, def?.sku, placement.id], {

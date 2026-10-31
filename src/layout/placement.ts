@@ -1,6 +1,7 @@
 import type { Annotation } from './annotations';
 import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
+import type { Rail } from './rail';
 import { LAYOUT_EPSILON_UNITS } from './units';
 
 export interface ModuleRef {
@@ -46,12 +47,8 @@ export interface Panel {
   info?: ProjectInfo;
   /** Notes written on the front view; only when there are some. */
   annotations?: Annotation[];
-  /** Snapshot of the enclosure rails, so later library edits cannot move placed modules. */
-  railLengthsUnits: number[];
-  /** Centre-to-centre distance in mm between rail i and rail i+1; one entry fewer than the rails. */
-  railPitchesMm: number[];
-  /** One entry per rail; empty text means no label. */
-  railLabels: string[];
+  /** The rails, copied from the enclosure, so later library edits cannot move placed modules. */
+  rails: Rail[];
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */
@@ -99,7 +96,7 @@ function checkFit(
 ): PlacementError | null {
   const width = widthOf(candidate);
   if (width === undefined) return { kind: 'unknown-module' };
-  const railLength = panel.railLengthsUnits[candidate.rail];
+  const railLength = panel.rails[candidate.rail]?.lengthUnits;
   if (railLength === undefined) return { kind: 'unknown-rail' };
   const { slot } = candidate;
   if (!Number.isFinite(slot) || slot < 0 || slot + width > railLength + LAYOUT_EPSILON_UNITS) {
@@ -186,7 +183,7 @@ export function insertPlacement(
   if (strict.ok || strict.error.kind !== 'overlap') return strict;
 
   const width = widthOf(placement) ?? 1;
-  const railLength = panel.railLengthsUnits[placement.rail] ?? 0;
+  const railLength = panel.rails[placement.rail]?.lengthUnits ?? 0;
   const others = panel.placements
     .filter((p) => p.rail === placement.rail && p.id !== replaceId)
     .map((p) => ({ p, w: widthOf(p) ?? 1 }))

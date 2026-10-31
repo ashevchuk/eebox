@@ -3,12 +3,12 @@
   "version": 1,
   "project": {
     "panel": {
-      "railLengthsUnits": [
-        24
-      ],
-      "railPitchesMm": [],
-      "railLabels": [
-        ""
+      "rails": [
+        {
+          "x": 0,
+          "y": 110,
+          "lengthUnits": 24
+        }
       ],
       "placements": [
         {

@@ -32,7 +32,7 @@ describe('making a snippet', () => {
     const { panel } = snippet.file.project;
     expect(snippet.name).toBe('Light group');
     expect(panel.placements.map((p) => [p.rail, p.slot])).toEqual([[0, 0], [0, 2]]);
-    expect(panel.railLengthsUnits).toHaveLength(1);
+    expect(panel.rails).toHaveLength(1);
     expect(Object.keys(snippet.file.modules)).toEqual(['lib/breaker16']);
   });
 

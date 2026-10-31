@@ -9,6 +9,7 @@ import { buildProjectFile, parseProjectFile, parseProjectJson } from '../src/pro
 import { decodeShare, encodeShare } from '../src/project/share';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { addNode, connectAll, syncModuleNodes } from '../src/schematic/model';
+import { withRailPitches } from './fixtures';
 
 const C16: ModuleDef = { id: 'c16', kind: 'breaker', name: 'MCB 1P C16', widthUnits: 1, poles: 1, ratedCurrentA: 16, curve: 'C', sku: 'SKU-1' };
 const RCD: ModuleDef = { id: 'rcd', kind: 'rcd', name: 'RCD 2P', widthUnits: 2, poles: 2 };
@@ -209,31 +210,33 @@ describe('bill of materials', () => {
 describe('panel spacing in the project file', () => {
   it('round-trips custom row spacing', () => {
     const project = sampleProject();
-    const panel = { ...createPanel([12, 18]), railPitchesMm: [210], placements: project.panel.placements };
+    const panel = { ...withRailPitches(createPanel([12, 18]), [210]), placements: project.panel.placements };
     const file = buildProjectFile({ ...project, panel }, resolve);
     expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
   });
 
-  it.each(['railPitchesMm', 'combs'])('requires %s instead of guessing a default', (field) => {
+  it.each(['rails', 'combs'])('requires %s instead of guessing a default', (field) => {
     const file = validFile();
     delete (file.project.panel as unknown as Record<string, unknown>)[field];
     expect(errorPaths(file)).toEqual([`project.panel.${field}`]);
   });
 
-  it('rejects a spacing list that does not match the rows', () => {
+  it('rejects a panel without rails and one with too many', () => {
     const file = validFile();
-    file.project.panel.railPitchesMm = [150];
-    expect(errorPaths(file)).toEqual(['project.panel.railPitchesMm']);
+    file.project.panel.rails = [];
+    expect(errorPaths(file)).toEqual(['project.panel.rails']);
+    file.project.panel.rails = Array.from({ length: 21 }, () => ({ x: 0, y: 110, lengthUnits: 12 }));
+    expect(errorPaths(file)).toEqual(['project.panel.rails']);
   });
 
-  it('rejects out-of-range spacing and absurd rail lengths', () => {
+  it('rejects a rail with a position outside the limits or an absurd length', () => {
     const file = validFile();
-    file.project.panel.railLengthsUnits = [12, 12];
-    file.project.panel.railPitchesMm = [50];
-    expect(errorPaths(file)).toEqual(['project.panel.railPitchesMm']);
-    file.project.panel.railPitchesMm = [150];
-    file.project.panel.railLengthsUnits = [1_000_000_000, 12];
-    expect(errorPaths(file)).toEqual(['project.panel.railLengthsUnits']);
+    file.project.panel.rails = [{ x: -1, y: 110, lengthUnits: 12 }];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].x']);
+    file.project.panel.rails = [{ x: 0, y: 1_000_000, lengthUnits: 12 }];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].y']);
+    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 1_000_000_000 }];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].lengthUnits']);
   });
 });
 
@@ -350,7 +353,7 @@ describe('labels in the project file', () => {
   const labelled = () => {
     const file = validFile();
     file.project.panel.placements[0]!.label = 'F1 Lights';
-    file.project.panel.railLabels = ['Final circuits'];
+    file.project.panel.rails = file.project.panel.rails.map((r) => ({ ...r, label: 'Final circuits' }));
     file.project.schematic.wires[0]!.label = 'NYM 3x1.5';
     return file;
   };
@@ -361,14 +364,14 @@ describe('labels in the project file', () => {
     expect(parseProjectJson(JSON.stringify(file))).toEqual({ ok: true, file, warnings: [] });
   });
 
-  it('requires one row label per rail, and valid ones', () => {
+  it('accepts only a valid label on a rail, and no other field', () => {
     const file = validFile();
-    file.project.panel.railLabels = [];
-    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
-    file.project.panel.railLabels = ['a\nb'];
-    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
-    delete asRecord(file.project.panel).railLabels;
-    expect(errorPaths(file)).toEqual(['project.panel.railLabels']);
+    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, label: 'a\nb' }];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
+    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, label: '' }];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
+    file.project.panel.rails = [{ x: 0, y: 110, lengthUnits: 12, colour: 'red' } as never];
+    expect(errorPaths(file)).toEqual(['project.panel.rails[0].colour']);
   });
 
   it.each([

@@ -9,9 +9,9 @@ import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
-  MAX_RAIL_PITCH_MM,
-  MIN_RAIL_PITCH_MM,
+  MAX_RAIL_POSITION_MM,
 } from '../layout/limits';
+import type { Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
 import {
   findProblems as findPanelProblems,
@@ -29,7 +29,7 @@ import {
   labelCheck,
   oneOf,
   widthCheck,
-  railLengthsCheck,
+  validateEntries,
   validateList,
   validateObject,
   type FieldSpec,
@@ -77,12 +77,10 @@ const slotCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_LENGTH_UNITS ? null : `must be a number of units from 0 to ${MAX_RAIL_LENGTH_UNITS}`;
 const unitsCheck = widthCheck;
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
-const pitchListCheck = (v: unknown) =>
-  Array.isArray(v) &&
-  v.length < MAX_RAILS &&
-  v.every((n) => Number.isInteger(n) && n >= MIN_RAIL_PITCH_MM && n <= MAX_RAIL_PITCH_MM)
-    ? null
-    : `must be an array of whole numbers from ${MIN_RAIL_PITCH_MM} to ${MAX_RAIL_PITCH_MM} (mm)`;
+const railPositionCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_POSITION_MM ? null : `must be a number of mm from 0 to ${MAX_RAIL_POSITION_MM}`;
+const railLengthCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= MAX_RAIL_LENGTH_UNITS ? null : `must be a number of units from 1 to ${MAX_RAIL_LENGTH_UNITS}`;
 const terminalRefCheck = (v: unknown) =>
   isRecord(v) && Object.keys(v).length === 2 && nonEmptyString(v.node) === null && nonEmptyString(v.terminal) === null
     ? null
@@ -95,10 +93,12 @@ const conductorsCheck = (v: unknown) =>
   v.every((c) => (CONDUCTORS as readonly unknown[]).includes(c))
     ? null
     : `must list each of 1 to ${CONDUCTORS.length} conductors once, out of: ${CONDUCTORS.join(', ')}`;
-const railLabelsCheck = (v: unknown) =>
-  Array.isArray(v) && v.length <= MAX_RAILS && v.every((l) => l === '' || labelCheck(l) === null)
-    ? null
-    : 'must be a list with one entry per rail, each empty or a valid label';
+const RAIL_SPEC: FieldSpec = {
+  x: { required: true, check: railPositionCheck },
+  y: { required: true, check: railPositionCheck },
+  lengthUnits: { required: true, check: railLengthCheck },
+  label: { required: false, check: labelCheck },
+};
 const MAX_TERMINAL_LABELS = 64;
 const terminalLabelsCheck = (v: unknown) =>
   isRecord(v) &&
@@ -132,9 +132,7 @@ const PANEL_SPEC: FieldSpec = {
   title: { required: false, check: labelCheck },
   info: { required: false, check: infoCheck },
   annotations: { required: false, check: annotationsCheck },
-  railLengthsUnits: { required: true, check: railLengthsCheck },
-  railPitchesMm: { required: true, check: pitchListCheck },
-  railLabels: { required: true, check: railLabelsCheck },
+  rails: { required: true, check: arrayCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -321,20 +319,9 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   );
   const wires = validateList<Wire>(schematicRaw?.wires, WIRE_SPEC, 'project.schematic.wires', errors);
   const modules = validateModules(root?.modules, errors);
-  const railLengthsUnits = (panelRaw?.railLengthsUnits ?? []) as number[];
-  const railPitchesMm = (panelRaw?.railPitchesMm ?? []) as number[];
-  if (panelRaw && railPitchesMm.length !== railLengthsUnits.length - 1) {
-    errors.push({
-      path: 'project.panel.railPitchesMm',
-      message: `must have one entry per gap between rails (${railLengthsUnits.length - 1})`,
-    });
-  }
-  const railLabels = (panelRaw?.railLabels ?? []) as string[];
-  if (panelRaw && railLabels.length !== railLengthsUnits.length) {
-    errors.push({
-      path: 'project.panel.railLabels',
-      message: `must have one entry per rail (${railLengthsUnits.length})`,
-    });
+  const rails = validateEntries<Rail>(panelRaw?.rails, RAIL_SPEC, 'project.panel.rails', errors);
+  if (panelRaw && Array.isArray(panelRaw.rails) && (panelRaw.rails.length < 1 || panelRaw.rails.length > MAX_RAILS)) {
+    errors.push({ path: 'project.panel.rails', message: `must list 1 to ${MAX_RAILS} rails` });
   }
   if (!root || !panelRaw || !schematicRaw || errors.length > 0) return { ok: false, errors };
 
@@ -343,9 +330,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       ...(panelRaw.title !== undefined ? { title: panelRaw.title as string } : {}),
       ...(panelRaw.info !== undefined ? { info: panelRaw.info as ProjectInfo } : {}),
       ...(panelRaw.annotations !== undefined ? { annotations: panelRaw.annotations as Annotation[] } : {}),
-      railLengthsUnits,
-      railPitchesMm,
-      railLabels,
+      rails,
       placements,
       combs,
       shelf,

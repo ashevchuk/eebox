@@ -329,7 +329,7 @@ describe('makeVariants', () => {
 describe('railPreviewScene', () => {
   it('puts the module one unit into a rail that has a unit of room at each end', () => {
     const { panel, resolve } = railPreviewScene(relay, 3);
-    expect(panel.railLengthsUnits).toEqual([5]);
+    expect(panel.rails.map((r) => r.lengthUnits)).toEqual([5]);
     expect(panel.placements).toHaveLength(1);
     expect(panel.placements[0]).toMatchObject({ rail: 0, slot: 1, widthUnits: 3 });
     expect(resolve(panel.placements[0]!.module)).toBe(relay);

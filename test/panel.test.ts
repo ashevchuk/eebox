@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RAIL_LENGTH_UNITS,
   DEFAULT_RAIL_PITCH_MM,
+  FIRST_RAIL_Y_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
-  MAX_RAIL_PITCH_MM,
-  MIN_RAIL_PITCH_MM,
+  MAX_RAIL_POSITION_MM,
 } from '../src/layout/limits';
 import {
   createPanel,
   moveRail,
   setRailCount,
   setRailLength,
-  setRailPitch,
+  setRailPosition,
   type PanelEditError,
   type PanelEditResult,
 } from '../src/layout/panel';
@@ -36,33 +36,36 @@ function errorOf(result: PanelEditResult): PanelEditError {
   return result.error;
 }
 
+const lengths = (panel: Panel) => panel.rails.map((r) => r.lengthUnits);
+const heights = (panel: Panel) => panel.rails.map((r) => r.y);
+
 describe('createPanel', () => {
-  it('makes one pitch per gap between rails', () => {
-    expect(createPanel([18, 18, 12]).railPitchesMm).toEqual([DEFAULT_RAIL_PITCH_MM, DEFAULT_RAIL_PITCH_MM]);
-    expect(createPanel([12]).railPitchesMm).toEqual([]);
-    expect(createPanel([]).railPitchesMm).toEqual([]);
+  it('stacks the rails one pitch apart, the first at the first rail height', () => {
+    expect(heights(createPanel([18, 18, 12]))).toEqual([FIRST_RAIL_Y_MM, FIRST_RAIL_Y_MM + DEFAULT_RAIL_PITCH_MM, FIRST_RAIL_Y_MM + 2 * DEFAULT_RAIL_PITCH_MM]);
+    expect(createPanel([12]).rails).toEqual([{ x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 }]);
+    expect(createPanel([]).rails).toEqual([]);
   });
 });
 
 describe('setRailCount', () => {
   it('adds rows that copy the last row length and spacing', () => {
     let panel = createPanel([18, 24]);
-    panel = unwrap(setRailPitch(panel, 0, 200));
+    panel = unwrap(setRailPosition(panel, 1, 0, FIRST_RAIL_Y_MM + 200));
     const grown = unwrap(setRailCount(panel, 4));
-    expect(grown.railLengthsUnits).toEqual([18, 24, 24, 24]);
-    expect(grown.railPitchesMm).toEqual([200, 200, 200]);
+    expect(lengths(grown)).toEqual([18, 24, 24, 24]);
+    expect(heights(grown)).toEqual([0, 200, 400, 600].map((d) => FIRST_RAIL_Y_MM + d));
   });
 
   it('builds the first rows from defaults when the panel has none', () => {
     const panel = unwrap(setRailCount(createPanel([]), 3));
-    expect(panel.railLengthsUnits).toEqual(Array(3).fill(DEFAULT_RAIL_LENGTH_UNITS));
-    expect(panel.railPitchesMm).toEqual([DEFAULT_RAIL_PITCH_MM, DEFAULT_RAIL_PITCH_MM]);
+    expect(lengths(panel)).toEqual(Array(3).fill(DEFAULT_RAIL_LENGTH_UNITS));
+    expect(heights(panel)).toEqual([0, 1, 2].map((i) => FIRST_RAIL_Y_MM + i * DEFAULT_RAIL_PITCH_MM));
   });
 
   it('removes empty rows from the bottom', () => {
     const panel = unwrap(setRailCount(createPanel([18, 12, 6]), 2));
-    expect(panel.railLengthsUnits).toEqual([18, 12]);
-    expect(panel.railPitchesMm).toHaveLength(1);
+    expect(lengths(panel)).toEqual([18, 12]);
+    expect(panel.rails).toHaveLength(2);
   });
 
   it('refuses to remove a row that still holds a module', () => {
@@ -85,13 +88,13 @@ describe('setRailCount', () => {
   });
 
   it('accepts the largest allowed count', () => {
-    expect(unwrap(setRailCount(createPanel([12]), MAX_RAILS)).railLengthsUnits).toHaveLength(MAX_RAILS);
+    expect(unwrap(setRailCount(createPanel([12]), MAX_RAILS)).rails).toHaveLength(MAX_RAILS);
   });
 });
 
 describe('setRailLength', () => {
   it('changes only the chosen rail', () => {
-    expect(unwrap(setRailLength(createPanel([12, 12]), widthOf, 1, 30)).railLengthsUnits).toEqual([12, 30]);
+    expect(lengths(unwrap(setRailLength(createPanel([12, 12]), widthOf, 1, 30)))).toEqual([12, 30]);
   });
 
   it('allows shrinking to exactly the last module end', () => {
@@ -128,55 +131,63 @@ describe('setRailLength', () => {
   });
 });
 
-describe('setRailPitch', () => {
-  it('changes only the chosen gap', () => {
-    const panel = unwrap(setRailPitch(createPanel([12, 12, 12]), 1, 220));
-    expect(panel.railPitchesMm).toEqual([DEFAULT_RAIL_PITCH_MM, 220]);
+describe('setRailPosition', () => {
+  it('moves only the chosen rail, in both directions', () => {
+    const before = createPanel([12, 12, 12]);
+    const panel = unwrap(setRailPosition(before, 1, 30, 220));
+    expect(panel.rails[1]).toEqual({ x: 30, y: 220, lengthUnits: 12 });
+    expect(panel.rails[0]).toEqual(before.rails[0]);
+    expect(panel.rails[2]).toEqual(before.rails[2]);
+  });
+
+  it('lets two rails stand side by side', () => {
+    const panel = unwrap(setRailPosition(createPanel([6, 6]), 1, 6 * 17.5 + 20, FIRST_RAIL_Y_MM));
+    expect(panel.rails[1]?.y).toBe(panel.rails[0]?.y);
   });
 
   it('accepts both limits and rejects values just outside them', () => {
     const panel = createPanel([12, 12]);
-    expect(setRailPitch(panel, 0, MIN_RAIL_PITCH_MM).ok).toBe(true);
-    expect(setRailPitch(panel, 0, MAX_RAIL_PITCH_MM).ok).toBe(true);
-    expect(errorOf(setRailPitch(panel, 0, MIN_RAIL_PITCH_MM - 1))).toBe('invalid-value');
-    expect(errorOf(setRailPitch(panel, 0, MAX_RAIL_PITCH_MM + 1))).toBe('invalid-value');
-    expect(errorOf(setRailPitch(panel, 0, 120.5))).toBe('invalid-value');
+    expect(setRailPosition(panel, 0, 0, 0).ok).toBe(true);
+    expect(setRailPosition(panel, 0, MAX_RAIL_POSITION_MM, MAX_RAIL_POSITION_MM).ok).toBe(true);
+    expect(errorOf(setRailPosition(panel, 0, -1, 100))).toBe('invalid-value');
+    expect(errorOf(setRailPosition(panel, 0, 100, MAX_RAIL_POSITION_MM + 1))).toBe('invalid-value');
+    expect(errorOf(setRailPosition(panel, 0, Number.NaN, 100))).toBe('invalid-value');
   });
 
-  it('has no gap to edit on a single-row panel', () => {
-    expect(errorOf(setRailPitch(createPanel([12]), 0, 150))).toBe('unknown-rail');
+  it('refuses an unknown rail', () => {
+    expect(errorOf(setRailPosition(createPanel([12]), 1, 0, 0))).toBe('unknown-rail');
   });
 
   it('does not mutate the input panel', () => {
     const panel = createPanel([12, 12]);
-    setRailPitch(panel, 0, 300);
-    expect(panel.railPitchesMm).toEqual([DEFAULT_RAIL_PITCH_MM]);
+    setRailPosition(panel, 0, 300, 300);
+    expect(panel.rails[0]).toEqual({ x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 });
   });
 });
 
 describe('moveRail', () => {
   const stocked = (): Panel => ({
     ...createPanel([10, 20, 30]),
-    railPitchesMm: [110, 220],
+    rails: createPanel([10, 20, 30]).rails.map((r, i) => ({ ...r, y: FIRST_RAIL_Y_MM + [0, 110, 330][i]! })),
     placements: [place('a', 0, 0), place('b', 1, 0), place('c', 2, 0), place('d', 1, 4)],
   });
   const railOf = (panel: Panel) => Object.fromEntries(panel.placements.map((p) => [p.id, p.rail]));
 
   it('swaps adjacent rows and their modules together', () => {
     const moved = unwrap(moveRail(stocked(), 0, 1));
-    expect(moved.railLengthsUnits).toEqual([20, 10, 30]);
+    expect(lengths(moved)).toEqual([20, 10, 30]);
     expect(railOf(moved)).toEqual({ a: 1, b: 0, c: 2, d: 0 });
   });
 
   it('moves a row several places down and shifts the rows in between up', () => {
     const moved = unwrap(moveRail(stocked(), 0, 2));
-    expect(moved.railLengthsUnits).toEqual([20, 30, 10]);
+    expect(lengths(moved)).toEqual([20, 30, 10]);
     expect(railOf(moved)).toEqual({ a: 2, b: 0, c: 1, d: 0 });
   });
 
   it('moves a row up and shifts the rows in between down', () => {
     const moved = unwrap(moveRail(stocked(), 2, 0));
-    expect(moved.railLengthsUnits).toEqual([30, 10, 20]);
+    expect(lengths(moved)).toEqual([30, 10, 20]);
     expect(railOf(moved)).toEqual({ a: 1, b: 2, c: 0, d: 2 });
   });
 
@@ -185,9 +196,9 @@ describe('moveRail', () => {
     expect(unwrap(moveRail(panel, 0, 2)).combs[0]?.rail).toBe(2);
   });
 
-  it('keeps slots, ids and the spacing that belongs to the positions', () => {
+  it('keeps slots, ids and the places that belong to the positions', () => {
     const moved = unwrap(moveRail(stocked(), 0, 2));
-    expect(moved.railPitchesMm).toEqual([110, 220]);
+    expect(moved.rails.map((r) => [r.x, r.y])).toEqual(stocked().rails.map((r) => [r.x, r.y]));
     expect(moved.placements.find((p) => p.id === 'd')?.slot).toBe(4);
     expect(moved.placements.map((p) => p.id)).toEqual(['a', 'b', 'c', 'd']);
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RAIL_PITCH_MM } from '../src/layout/limits';
+import { DEFAULT_RAIL_PITCH_MM, FIRST_RAIL_Y_MM } from '../src/layout/limits';
 import { createPanel } from '../src/layout/panel';
 import { nextPlacementId, type Panel, type Placement } from '../src/layout/placement';
 import { Camera } from '../src/view/Camera';
@@ -16,6 +16,7 @@ import {
   snapToSlot,
 } from '../src/view/geometry';
 import { History } from '../src/view/history';
+import { withRailPitches } from './fixtures';
 
 const placement = (id: string, rail: number, slot: number): Placement => ({
   id,
@@ -137,7 +138,7 @@ describe('Camera', () => {
 });
 
 describe('panel geometry with custom pitches', () => {
-  const uneven = (): Panel => ({ ...createPanel([10, 10, 10]), railPitchesMm: [200, 120] });
+  const uneven = (): Panel => ({ ...createPanel([10, 10, 10]), rails: createPanel([10, 10, 10]).rails.map((r, i) => ({ ...r, y: FIRST_RAIL_Y_MM + [0, 200, 320][i]! })) });
 
   it('places each rail centre after the pitches above it', () => {
     const p = uneven();
@@ -183,18 +184,18 @@ describe('labelRoom', () => {
   });
 
   it('grows with the spacing between rows', () => {
-    const wide = { ...createPanel([10, 10]), railPitchesMm: [250] };
+    const wide = withRailPitches(createPanel([10, 10]), [250]);
     expect(labelRoom(wide, 0)).toBe(labelRoom(createPanel([10, 10]), 0) + 100);
   });
 
   it('never goes negative', () => {
-    const tight = { ...createPanel([10, 10]), railPitchesMm: [90] };
+    const tight = withRailPitches(createPanel([10, 10]), [90]);
     expect(labelRoom(tight, 0)).toBe(0);
   });
 });
 
 describe('railAtPoint', () => {
-  const panel = () => ({ ...createPanel([10, 6]), railPitchesMm: [200] });
+  const panel = () => withRailPitches(createPanel([10, 6]), [200]);
 
   it('finds the row whose rail bar is under the point', () => {
     const p = panel();

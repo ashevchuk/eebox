@@ -54,7 +54,7 @@ export function pasteItems(panel: Panel, widthOf: WidthOf, combLookup: CombLooku
     return { left: item.slot, right: item.slot + width };
   });
   const panelEdges = panel.placements.map((item) => ({ left: item.slot, right: item.slot + (widthOf(item) ?? 1) }));
-  const railLength = Math.max(0, ...panel.railLengthsUnits);
+  const railLength = Math.max(0, ...panel.rails.map((r) => r.lengthUnits));
 
   const offsets = new Set<number>([0]);
   for (let dx = GRID_UNITS; dx <= railLength; dx += GRID_UNITS) offsets.add(roundUnits(dx)).add(roundUnits(-dx));

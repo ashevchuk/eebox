@@ -544,11 +544,11 @@ try {
     const packed = await placements();
     const first = packed.placements.filter((p) => p.rail === 0).map((p) => p.slot).sort((a, b) => a - b);
     expectEqual(first[0], 0, 'the first module of the row after To the start');
-    const rowsBefore = packed.railLengthsUnits.length;
+    const rowsBefore = packed.rails.length;
     await browser.evaluate(`document.getElementById('duplicate-row').click()`);
     await new Promise((r) => setTimeout(r, 900));
     const copied = await placements();
-    expectEqual(copied.railLengthsUnits.length, rowsBefore + 1, 'the rows after Duplicate row');
+    expectEqual(copied.rails.length, rowsBefore + 1, 'the rows after Duplicate row');
     expectTrue(copied.placements.length > packed.placements.length, 'no modules were copied with the row');
     await browser.evaluate(`document.getElementById('undo')?.click() ?? [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo').click()`);
   });
@@ -582,7 +582,7 @@ try {
   });
 
   await step('the arrow keys move the selected module, Tab walks to the next one and Escape lets go', async () => {
-    const panel = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); const f = JSON.parse(localStorage.getItem('eebox:autosave')); return { placements: f.project.panel.placements, lengths: f.project.panel.railLengthsUnits, modules: f.modules }; })()`);
+    const panel = () => browser.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 900)); const f = JSON.parse(localStorage.getItem('eebox:autosave')); return { placements: f.project.panel.placements, lengths: f.project.panel.rails.map((r) => r.lengthUnits), modules: f.modules }; })()`);
     await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Panel').click()`);
     await browser.mouse('mousePressed', 260, 120);
     await browser.mouse('mouseReleased', 260, 120);

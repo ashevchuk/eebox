@@ -1,13 +1,14 @@
 import { MODULE_UNIT_MM } from '../library/types';
 import type { CombPlacement, Panel, Placement, WidthOf } from '../layout/placement';
 import type { TerminalSide } from '../library/types';
+import { FIRST_RAIL_Y_MM } from '../layout/limits';
 import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
 import type { Bounds, Point } from './Camera';
 
 /** World units are millimetres. */
 export const RAIL_HEIGHT = 35;
 /** Space above the first and below the last rail, inside the frame. */
-export const ROW_MARGIN = 110;
+export const ROW_MARGIN = FIRST_RAIL_Y_MM;
 /** How far from a rail a drop still counts as being on that rail. */
 const SNAP_DISTANCE = 75;
 export const MODULE_HEIGHT = 90;
@@ -21,22 +22,21 @@ export interface Rect {
 }
 
 export function railCenterY(panel: Panel, rail: number): number {
-  const above = panel.railPitchesMm.slice(0, rail).reduce((sum, pitch) => sum + pitch, 0);
-  return FRAME_PADDING + ROW_MARGIN + above;
+  return FRAME_PADDING + (panel.rails[rail]?.y ?? 0);
 }
 
 export function railRect(panel: Panel, rail: number): Rect {
   return {
-    x: FRAME_PADDING,
+    x: FRAME_PADDING + (panel.rails[rail]?.x ?? 0),
     y: railCenterY(panel, rail) - RAIL_HEIGHT / 2,
-    width: (panel.railLengthsUnits[rail] ?? 0) * MODULE_UNIT_MM,
+    width: (panel.rails[rail]?.lengthUnits ?? 0) * MODULE_UNIT_MM,
     height: RAIL_HEIGHT,
   };
 }
 
 export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits: number): Rect {
   return {
-    x: FRAME_PADDING + slot * MODULE_UNIT_MM,
+    x: railRect(panel, rail).x + slot * MODULE_UNIT_MM,
     y: railCenterY(panel, rail) - MODULE_HEIGHT / 2,
     width: widthUnits * MODULE_UNIT_MM,
     height: MODULE_HEIGHT,
@@ -62,14 +62,16 @@ export function combRect(
 
 /**
  * Length available for a label printed under the modules of a rail: down to the combs that
- * overhang the next row, or to the end of the frame for the last row.
+ * overhang the nearest rail below it that shares some of its length, or to the end of the frame.
  */
 export function labelRoom(panel: Panel, rail: number): number {
   const bottom = railCenterY(panel, rail) + MODULE_HEIGHT / 2;
-  const limit =
-    rail + 1 < panel.railLengthsUnits.length
-      ? railCenterY(panel, rail + 1) - MODULE_HEIGHT / 2 - COMB_OVERHANG
-      : frameRect(panel).height;
+  const here = railRect(panel, rail);
+  const below = panel.rails
+    .map((_r, i) => railRect(panel, i))
+    .filter((r, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
+    .map((r) => r.y + r.height / 2 - MODULE_HEIGHT / 2 - COMB_OVERHANG);
+  const limit = below.length > 0 ? Math.min(...below) : frameRect(panel).height;
   return Math.max(0, limit - bottom - LABEL_GAP);
 }
 
@@ -87,10 +89,10 @@ export function combAtPoint(
 }
 
 export function frameRect(panel: Panel): Rect {
-  const longest = Math.max(0, ...panel.railLengthsUnits) * MODULE_UNIT_MM;
-  const lastRail = panel.railLengthsUnits.length - 1;
-  const bottom = lastRail < 0 ? FRAME_PADDING : railCenterY(panel, lastRail) + ROW_MARGIN + FRAME_PADDING;
-  return { x: 0, y: 0, width: longest + FRAME_PADDING * 2, height: bottom };
+  const right = Math.max(0, ...panel.rails.map((r) => r.x + r.lengthUnits * MODULE_UNIT_MM));
+  const lowest = panel.rails.length === 0 ? undefined : Math.max(...panel.rails.map((r) => r.y));
+  const bottom = lowest === undefined ? FRAME_PADDING : FRAME_PADDING + lowest + ROW_MARGIN + FRAME_PADDING;
+  return { x: 0, y: 0, width: right + FRAME_PADDING * 2, height: bottom };
 }
 
 /**
@@ -117,18 +119,18 @@ export function snapToSlot(
   anchorUnits: number,
   neighbours: readonly Neighbour[] = [],
 ): { rail: number; slot: number } | null {
-  let rail = -1;
-  let nearest = Infinity;
-  panel.railLengthsUnits.forEach((_length, i) => {
-    const distance = Math.abs(point.y - railCenterY(panel, i));
-    if (distance < nearest) {
-      nearest = distance;
-      rail = i;
-    }
-  });
-  const railLength = panel.railLengthsUnits[rail];
+  const heightOf = (i: number) => Math.abs(point.y - railCenterY(panel, i));
+  const outsideOf = (i: number) => {
+    const r = railRect(panel, i);
+    return Math.max(r.x - point.x, 0, point.x - (r.x + r.width));
+  };
+  const nearest = Math.min(Infinity, ...panel.rails.map((_r, i) => heightOf(i)));
+  // Rails side by side in one row are told apart by how far the point is from their length; a point past the end of a rail still belongs to it.
+  const row = panel.rails.map((_r, i) => i).filter((i) => heightOf(i) <= nearest + RAIL_HEIGHT / 2);
+  const rail = row.reduce((best, i) => (best < 0 || outsideOf(i) < outsideOf(best) || (outsideOf(i) === outsideOf(best) && heightOf(i) < heightOf(best)) ? i : best), -1);
+  const railLength = panel.rails[rail]?.lengthUnits;
   if (railLength === undefined || nearest > SNAP_DISTANCE) return null;
-  const raw = (point.x - FRAME_PADDING) / MODULE_UNIT_MM - anchorUnits;
+  const raw = (point.x - railRect(panel, rail).x) / MODULE_UNIT_MM - anchorUnits;
   const last = Math.max(0, railLength - widthUnits);
   const edges = [
     0,
@@ -143,7 +145,7 @@ export function snapToSlot(
 
 /** The row whose rail bar is under the point, if any. */
 export function railAtPoint(panel: Panel, point: Point): number | undefined {
-  const index = panel.railLengthsUnits.findIndex((_length, rail) => {
+  const index = panel.rails.findIndex((_r, rail) => {
     const r = railRect(panel, rail);
     return point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y - 2 && point.y <= r.y + r.height + 2;
   });
@@ -194,7 +196,8 @@ export const PRINT_MARGIN_MM = 12;
 /** A label under a module is cut at the room it has, and starts this far below the module. */
 const PRINT_LABEL_START_MM = 4;
 const PRINT_LABEL_HALF_WIDTH_MM = 6;
-const ROW_LABEL_X_MM = FRAME_PADDING / 2;
+/** A row label stands in the margin to the left of its rail. */
+export const rowLabelX = (panel: Panel, rail: number): number => railRect(panel, rail).x - FRAME_PADDING / 2;
 
 /**
  * What a drawing of the panel at full size has to cover: the rails, the modules, the combs and the
@@ -208,7 +211,7 @@ export function printArea(
   combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
   measure: (text: string) => number,
 ): { bounds: Bounds; rects: Rect[] } {
-  const rects: Rect[] = panel.railLengthsUnits.map((_length, rail) => railRect(panel, rail));
+  const rects: Rect[] = panel.rails.map((_r, rail) => railRect(panel, rail));
   for (const p of panel.placements) {
     const r = moduleRect(panel, p.rail, p.slot, widthOf(p) ?? 1);
     rects.push(r);
@@ -221,11 +224,11 @@ export function printArea(
     const info = combInfoOf(c);
     if (info) rects.push(combRect(panel, c.rail, c.slot, info.widthUnits, info.side));
   }
-  panel.railLabels.forEach((label, rail) => {
+  panel.rails.forEach(({ label }, rail) => {
     if (!label) return;
     const centre = railCenterY(panel, rail);
     const half = Math.min(measure(label), 110) / 2;
-    rects.push({ x: ROW_LABEL_X_MM - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
+    rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
   });
   if (rects.length === 0) {
     const frame = frameRect(panel);

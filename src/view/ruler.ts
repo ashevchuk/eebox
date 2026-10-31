@@ -51,7 +51,7 @@ export function edgeLines(
     ys.push(r.y, r.y + r.height);
   };
   add(frameRect(panel));
-  panel.railLengthsUnits.forEach((_length, rail) => add(railRect(panel, rail)));
+  panel.rails.forEach((_r, rail) => add(railRect(panel, rail)));
   for (const p of panel.placements) add(moduleRect(panel, p.rail, p.slot, widthOf(p) ?? 1));
   for (const c of panel.combs) {
     const info = combInfoOf(c);

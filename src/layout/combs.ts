@@ -32,7 +32,7 @@ function checkComb(panel: Panel, lookup: CombLookup, candidate: CombPlacement, i
   const side = lookup.sideOf(candidate.module);
   const width = lookup.widthOf(candidate);
   if (side === undefined || width === undefined) return { kind: 'not-a-comb' };
-  const railLength = panel.railLengthsUnits[candidate.rail];
+  const railLength = panel.rails[candidate.rail]?.lengthUnits;
   if (railLength === undefined) return { kind: 'unknown-rail' };
   const { slot } = candidate;
   if (!Number.isFinite(slot) || slot < 0 || slot + width > railLength + LAYOUT_EPSILON_UNITS) return { kind: 'out-of-rail' };

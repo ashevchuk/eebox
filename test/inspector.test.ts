@@ -119,14 +119,15 @@ describe('inspect: what is shown', () => {
     expect(field(ctx({ combId: 'c1' }), 'width')).toMatchObject({ kind: 'number', value: 6, min: 2, max: 12 });
   });
 
-  it('describes a row, with spacing only when there is a row below', () => {
+  it('describes a row, with where it lies on the panel', () => {
     const first = inspect(ctx({ rail: 0 }))!;
     expect(first.title).toBe('Row 1');
     expect(field(ctx({ rail: 0 }), 'label')).toMatchObject({ value: '', placeholder: 'Row 1' });
     expect(field(ctx({ rail: 0 }), 'length')).toMatchObject({ value: 24, min: 1, max: 144 });
-    expect(field(ctx({ rail: 0 }), 'spacing')).toMatchObject({ value: 150, min: 90, max: 500 });
+    expect(field(ctx({ rail: 0 }), 'x')).toMatchObject({ value: 0, min: 0, max: 3000 });
+    expect(field(ctx({ rail: 0 }), 'y')).toMatchObject({ value: 110, min: 0, max: 3000 });
     expect(field(ctx({ rail: 0 }), 'contents')?.value).toBe('3 modules, 1 comb');
-    expect(keysOf(ctx({ rail: 1 }))).not.toContain('spacing');
+    expect(field(ctx({ rail: 1 }), 'y')).toMatchObject({ value: 260 });
     expect(field(ctx({ rail: 1 }), 'contents')?.value).toBe('0 modules, 0 combs');
   });
 
@@ -168,7 +169,7 @@ describe('applyEdit: labels', () => {
   it('labels a module, a comb, a row and a wire', () => {
     expect(ok(applyEdit(ctx({ placementId: 'p1' }), 'label', ' Kitchen ')).panel.placements[0]?.label).toBe('Kitchen');
     expect(ok(applyEdit(ctx({ combId: 'c1' }), 'label', 'Phase bus')).panel.combs[0]?.label).toBe('Phase bus');
-    expect(ok(applyEdit(ctx({ rail: 1 }), 'label', 'Lighting')).panel.railLabels).toEqual(['', 'Lighting']);
+    expect(ok(applyEdit(ctx({ rail: 1 }), 'label', 'Lighting')).panel.rails.map((r) => r.label ?? '')).toEqual(['', 'Lighting']);
     expect(ok(applyEdit(ctx({ wireId: 'w1' }, 'schematic'), 'label', 'NYM 3x1.5')).schematic.wires[0]?.label).toBe('NYM 3x1.5');
   });
 
@@ -266,14 +267,15 @@ describe('applyEdit: position and width', () => {
 
 describe('applyEdit: rows', () => {
   it('changes the length, refusing what would not fit the modules', () => {
-    expect(ok(applyEdit(ctx({ rail: 1 }), 'length', '12')).panel.railLengthsUnits).toEqual([24, 12]);
+    expect(ok(applyEdit(ctx({ rail: 1 }), 'length', '12')).panel.rails.map((r) => r.lengthUnits)).toEqual([24, 12]);
     expect(message(applyEdit(ctx({ rail: 0 }), 'length', '5'))).toBe('Modules on this row would not fit.');
     expect(message(applyEdit(ctx({ rail: 0 }), 'length', '500'))).toBe('Length is 1 to 144 units.');
   });
 
-  it('changes the spacing within its limits', () => {
-    expect(ok(applyEdit(ctx({ rail: 0 }), 'spacing', '200')).panel.railPitchesMm).toEqual([200]);
-    expect(message(applyEdit(ctx({ rail: 0 }), 'spacing', '50'))).toBe('Spacing is 90 to 500 mm.');
+  it('changes the position within its limits', () => {
+    expect(ok(applyEdit(ctx({ rail: 0 }), 'y', '200')).panel.rails[0]).toMatchObject({ x: 0, y: 200 });
+    expect(ok(applyEdit(ctx({ rail: 0 }), 'x', '40')).panel.rails[0]).toMatchObject({ x: 40 });
+    expect(message(applyEdit(ctx({ rail: 0 }), 'y', '5000'))).toBe('Positions are 0 to 3000 mm.');
   });
 
   it('moves a row with its contents and keeps it selected at its new position', () => {
@@ -338,8 +340,8 @@ describe('panel properties', () => {
   });
 
   it('changes the number of rows, refusing one that still holds modules', () => {
-    expect(ok(applyEdit(ctx({}), 'rows', '3')).panel.railLengthsUnits).toHaveLength(3);
-    expect(ok(applyEdit(ctx({}), 'rows', '1')).panel.railLengthsUnits).toHaveLength(1);
+    expect(ok(applyEdit(ctx({}), 'rows', '3')).panel.rails).toHaveLength(3);
+    expect(ok(applyEdit(ctx({}), 'rows', '1')).panel.rails).toHaveLength(1);
     expect(message(applyEdit(ctx({}), 'rows', '0'))).toBe('Rows: 1 to 20.');
     expect(message(applyEdit(ctx({}), 'rows', 'abc'))).toBe('Enter a whole number.');
     const withModuleOnSecondRow = ok(applyEdit(ctx({ placementId: 'p1' }), 'row', '2'));

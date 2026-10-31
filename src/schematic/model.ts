@@ -398,7 +398,7 @@ export function syncModuleNodes(
 ): Schematic {
   const linked = new Set(schematic.nodes.map((n) => n.placementId));
   let result = schematic;
-  panel.railLengthsUnits.forEach((_length, rail) => {
+  panel.rails.forEach((_r, rail) => {
     const onRail = panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot);
     onRail.forEach((placement, column) => {
       if (linked.has(placement.id)) return;

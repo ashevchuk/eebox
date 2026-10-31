@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { setInfoField } from '../src/layout/info';
+import { createPanel } from '../src/layout/panel';
 import type { Panel } from '../src/layout/placement';
 import { diffProjects, summarize } from '../src/project/diff';
 import { buildProjectFile, type ProjectFile } from '../src/project/file';
 import type { Project } from '../src/project';
 import { addNode, connect, emptySchematic, setNodeLoad, setWireLabel, syncModuleNodes } from '../src/schematic/model';
-import { combAt, defs, panelOf, place, resolve } from './fixtures';
+import { combAt, defs, panelOf, place, resolve, withRailLabels } from './fixtures';
 
 function project(): Project {
-  const panel = { ...panelOf([place('p1', 'breaker16', 0, 0), place('p2', 'breaker16', 0, 2)], [combAt('c1', 'comb3', 0, 0)]), title: 'House', railLabels: ['Incoming', ''] };
+  const panel = { ...withRailLabels(panelOf([place('p1', 'breaker16', 0, 0), place('p2', 'breaker16', 0, 2)], [combAt('c1', 'comb3', 0, 0)]), ['Incoming', '']), title: 'House' };
   let schematic = syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId);
   schematic = addNode(schematic, { kind: 'source', label: 'Mains', x: 0, y: -100, conductors: ['L', 'N'] }).schematic;
   schematic = addNode(schematic, { kind: 'load', label: 'Oven', x: 0, y: 300, conductors: ['L', 'N'] }).schematic;
@@ -31,7 +32,7 @@ describe('comparing two projects', () => {
 
   it('reports the title, the info and the rows', () => {
     const a = project();
-    let panel: Panel = { ...a.panel, title: 'House, second floor', railLengthsUnits: [24, 12], railLabels: ['Mains', ''] };
+    let panel: Panel = { ...a.panel, title: 'House, second floor', rails: createPanel([24, 12]).rails.map((r, i) => (i === 0 ? { ...r, label: 'Mains' } : r)) };
     const stated = setInfoField(panel, 'status', 'approved');
     if (!stated.ok) throw new Error('info');
     panel = stated.panel;

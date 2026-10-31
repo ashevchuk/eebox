@@ -5,7 +5,7 @@ import { addNode, connect, emptySchematic, syncModuleNodes } from '../src/schema
 import { focusOfObjects, objectsOfSelection } from '../src/ui/problems';
 import { MAX_SEARCH_RESULTS, searchProject } from '../src/ui/search';
 import { fromMinimap, minimapFit, toMinimap, visibleWorld } from '../src/view/minimap';
-import { combAt, panelOf, place, resolve } from './fixtures';
+import { combAt, panelOf, place, resolve, withRailLabels } from './fixtures';
 
 function project(): Project {
   const placements = [
@@ -13,7 +13,7 @@ function project(): Project {
     { ...place('p2', 'breaker16', 0, 2), label: 'Kitchen sockets' },
     place('p3', 'mcb1', 1, 4),
   ];
-  const panel = { ...panelOf(placements, [{ ...combAt('c1', 'comb3', 0, 0), label: 'Bus' }]), railLabels: ['Incoming', ''] };
+  const panel = withRailLabels(panelOf(placements, [{ ...combAt('c1', 'comb3', 0, 0), label: 'Bus' }]), ['Incoming', '']);
   let schematic = syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId);
   schematic = addNode(schematic, { kind: 'source', label: 'Mains 3-phase', x: 0, y: -100, conductors: ['L', 'N'] }).schematic;
   const terminalsOf = nodeTerminalsLookup(panel, resolve);

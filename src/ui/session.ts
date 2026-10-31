@@ -179,7 +179,7 @@ export class Session {
         kept.placements.filter((id) => panel.placements.some((p) => p.id === id)),
         kept.combs.filter((id) => panel.combs.some((c) => c.id === id)),
       ),
-      ...(rail !== undefined && rail < panel.railLengthsUnits.length ? { rail } : {}),
+      ...(rail !== undefined && rail < panel.rails.length ? { rail } : {}),
       ...(nodeId && schematic.nodes.some((n) => n.id === nodeId) ? { nodeId } : {}),
       ...wireGroupSelection(selectedWires(this.selection).filter((id) => schematic.wires.some((w) => w.id === id))),
     };

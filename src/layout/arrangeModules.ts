@@ -1,5 +1,5 @@
 import { nextCombId } from './combs';
-import { moveRail, setRailCount, setRailLength, type PanelEditError } from './panel';
+import { moveRail, setRailCount, setRailLabel, setRailLength, type PanelEditError } from './panel';
 import { findProblems, nextPlacementId, type Panel, type Placement, type WidthOf } from './placement';
 import { roundUnits } from './units';
 
@@ -41,7 +41,7 @@ export function arrangeModules(panel: Panel, widthOf: WidthOf, ids: readonly str
     if (how === 'spread' && ordered.length < 3) continue;
     spreadable = true;
     const widths = ordered.map((p) => widthOf(p) ?? 1);
-    const slots = slotsFor(ordered, widths, panel.railLengthsUnits[rail] ?? 0, how);
+    const slots = slotsFor(ordered, widths, panel.rails[rail]?.lengthUnits ?? 0, how);
     ordered.forEach((p, i) => {
       if (Math.abs(slots[i]! - p.slot) > 1e-9) moved.set(p.id, slots[i]!);
     });
@@ -57,14 +57,16 @@ export type DuplicateRowResult = { ok: true; panel: Panel; placementIds: string[
 
 /** Puts a copy of a row, with its modules, combs and label, right below it. */
 export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
-  const length = panel.railLengthsUnits[rail];
-  if (length === undefined) return { ok: false, error: 'unknown-rail' };
-  const added = setRailCount(panel, panel.railLengthsUnits.length + 1);
+  const source = panel.rails[rail];
+  if (source === undefined) return { ok: false, error: 'unknown-rail' };
+  const added = setRailCount(panel, panel.rails.length + 1);
   if (!added.ok) return added;
-  const lastIndex = added.panel.railLengthsUnits.length - 1;
-  const sized = setRailLength(added.panel, () => 1, lastIndex, length);
+  const lastIndex = added.panel.rails.length - 1;
+  const sized = setRailLength(added.panel, () => 1, lastIndex, source.lengthUnits);
   if (!sized.ok) return sized;
-  let next: Panel = { ...sized.panel, railLabels: sized.panel.railLabels.map((label, i) => (i === lastIndex ? panel.railLabels[rail] ?? '' : label)) };
+  const labelled = setRailLabel(sized.panel, lastIndex, source.label ?? '');
+  if (!labelled.ok) return labelled;
+  let next: Panel = labelled.panel;
   const placementIds: string[] = [];
   for (const source of panel.placements.filter((p) => p.rail === rail)) {
     const id = nextPlacementId(next);

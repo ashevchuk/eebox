@@ -3,8 +3,7 @@ import { lookupsOf } from '../layout/lookups';
 import {
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
-  MAX_RAIL_PITCH_MM,
-  MIN_RAIL_PITCH_MM,
+  MAX_RAIL_POSITION_MM,
 } from '../layout/limits';
 import {
   moveRail,
@@ -12,7 +11,7 @@ import {
   setRailCount,
   setRailLabel,
   setRailLength,
-  setRailPitch,
+  setRailPosition,
 } from '../layout/panel';
 import { takeOff } from '../layout/shelf';
 import {
@@ -172,7 +171,7 @@ function targetOf({ project, selection, mode }: InspectContext): Target {
   if (comb) return { kind: 'comb', comb };
   const placement = panel.placements.find((p) => p.id === selection.placementId);
   if (placement) return { kind: 'placement', placement };
-  if (selection.rail !== undefined && selection.rail < panel.railLengthsUnits.length) {
+  if (selection.rail !== undefined && selection.rail < panel.rails.length) {
     return { kind: 'rail', rail: selection.rail };
   }
   return { kind: 'panel' };
@@ -316,8 +315,8 @@ function positionFields(
   width: number,
   unit: LengthUnit,
 ): InspectorField[] {
-  const rails = project.panel.railLengthsUnits;
-  const railLength = rails[item.rail] ?? 0;
+  const rails = project.panel.rails;
+  const railLength = rails[item.rail]?.lengthUnits ?? 0;
   const resizable = def?.resizable;
   const named = unit === 'mm' ? 'mm' : 'units';
   return [
@@ -349,7 +348,7 @@ export function inspect(ctx: InspectContext): InspectorView {
   switch (target.kind) {
     case 'panel': {
       const { panel } = project;
-      const longest = Math.max(0, ...panel.railLengthsUnits);
+      const longest = Math.max(0, ...panel.rails.map((r) => r.lengthUnits));
       const { changed, missing } = moduleDifferences(project, ctx.snapshot, ctx.fromLibraries);
       const differences = [
         changed.length > 0 ? `${changed.length} differ from the libraries` : '',
@@ -361,7 +360,7 @@ export function inspect(ctx: InspectContext): InspectorView {
         fields: [
           text('title', 'Title', panel.title ?? '', 'Untitled panel'),
           ...infoFields(panel),
-          integer('rows', 'Rows', panel.railLengthsUnits.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
+          integer('rows', 'Rows', panel.rails.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
           readonly('size', 'Size', `longest row ${longest} units`),
           readonly(
             'contents',
@@ -452,12 +451,11 @@ export function inspect(ctx: InspectContext): InspectorView {
         title: `Row ${rail + 1}`,
         actions: [],
         fields: [
-          text('label', 'Label', panel.railLabels[rail] ?? '', `Row ${rail + 1}`),
-          integer('position', 'Position', rail + 1, 1, panel.railLengthsUnits.length),
-          decimal('length', 'Length', panel.railLengthsUnits[rail] ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.railLengthsUnits[rail] ?? 0)} mm`),
-          ...(rail < panel.railPitchesMm.length
-            ? [integer('spacing', 'Spacing below', panel.railPitchesMm[rail] ?? 0, MIN_RAIL_PITCH_MM, MAX_RAIL_PITCH_MM, 'mm to the next row')]
-            : []),
+          text('label', 'Label', panel.rails[rail]?.label ?? '', `Row ${rail + 1}`),
+          integer('position', 'Position', rail + 1, 1, panel.rails.length),
+          decimal('length', 'Length', panel.rails[rail]?.lengthUnits ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.rails[rail]?.lengthUnits ?? 0)} mm`),
+          decimal('x', 'Left end', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge'),
+          decimal('y', 'Height', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top to the middle of the rail'),
           readonly('contents', 'Contents', `${onRail} module${onRail === 1 ? '' : 's'}, ${combsOnRail} comb${combsOnRail === 1 ? '' : 's'}`),
         ],
       };
@@ -731,7 +729,7 @@ export function applyEdit(
         const result = setRailLabel(panel, rail, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
       }
-      const value = key === 'length' ? numberOf(raw) : integerOf(raw);
+      const value = key === 'length' || key === 'x' || key === 'y' ? numberOf(raw) : integerOf(raw);
       if (value === null) return fail(NOT_A_NUMBER);
       if (key === 'position') {
         const result = moveRail(panel, rail, value - 1);
@@ -741,9 +739,10 @@ export function applyEdit(
         const result = setRailLength(panel, widthOf, rail, value);
         return result.ok ? withPanel(result.panel) : fail(result.error === 'invalid-value' ? `Length is 1 to ${MAX_RAIL_LENGTH_UNITS} units.` : describeError(result.error));
       }
-      if (key === 'spacing') {
-        const result = setRailPitch(panel, rail, value);
-        return result.ok ? withPanel(result.panel) : fail(`Spacing is ${MIN_RAIL_PITCH_MM} to ${MAX_RAIL_PITCH_MM} mm.`);
+      if (key === 'x' || key === 'y') {
+        const current = panel.rails[rail];
+        const result = setRailPosition(panel, rail, key === 'x' ? value : current?.x ?? 0, key === 'y' ? value : current?.y ?? 0);
+        return result.ok ? withPanel(result.panel) : fail(`Positions are 0 to ${MAX_RAIL_POSITION_MM} mm.`);
       }
       return fail('That property cannot be edited.');
     }

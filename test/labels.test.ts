@@ -4,6 +4,7 @@ import { isStoredLabel, normalizeLabel } from '../src/layout/labels';
 import { MAX_LABEL_LENGTH } from '../src/layout/limits';
 import { createPanel, moveRail, setRailCount, setRailLabel } from '../src/layout/panel';
 import { setPlacementLabel } from '../src/layout/placement';
+import type { Panel } from '../src/layout/placement';
 import { addNode, emptySchematic, renameNode, setWireLabel, type Schematic } from '../src/schematic/model';
 import { combAt, panelOf, place } from './fixtures';
 
@@ -71,6 +72,8 @@ describe('placement and comb labels', () => {
   });
 });
 
+const labels = (panel: Panel) => panel.rails.map((r) => r.label ?? '');
+
 describe('row labels', () => {
   const unwrap = (result: ReturnType<typeof setRailLabel>) => {
     if (!result.ok) throw new Error(result.error);
@@ -78,14 +81,14 @@ describe('row labels', () => {
   };
 
   it('starts without labels, one entry per rail', () => {
-    expect(createPanel([12, 12, 12]).railLabels).toEqual(['', '', '']);
-    expect(createPanel([]).railLabels).toEqual([]);
+    expect(labels(createPanel([12, 12, 12]))).toEqual(['', '', '']);
+    expect(labels(createPanel([]))).toEqual([]);
   });
 
   it('sets, trims and clears the label of one row', () => {
     const labelled = unwrap(setRailLabel(createPanel([12, 12]), 1, ' Lighting '));
-    expect(labelled.railLabels).toEqual(['', 'Lighting']);
-    expect(unwrap(setRailLabel(labelled, 1, '')).railLabels).toEqual(['', '']);
+    expect(labels(labelled)).toEqual(['', 'Lighting']);
+    expect(labels(unwrap(setRailLabel(labelled, 1, '')))).toEqual(['', '']);
   });
 
   it('rejects an unknown row and an invalid label', () => {
@@ -96,18 +99,18 @@ describe('row labels', () => {
   it('pads new rows with no label and drops the labels of removed rows', () => {
     const labelled = unwrap(setRailLabel(unwrap(setRailLabel(createPanel([12, 12]), 0, 'A')), 1, 'B'));
     const grown = setRailCount(labelled, 3);
-    expect(grown.ok && grown.panel.railLabels).toEqual(['A', 'B', '']);
+    expect(grown.ok && labels(grown.panel)).toEqual(['A', 'B', '']);
     const shrunk = setRailCount(labelled, 1);
-    expect(shrunk.ok && shrunk.panel.railLabels).toEqual(['A']);
+    expect(shrunk.ok && labels(shrunk.panel)).toEqual(['A']);
   });
 
   it('moves a label together with its row', () => {
     let panel = createPanel([12, 12, 12]);
     for (const [i, name] of ['A', 'B', 'C'].entries()) panel = unwrap(setRailLabel(panel, i, name));
     const moved = moveRail(panel, 0, 2);
-    expect(moved.ok && moved.panel.railLabels).toEqual(['B', 'C', 'A']);
+    expect(moved.ok && labels(moved.panel)).toEqual(['B', 'C', 'A']);
     const back = moveRail(panel, 2, 0);
-    expect(back.ok && back.panel.railLabels).toEqual(['C', 'A', 'B']);
+    expect(back.ok && labels(back.panel)).toEqual(['C', 'A', 'B']);
   });
 });
 

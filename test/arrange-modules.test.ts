@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { arrangeModules, duplicateRow } from '../src/layout/arrangeModules';
 import { MAX_RAILS } from '../src/layout/limits';
 import { findProblems } from '../src/layout/placement';
-import { combAt, panelOf, place, widthOf } from './fixtures';
+import { combAt, panelOf, place, widthOf, withRailLabels } from './fixtures';
 
 const slots = (panel: ReturnType<typeof panelOf>, rail = 0) => panel.placements.filter((p) => p.rail === rail).sort((a, b) => a.slot - b.slot).map((p) => [p.id, p.slot]);
 
@@ -59,15 +59,15 @@ describe('arranging modules along a rail', () => {
 describe('duplicating a row', () => {
   const base = () => {
     const panel = panelOf([place('p1', 'breaker16', 0, 0), place('p2', 'breaker16', 0, 2), place('p3', 'breaker16', 1, 4)], [combAt('c1', 'comb3', 0, 0)], [24, 12]);
-    return { ...panel, railLabels: ['Incoming', 'Final'] };
+    return withRailLabels(panel, ['Incoming', 'Final']);
   };
 
   it('puts a copy of the row, with its label, modules and combs, right under it', () => {
     const result = duplicateRow(base(), 0);
     if (!result.ok) throw new Error(result.error);
     const { panel } = result;
-    expect(panel.railLengthsUnits).toEqual([24, 24, 12]);
-    expect(panel.railLabels).toEqual(['Incoming', 'Incoming', 'Final']);
+    expect(panel.rails.map((r) => r.lengthUnits)).toEqual([24, 24, 12]);
+    expect(panel.rails.map((r) => r.label ?? '')).toEqual(['Incoming', 'Incoming', 'Final']);
     expect(slots(panel, 1)).toHaveLength(2);
     expect(panel.combs.filter((c) => c.rail === 1)).toHaveLength(1);
     expect(slots(panel, 2)).toEqual([['p3', 4]]);

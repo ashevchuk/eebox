@@ -2,6 +2,18 @@ import { createPanel } from '../src/layout/panel';
 import type { CombPlacement, ModuleRef, Panel, Placement } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 
+/** The panel with the given row labels, one per rail; an empty text leaves the row unlabelled. */
+export const withRailLabels = (panel: Panel, labels: string[]): Panel => ({
+  ...panel,
+  rails: panel.rails.map((r, i) => ({ ...r, ...(labels[i] ? { label: labels[i] } : {}) })),
+});
+
+/** The panel with rail i + 1 lying `pitches[i]` mm below rail i, the first rail where it was. */
+export const withRailPitches = (panel: Panel, pitches: number[]): Panel => {
+  let y = panel.rails[0]?.y ?? 0;
+  return { ...panel, rails: panel.rails.map((r, i) => ({ ...r, y: i === 0 ? y : (y += pitches[i - 1] ?? 0) })) };
+};
+
 export const defs: Record<string, ModuleDef> = {
   mcb1: { id: 'mcb1', kind: 'breaker', name: 'MCB 1P', widthUnits: 1, poles: 1 },
   breaker16: {

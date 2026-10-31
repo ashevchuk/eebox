@@ -1,13 +1,14 @@
 import {
   DEFAULT_RAIL_LENGTH_UNITS,
   DEFAULT_RAIL_PITCH_MM,
+  FIRST_RAIL_Y_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
-  MAX_RAIL_PITCH_MM,
-  MIN_RAIL_PITCH_MM,
+  MAX_RAIL_POSITION_MM,
 } from './limits';
 import { normalizeLabel } from './labels';
 import type { Panel, WidthOf } from './placement';
+import type { Rail } from './rail';
 import { LAYOUT_EPSILON_UNITS } from './units';
 
 export type PanelEditError = 'invalid-value' | 'unknown-rail' | 'rail-not-empty' | 'modules-do-not-fit';
@@ -18,56 +19,65 @@ const failure = (error: PanelEditError): PanelEditResult => ({ ok: false, error 
 const inRange = (value: number, min: number, max: number) =>
   Number.isInteger(value) && value >= min && value <= max;
 
+/** Rails of the given lengths, one under the other, `pitchMm` apart. */
 export function createPanel(railLengthsUnits: number[], pitchMm = DEFAULT_RAIL_PITCH_MM): Panel {
   return {
-    railLengthsUnits: [...railLengthsUnits],
-    railPitchesMm: railLengthsUnits.slice(1).map(() => pitchMm),
-    railLabels: railLengthsUnits.map(() => ''),
+    rails: railLengthsUnits.map((lengthUnits, i) => ({ x: 0, y: FIRST_RAIL_Y_MM + i * pitchMm, lengthUnits })),
     placements: [],
     combs: [],
     shelf: [],
   };
 }
 
-/** New rows copy the last row's length and spacing. Rows can only be removed while empty. */
+/** New rows copy the last row's length and the distance between the last two rows. Rows can only be removed while empty. */
 export function setRailCount(panel: Panel, count: number): PanelEditResult {
   if (!inRange(count, 1, MAX_RAILS)) return failure('invalid-value');
   if (panel.placements.some((p) => p.rail >= count) || panel.combs.some((c) => c.rail >= count)) {
     return failure('rail-not-empty');
   }
-  const lengths = panel.railLengthsUnits.slice(0, count);
-  const pitches = panel.railPitchesMm.slice(0, count - 1);
-  const labels = panel.railLabels.slice(0, count);
-  const lastLength = lengths[lengths.length - 1] ?? DEFAULT_RAIL_LENGTH_UNITS;
-  const lastPitch = pitches[pitches.length - 1] ?? DEFAULT_RAIL_PITCH_MM;
-  while (lengths.length < count) lengths.push(lastLength);
-  while (pitches.length < count - 1) pitches.push(lastPitch);
-  while (labels.length < count) labels.push('');
-  return { ok: true, panel: { ...panel, railLengthsUnits: lengths, railPitchesMm: pitches, railLabels: labels } };
+  const rails = panel.rails.slice(0, count);
+  const last = rails[rails.length - 1];
+  const before = rails[rails.length - 2];
+  const gap = last && before && last.y > before.y ? last.y - before.y : DEFAULT_RAIL_PITCH_MM;
+  while (rails.length < count) {
+    const above = rails[rails.length - 1];
+    rails.push(
+      above
+        ? { x: above.x, y: Math.min(above.y + gap, MAX_RAIL_POSITION_MM), lengthUnits: above.lengthUnits }
+        : { x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: DEFAULT_RAIL_LENGTH_UNITS },
+    );
+  }
+  return { ok: true, panel: { ...panel, rails } };
 }
 
 export function setRailLength(panel: Panel, widthOf: WidthOf, rail: number, units: number): PanelEditResult {
-  if (!inRange(rail, 0, panel.railLengthsUnits.length - 1)) return failure('unknown-rail');
+  if (!inRange(rail, 0, panel.rails.length - 1)) return failure('unknown-rail');
   if (!Number.isFinite(units) || units < 1 || units > MAX_RAIL_LENGTH_UNITS) return failure('invalid-value');
   const overflows = [...panel.placements, ...panel.combs].some(
     (p) => p.rail === rail && p.slot + (widthOf(p) ?? 1) > units + LAYOUT_EPSILON_UNITS,
   );
   if (overflows) return failure('modules-do-not-fit');
-  const railLengthsUnits = panel.railLengthsUnits.map((length, i) => (i === rail ? units : length));
-  return { ok: true, panel: { ...panel, railLengthsUnits } };
+  return { ok: true, panel: { ...panel, rails: panel.rails.map((r, i) => (i === rail ? { ...r, lengthUnits: units } : r)) } };
+}
+
+/** Puts the left end of a rail at `x` and its centre line at `y`, in mm; the modules on it go along. */
+export function setRailPosition(panel: Panel, rail: number, x: number, y: number): PanelEditResult {
+  if (!inRange(rail, 0, panel.rails.length - 1)) return failure('unknown-rail');
+  const valid = (v: number) => Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_POSITION_MM;
+  if (!valid(x) || !valid(y)) return failure('invalid-value');
+  return { ok: true, panel: { ...panel, rails: panel.rails.map((r, i) => (i === rail ? { ...r, x, y } : r)) } };
 }
 
 /**
- * Moves a row with its modules to another position. Spacing stays attached to the positions,
- * not to the rows, so the gaps between rails keep their places.
+ * Moves a row with its modules to another position in the order. The places stay where they are:
+ * the rails trade their lengths and labels, not their x and y.
  */
 export function moveRail(panel: Panel, from: number, to: number): PanelEditResult {
-  const last = panel.railLengthsUnits.length - 1;
+  const last = panel.rails.length - 1;
   if (!inRange(from, 0, last) || !inRange(to, 0, last)) return failure('unknown-rail');
-  const railLengthsUnits = [...panel.railLengthsUnits];
-  railLengthsUnits.splice(to, 0, ...railLengthsUnits.splice(from, 1));
-  const railLabels = [...panel.railLabels];
-  railLabels.splice(to, 0, ...railLabels.splice(from, 1));
+  const order = [...panel.rails];
+  order.splice(to, 0, ...order.splice(from, 1));
+  const rails: Rail[] = order.map((r, i) => ({ ...r, x: panel.rails[i]!.x, y: panel.rails[i]!.y }));
   const newIndex = (rail: number) => {
     if (rail === from) return to;
     if (from < to && rail > from && rail <= to) return rail - 1;
@@ -76,7 +86,7 @@ export function moveRail(panel: Panel, from: number, to: number): PanelEditResul
   };
   const placements = panel.placements.map((p) => ({ ...p, rail: newIndex(p.rail) }));
   const combs = panel.combs.map((c) => ({ ...c, rail: newIndex(c.rail) }));
-  return { ok: true, panel: { ...panel, railLengthsUnits, railLabels, placements, combs } };
+  return { ok: true, panel: { ...panel, rails, placements, combs } };
 }
 
 export function setPanelTitle(panel: Panel, text: string): PanelEditResult {
@@ -87,17 +97,13 @@ export function setPanelTitle(panel: Panel, text: string): PanelEditResult {
 }
 
 export function setRailLabel(panel: Panel, rail: number, text: string): PanelEditResult {
-  if (!inRange(rail, 0, panel.railLengthsUnits.length - 1)) return failure('unknown-rail');
+  if (!inRange(rail, 0, panel.rails.length - 1)) return failure('unknown-rail');
   const parsed = normalizeLabel(text);
   if (!parsed.ok) return failure('invalid-value');
-  const railLabels = panel.railLabels.map((label, i) => (i === rail ? (parsed.label ?? '') : label));
-  return { ok: true, panel: { ...panel, railLabels } };
-}
-
-/** `gap` 0 is the distance between rail 0 and rail 1, measured between rail centre lines. */
-export function setRailPitch(panel: Panel, gap: number, mm: number): PanelEditResult {
-  if (!inRange(gap, 0, panel.railPitchesMm.length - 1)) return failure('unknown-rail');
-  if (!inRange(mm, MIN_RAIL_PITCH_MM, MAX_RAIL_PITCH_MM)) return failure('invalid-value');
-  const railPitchesMm = panel.railPitchesMm.map((pitch, i) => (i === gap ? mm : pitch));
-  return { ok: true, panel: { ...panel, railPitchesMm } };
+  const rails = panel.rails.map((r, i) => {
+    if (i !== rail) return r;
+    const { label: _previous, ...rest } = r;
+    return parsed.label === undefined ? rest : { ...rest, label: parsed.label };
+  });
+  return { ok: true, panel: { ...panel, rails } };
 }

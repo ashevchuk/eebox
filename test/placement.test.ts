@@ -104,7 +104,7 @@ describe('addPlacement', () => {
     });
 
     it('fits nine modules of 22.5 mm on a rail of 210 mm, where whole units would have fitted six', () => {
-      let panel = { ...emptyPanel(), railLengthsUnits: [12, 12] };
+      let panel = { ...emptyPanel(), rails: createPanel([12, 12]).rails };
       for (let i = 0; i < 9; i++) {
         const result = addPlacement(panel, wideOf, place(`r${i}`, 'relay', 0, i * relayWidth));
         if (!result.ok) throw new Error(`relay ${i}: ${JSON.stringify(result.error)}`);

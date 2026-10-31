@@ -31,7 +31,7 @@ describe('printArea', () => {
   it('makes room for the label of a row on the left', () => {
     const base = panelOf([place('p1', 'mcb1', 0, 0)], [], [12]);
     const without = printArea(base, widthOf, noComb, measure).bounds;
-    const withLabel = printArea({ ...base, railLabels: ['Incoming'] }, widthOf, noComb, measure).bounds;
+    const withLabel = printArea({ ...base, rails: base.rails.map((r) => ({ ...r, label: 'Incoming' })) }, widthOf, noComb, measure).bounds;
     expect(withLabel.minX).toBeLessThan(without.minX);
   });
 
