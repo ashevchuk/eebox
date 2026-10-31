@@ -89,6 +89,11 @@ export async function launch({ width = 1516, height = 784 } = {}) {
       await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key, code, windowsVirtualKeyCode: keyCode, text, modifiers });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode, modifiers });
     },
+    /** A real press of the right button, which is what opens a context menu. */
+    rightClick: async (x, y) => {
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', buttons: 2, clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', buttons: 0, clickCount: 1 });
+    },
     mouse: async (type, x, y, modifiers = 0) => send('Input.dispatchMouseEvent', { type, x, y, modifiers, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }),
     /** Makes the page believe the window has this size, as a small screen would; `touch` also emulates a touch screen. */
     resize: (width, height, touch = false) =>

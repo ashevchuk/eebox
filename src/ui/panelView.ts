@@ -11,6 +11,7 @@ import {
   isFree,
   isOnRail,
   nextPlacementId,
+  type CombPlacement,
   type ModuleRef,
   type Panel,
   type Placement,
@@ -199,6 +200,39 @@ export class PanelView implements View {
     return { x: inside(snapped.x), y: inside(snapped.y), guides: snapped.guides };
   }
 
+  private combAt(world: Point): CombPlacement | undefined {
+    return combAtPoint(
+      this.session.scope.panel,
+      this.session.sizes,
+      (item) => {
+        const def = this.session.resolve(item.module);
+        return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
+      },
+      world,
+    );
+  }
+
+  /**
+   * Selects what is under a point, as a press would but without starting a drag, for a context menu. What is
+   * already chosen, alone or in a group, stays chosen, so the menu acts on the whole group.
+   */
+  selectAt(world: Point): void {
+    const panel = this.session.scope.panel;
+    const chosen = selectedIds(this.session.selection);
+    const comb = this.combAt(world);
+    const hit = comb ? undefined : placementAt(panel, this.session.sizes, world);
+    const duct = comb || hit ? undefined : ductAt(panel, world);
+    const id = comb?.id ?? hit?.id ?? duct?.id;
+    if (id !== undefined) {
+      if (![...chosen.placements, ...chosen.combs, ...chosen.ducts].includes(id)) {
+        this.session.select(comb ? { combId: comb.id } : hit ? { placementId: hit.id } : { ductId: duct!.id });
+      }
+      return;
+    }
+    const rail = railAtPoint(panel, world);
+    this.session.select(rail === undefined ? {} : { rail: rail + this.session.scope.offset });
+  }
+
   pointerDown(e: PointerEvent, world: Point): boolean {
     if (this.session.ruler.on) {
       const start = this.snapped(world);
@@ -214,15 +248,7 @@ export class PanelView implements View {
       return true;
     }
     const panel = this.session.scope.panel;
-    const comb = combAtPoint(
-      panel,
-      this.session.sizes,
-      (item) => {
-        const def = this.session.resolve(item.module);
-        return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
-      },
-      world,
-    );
+    const comb = this.combAt(world);
     const chosen = selectedIds(this.session.selection);
     const inGroup = (kind: 'placement' | 'comb' | 'duct', id: string) =>
       this.session.selection.placementIds !== undefined || this.session.selection.combIds !== undefined
@@ -526,6 +552,11 @@ export class PanelView implements View {
     }
     this.session.commit({ ...this.session.project, panel: result.panel });
     this.session.select(groupSelection(result.placementIds, result.combIds, result.ductIds));
+  }
+
+  /** Whether something was copied that Paste can put on the panel. */
+  hasClipboard(): boolean {
+    return this.clip !== null;
   }
 
   duplicateSelection(): void {

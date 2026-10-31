@@ -69,6 +69,24 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
       }
       .menu-list[hidden] { display: none; }
+      .context-menu {
+        position: fixed;
+        z-index: 60;
+        min-width: 220px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 4px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      }
+      .context-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
+      .context-item { display: flex; justify-content: space-between; gap: 24px; width: 100%; padding: 5px 10px; text-align: left; background: transparent; border: 0; border-radius: 4px; }
+      .context-item:hover:not(:disabled), .context-item:focus-visible { background: var(--bg); outline: none; }
+      .context-item:disabled { color: var(--text-dim); cursor: default; }
+      .context-item kbd { font: inherit; font-size: 11px; color: var(--text-dim); }
       .menu-list hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
       .wide-button { width: 100%; margin-bottom: 6px; }
       .module { position: relative; }

@@ -77,6 +77,8 @@ export const UI: Dictionary = {
   Done: `Готово`,
   Remove: `Прибрати`,
   Duplicate: `Дублювати`,
+  'Duplicate the row': `Дублювати ряд`,
+  'Fit to the window': `Вмістити у вікно`,
   Edit: `Змінити`,
   copy: `копія`,
   edit: `змінити`,

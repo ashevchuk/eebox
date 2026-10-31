@@ -235,6 +235,22 @@ export class SchematicView implements View {
     this.drawPreview(ctx, frame);
   }
 
+  /** Selects the node or the wire under a point without starting a drag, unless it is already chosen; for the context menu. */
+  selectAt(world: Point): void {
+    const frame = this.frame();
+    const node = hitNode(frame.schematic, frame.layout, world);
+    if (node) {
+      if (!selectedNodes(this.session.selection).includes(node.id)) this.selectNode(node);
+      return;
+    }
+    const wire = hitWire(frame.schematic, routeWires(frame.schematic, frame.layout), world, this.reach(WIRE_HIT_TOLERANCE));
+    if (wire) {
+      if (!selectedWires(this.session.selection).includes(wire.id)) this.session.select({ wireId: wire.id });
+      return;
+    }
+    this.session.select({});
+  }
+
   pointerDown(e: PointerEvent, world: Point): boolean {
     const frame = this.frame();
     const portHit = hitPort(frame.schematic, frame.layout, world);

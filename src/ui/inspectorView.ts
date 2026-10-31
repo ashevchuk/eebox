@@ -19,7 +19,7 @@ export class InspectorView {
   ) {
     this.fields = new FieldsView(container, {
       onEdit: (key, raw) => void this.edit(key, raw),
-      onAction: (action) => void this.act(action.key),
+      onAction: (action) => void this.runAction(action.key),
     });
     session.subscribe(() => this.refresh(false));
     this.refresh(false);
@@ -40,7 +40,8 @@ export class InspectorView {
     this.fields.render(inspect(this.context()), force);
   }
 
-  private async act(key: string): Promise<void> {
+  /** Does an action of the inspector, as its button does; the context menu offers the same ones. */
+  async runAction(key: string): Promise<void> {
     if (key === EDIT_MODULE_ACTION) {
       const { project, selection } = this.session;
       const placementId = selection.placementId ?? project.schematic.nodes.find((n) => n.id === selection.nodeId)?.placementId;

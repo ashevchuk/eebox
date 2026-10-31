@@ -90,6 +90,8 @@ import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
 import { askForText } from './ui/textDialog';
+import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
+import { ContextMenuView } from './ui/contextMenuView';
 import { DEFAULT_WIRE_PATTERN, numberWires } from './schematic/numbering';
 import { PlateTabs } from './ui/plateTabs';
 import { fillTileSheet } from './ui/tileSheet';
@@ -309,6 +311,15 @@ function drawNotePreview(context: CanvasRenderingContext2D, dpr: number): void {
   context.restore();
 }
 
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (session.ductTool || session.noteTool || (session.mode === 'panel' && session.ruler.on)) return;
+  openContextMenu(e.clientX, e.clientY, worldPoint(e));
+});
+canvas.addEventListener('pointermove', (e) => {
+  lastPointer = { x: e.clientX, y: e.clientY };
+});
+
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
   if (e.pointerType === 'touch') {
@@ -450,7 +461,12 @@ canvas.addEventListener(
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
   const mod = e.ctrlKey || e.metaKey;
-  if (e.code === 'Space') {
+  if ((e.code === 'ContextMenu' || (e.shiftKey && e.code === 'F10')) && !modalOpen()) {
+    e.preventDefault();
+    const box = canvas.getBoundingClientRect();
+    const over = lastPointer.x >= box.left && lastPointer.x <= box.right && lastPointer.y >= box.top && lastPointer.y <= box.bottom;
+    openContextMenu(over ? lastPointer.x : box.left + box.width / 2, over ? lastPointer.y : box.top + box.height / 2, null);
+  } else if (e.code === 'Space') {
     spaceHeld = true;
     e.preventDefault();
   } else if (mod && e.code === 'KeyZ') {
@@ -519,6 +535,41 @@ window.addEventListener('keydown', (e) => {
 });
 
 const modalOpen = (): boolean => document.querySelector('dialog[open]') !== null;
+
+const contextMenu = new ContextMenuView();
+/** Where the pointer last was over the drawing, so the menu key opens the menu there. */
+let lastPointer = { x: 0, y: 0 };
+
+function runContextItem(item: MenuItem): void {
+  const colon = item.key.indexOf(':');
+  const kind = colon < 0 ? item.key : item.key.slice(0, colon);
+  const rest = colon < 0 ? '' : item.key.slice(colon + 1);
+  if (kind === 'action') void inspector.runAction(rest);
+  else if (kind === 'button') byId(rest).click();
+  else if (kind === 'copy') panelView.copySelection();
+  else if (kind === 'paste') panelView.paste();
+  else if (kind === 'duplicate') panelView.duplicateSelection();
+  else if (kind === 'duplicate-row') byId('duplicate-row').click();
+  else if (kind === 'delete') {
+    if (!removeSelectedNote()) activeView().deleteSelection();
+  } else if (kind === 'select-all') {
+    if (session.mode === 'panel') panelView.selectAll();
+    else schematicView.selectAll();
+  } else if (kind === 'undo') session.undo();
+  else if (kind === 'redo') session.redo();
+}
+
+/** Opens the menu at a screen point; `world` is where to select first, or null to act on what is selected. */
+function openContextMenu(x: number, y: number, world: Point | null): void {
+  activeView().cancel?.();
+  if (world) activeView().selectAt(world);
+  const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = session;
+  const entries = contextMenuEntries({
+    project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings, findings: session.findings, lengthUnit: session.lengthUnit, plate: session.plateId,
+    canUndo: session.canUndo, canRedo: session.canRedo, hasClipboard: panelView.hasClipboard(),
+  });
+  contextMenu.open(x, y, entries, runContextItem);
+}
 
 /** Something the arrow keys, Tab and Enter act on: a module or comb on the panel, a node on the schematic. */
 function hasSelection(): boolean {

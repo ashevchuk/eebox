@@ -23,6 +23,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       ['Tab, Shift+Tab', 'With something selected, select the next or previous module (or node); Escape lets go'],
       ['Enter', 'With something selected, go to its fields in the inspector'],
       ['Ctrl+F', 'Find a module, node or wire by its label, name or id'],
+      ['Right click, or the menu key or Shift+F10', 'The menu of what is under the pointer or selected: take off the rail, copy, duplicate, delete, undo and more'],
       ['?', 'This list'],
     ],
   },

@@ -205,6 +205,8 @@ export const INSPECTOR: Dictionary = {
   'Add to the selection': `Додати до виділеного`,
   'Shift + drag on empty space': `Shift + перетягування по порожньому місцю`,
   'Alt + drag': `Alt + перетягування`,
+  'Right click, or the menu key or Shift+F10': `Права кнопка миші, клавіша меню або Shift+F10`,
+  'The menu of what is under the pointer or selected: take off the rail, copy, duplicate, delete, undo and more': `Меню того, що під вказівником або вибране: зняти з рейки, копіювати, дублювати, видалити, скасувати й інше`,
   'Place a device or a duct on the plate freely, without drawing it to edges or to the grid': `Поставити пристрій чи канал на пластині вільно, без притягання до країв і до сітки`,
   'Select what is inside a rectangle': `Вибрати все всередині прямокутника`,
   'Select all': `Вибрати все`,
