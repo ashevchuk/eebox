@@ -54,7 +54,8 @@ export interface DesignerOptions {
   offerTemplates?: boolean;
 }
 
-type Tool = 'place' | 'connect';
+/** `select` is what is left when Place is switched off: a click only selects a terminal and a drag moves it. */
+type Tool = 'place' | 'select' | 'connect';
 type Mode = 'terminals' | 'face';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -163,7 +164,7 @@ export class ModuleDesignerView {
     const hint = document.createElement('p');
     hint.className = 'designer-hint';
     hint.textContent =
-      'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. ' +
+      'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ' +
       'Connect: click two terminals to join them inside the module.';
     this.face = new ArtEditorView({
       draft: () => this.draft,
@@ -320,7 +321,8 @@ export class ModuleDesignerView {
       this.kindSelect.append(option);
     }
     this.placeButton.textContent = 'Place';
-    this.placeButton.addEventListener('click', () => this.setTool('place'));
+    this.placeButton.title = 'Click again to switch placing off and only select and move terminals';
+    this.placeButton.addEventListener('click', () => this.setTool(this.tool === 'place' ? 'select' : 'place'));
     this.connectButton.textContent = 'Connect';
     this.connectButton.title = 'Click two terminals to join them inside the module';
     this.connectButton.addEventListener('click', () => this.setTool('connect'));
@@ -574,6 +576,7 @@ export class ModuleDesignerView {
       this.detachButton.disabled = this.module.terminals?.[this.selected]?.net === undefined;
       return;
     }
+    if (this.tool !== 'place') return;
     const slot = slotAt(this.layout, at.x, at.y);
     if (!slot) return;
     const kind = this.kindSelect.value;
