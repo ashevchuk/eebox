@@ -5,6 +5,7 @@ import {
   IndexedDbLibraryStorage,
   MemoryLibraryStorage,
   importLibraryText,
+  removeInvalidLibraries,
   seedBundledLibrary,
   type LibraryStorage,
 } from './library/storage';
@@ -1583,7 +1584,9 @@ async function init(): Promise<void> {
   if (autosaveStore) applyStoredSettings(autosaveStore);
   try {
     await seedBundledLibrary(storage, genericIecText);
+    const removed = await removeInvalidLibraries(storage);
     await refreshLibraries();
+    if (removed.length > 0) showStatus(`Removed libraries that could not be read: ${removed.join('; ')}`, true);
   } catch (error) {
     showStatus(`Library storage failed: ${(error as Error).message}`, true);
   }

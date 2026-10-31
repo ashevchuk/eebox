@@ -69,6 +69,7 @@ export const DYNAMIC: Dictionary = {
   'Kept the existing "{n}".': `Лишено наявний «{n}».`,
   '"{n}" is already up to date.': `«{n}» уже актуальний.`,
   'Library storage failed: {m}': `Сховище бібліотек не спрацювало: {m}`,
+  'Removed libraries that could not be read: {m}': `Видалено бібліотеки, які не вдалося прочитати: {m}`,
   'Saving failed: {m}': `Не вдалося зберегти: {m}`,
   'Saved "{n}".': `Збережено «{n}».`,
   'Modules ({n})': `Модулі ({n})`,

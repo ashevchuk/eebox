@@ -1,6 +1,6 @@
 import { planImport, type LibraryDiff } from './compare';
 import type { Library } from './types';
-import { parseLibraryJson, type ValidationError } from './validate';
+import { parseLibraryJson, validateLibrary, type ValidationError } from './validate';
 
 export interface LibraryStorage {
   list(): Promise<Library[]>;
@@ -112,4 +112,21 @@ export async function importLibraryText(
   }
   await storage.put(library);
   return { kind: plan.kind === 'new' ? 'imported' : 'replaced', library };
+}
+
+/**
+ * Removes stored libraries that no longer pass the validator, as those saved by an older format,
+ * and returns a line for each: a library the rest of the app cannot read would break the palette and the designer.
+ */
+export async function removeInvalidLibraries(storage: LibraryStorage): Promise<string[]> {
+  const removed: string[] = [];
+  for (const stored of await storage.list()) {
+    const parsed = validateLibrary(stored);
+    if (parsed.ok) continue;
+    await storage.remove(stored.id);
+    const [first] = parsed.errors;
+    const reason = [first?.path, first?.message].filter(Boolean).join(' ');
+    removed.push(`${stored.name || stored.id}: ${reason}`);
+  }
+  return removed;
 }
