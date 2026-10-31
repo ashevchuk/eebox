@@ -471,6 +471,10 @@
             Open…
             <input id="open-project" type="file" accept=".json,application/json" hidden />
           </label>
+          <label class="menu-item file-button" role="menuitem" tabindex="0" title="Name the terminals of the modules from a table of Device, Terminal and Label, such as the file that Export > Inputs and outputs writes, once its Label column is filled in">
+            Import terminal labels (CSV)…
+            <input id="import-terminal-labels" type="file" accept=".csv,text/csv" hidden />
+          </label>
           <button class="menu-item" role="menuitem" id="open-example" title="Open one of the bundled example projects">Examples…</button>
           <button class="menu-item" role="menuitem" id="open-projects" title="Keep projects in this browser and open them again">Projects…</button>
           <label class="menu-item file-button" role="menuitem" tabindex="0" title="See what differs between the project on the screen and a project file, such as one that came back from a review">
@@ -500,6 +504,7 @@
           <div id="view-text-options" class="text-options"></div>
           <hr />
           <div class="text-options"><label class="text-option"><input id="view-minimap" type="checkbox" checked /> Minimap</label></div>
+          <div class="text-options"><label class="text-option"><input id="view-dimensions" type="checkbox" checked title="Lines with the distance in mm from the selected thing to its neighbours and to the edge of the plate" /> Distances to the neighbours</label></div>
           <div class="text-options"><label class="text-option">Grid (mm) <select id="view-grid" title="Devices dragged on a plate are drawn to this grid; hold Alt to place one freely"></select></label></div>
           <hr />
           <div class="text-options"><label class="text-option">Language <select id="language" translate="no"></select></label></div>

@@ -132,6 +132,7 @@ export const DYNAMIC: Dictionary = {
   'Clearance is 0 to {n} mm.': `Зазор — від 0 до {n} мм.`,
   '{n} wire numbered.': ['{n} провід пронумеровано.', '{n} проводи пронумеровано.', '{n} проводів пронумеровано.'],
   '{n} wires numbered.': ['{n} провід пронумеровано.', '{n} проводи пронумеровано.', '{n} проводів пронумеровано.'],
+  'Terminal labels: {a} set, {b} cleared.': `Підписи клем: {a} задано, {b} прибрано.`,
   'Wire slack is 0 to {n} mm.': `Запас проводу — від 0 до {n} мм.`,
   'A depth is {a} to {b} mm, or 0 to leave it out.': `Глибина — від {a} до {b} мм, або 0, щоб не вказувати.`,
   '{a} % of the {b} % allowed': `{a} % із допустимих {b} %`,

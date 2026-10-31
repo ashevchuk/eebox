@@ -90,6 +90,7 @@ import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
 import { askForText } from './ui/textDialog';
+import { SKIPPED_SHOWN, importTerminalLabels } from './project/terminalLabelsImport';
 import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
 import { ContextMenuView } from './ui/contextMenuView';
 import { DEFAULT_WIRE_PATTERN, numberWires } from './schematic/numbering';
@@ -188,6 +189,7 @@ function resizeCanvas(): void {
 
 /** Space left around a thing that is brought to the middle of the drawing. */
 const MINIMAP_KEY = 'eebox:minimap';
+const DIMENSIONS_KEY = 'eebox:dimensions';
 const FOCUS_PADDING_MM = 60;
 
 function fitView(mode: Mode = session.mode): void {
@@ -973,6 +975,22 @@ async function printProject(): Promise<void> {
   window.print();
 }
 
+async function importLabels(file: File): Promise<void> {
+  const result = importTerminalLabels(await file.text(), session.project, session.resolve);
+  if (!result.ok) {
+    showStatus(result.error, true);
+    return;
+  }
+  if (result.set > 0 || result.cleared > 0) session.commit({ ...session.project, panel: result.panel });
+  const done = `Terminal labels: ${result.set} set, ${result.cleared} cleared.`;
+  if (result.skipped.length === 0) {
+    showStatus(done);
+    return;
+  }
+  const rest = result.skipped.length - SKIPPED_SHOWN;
+  showStatus(`${done} ${result.skipped.length} row${result.skipped.length === 1 ? '' : 's'} skipped: ${result.skipped.slice(0, SKIPPED_SHOWN).join('; ')}${rest > 0 ? `; and ${rest} more` : ''}.`, true);
+}
+
 async function numberTheWires(): Promise<void> {
   const pattern = await askForText('Number the wires', 'Pattern', DEFAULT_WIRE_PATTERN, 'Apply');
   if (pattern === null) return;
@@ -1408,6 +1426,11 @@ gridSelect.addEventListener('change', () => {
   if (autosaveStore) saveGrid(autosaveStore, session.gridMm);
   session.changed();
 });
+byId<HTMLInputElement>('view-dimensions').addEventListener('change', (e) => {
+  session.dimensionsShown = (e.target as HTMLInputElement).checked;
+  if (autosaveStore) saveFlag(autosaveStore, DIMENSIONS_KEY, session.dimensionsShown);
+  session.changed();
+});
 byId<HTMLInputElement>('view-minimap').addEventListener('change', (e) => {
   const shown = (e.target as HTMLInputElement).checked;
   minimap.visible = shown;
@@ -1511,6 +1534,11 @@ byId('route-automatically').addEventListener('click', () => schematicView.routeA
 byId('spread-wires').addEventListener('click', () => schematicView.spreadWires());
 byId('remove-orphans').addEventListener('click', removeOrphans);
 byId('number-wires').addEventListener('click', () => void numberTheWires());
+byId<HTMLInputElement>('import-terminal-labels').addEventListener('change', (e) => {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) void importLabels(file).then(() => (input.value = ''));
+});
 undoButton.addEventListener('click', () => session.undo());
 redoButton.addEventListener('click', () => session.redo());
 new ResizeObserver(resizeCanvas).observe(stageWrap);
@@ -1678,6 +1706,8 @@ function applyStoredSettings(store: KeyValueStore): void {
   snippets = stored.snippets;
   snippetsView.render(snippets);
   if (stored.problem) showStatus(stored.problem, true);
+  session.dimensionsShown = loadFlag(store, DIMENSIONS_KEY, true);
+  byId<HTMLInputElement>('view-dimensions').checked = session.dimensionsShown;
   const minimapShown = loadFlag(store, MINIMAP_KEY, true);
   minimap.visible = minimapShown;
   byId<HTMLInputElement>('view-minimap').checked = minimapShown;

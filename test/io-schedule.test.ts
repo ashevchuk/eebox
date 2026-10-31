@@ -32,9 +32,15 @@ function build(): Project {
 }
 
 describe('ioSchedule', () => {
-  it('lists every terminal of a controller, with the label of the terminal as its channel', () => {
+  it('lists every terminal of a controller by its name, with the label it was given beside it', () => {
     const rows = ioSchedule(build(), resolve);
-    expect(rows.map((r) => `${r.device}/${r.channel}/${r.side}`)).toEqual(['PLC 1/Start/top', 'PLC 1/DI1/top', 'PLC 1/DO0/bottom']);
+    expect(rows.map((r) => `${r.device}/${r.terminal}/${r.label}/${r.side}`)).toEqual(['PLC 1/DI0/Start/top', 'PLC 1/DI1//top', 'PLC 1/DO0//bottom']);
+  });
+
+  it('names a terminal by its id when the module has the same name on both sides', () => {
+    const twice: ModuleDef = { ...controller, terminals: [...controller.terminals!, { name: 'DI1', conductor: 'C', side: 'bottom', unit: 3 }] };
+    const rows = ioSchedule(build(), (r) => (r.moduleId === 'plc' ? twice : resolve(r)));
+    expect(rows.filter((r) => r.device === 'PLC 1').map((r) => r.terminal)).toEqual(['DI0', 'top:DI1', 'DO0', 'bottom:DI1']);
   });
 
   it('says where the wire on a channel goes and what the wire is called, and nothing for a channel that is not wired', () => {
@@ -51,7 +57,7 @@ describe('ioSchedule', () => {
     const rows = ioSchedule(build(), resolve);
     expect(ioTable(build(), resolve).columns.map((c) => c.label)).toEqual([...IO_HEADER]);
     const csv = ioScheduleToCsv(rows).split('\r\n');
-    expect(csv[0]).toBe('Device,Channel,Side,Conductor,Connected to,Wire');
+    expect(csv[0]).toBe('Device,Terminal,Label,Side,Conductor,Connected to,Wire');
     expect(csv[1]).toBe(ioCells(rows[0]!).join(','));
     expect(csv).toHaveLength(rows.length + 2);
   });

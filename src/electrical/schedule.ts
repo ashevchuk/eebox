@@ -294,8 +294,10 @@ export function terminalScheduleToCsv(rows: TerminalRow[]): string {
 export interface IoRow {
   /** The controller: its label, or its module name. */
   device: string;
-  /** The channel: the label of the terminal, or its name, such as DI3. */
-  channel: string;
+  /** The terminal's name, such as DI3, or its id, such as top:L1, when the module has that name on both sides. */
+  terminal: string;
+  /** The label that the terminal has been given, if any. */
+  label: string;
   side: 'top' | 'bottom';
   conductor: Conductor;
   /** Where the wires on this terminal go. */
@@ -304,9 +306,9 @@ export interface IoRow {
   wires: string[];
 }
 
-export const IO_HEADER = ['Device', 'Channel', 'Side', 'Conductor', 'Connected to', 'Wire'] as const;
+export const IO_HEADER = ['Device', 'Terminal', 'Label', 'Side', 'Conductor', 'Connected to', 'Wire'] as const;
 
-export const ioCells = (row: IoRow): string[] => [row.device, row.channel, row.side, row.conductor, row.connectedTo.join('; '), row.wires.join('; ')];
+export const ioCells = (row: IoRow): string[] => [row.device, row.terminal, row.label, row.side, row.conductor, row.connectedTo.join('; '), row.wires.join('; ')];
 
 /**
  * The inputs and outputs of the controllers (kind `plc`): a row for each of their terminals, in the order of
@@ -319,7 +321,8 @@ export function ioSchedule(project: Project, resolve: Resolve): IoRow[] {
     const def = resolve(placement.module);
     if (def?.kind !== 'plc') return [];
     const node = schematic.nodes.find((n) => n.kind === 'module' && n.placementId === placement.id);
-    return terminalsOf(def, placement.widthUnits ?? def.widthUnits).map((terminal): IoRow => {
+    const all = terminalsOf(def, placement.widthUnits ?? def.widthUnits);
+    return all.map((terminal): IoRow => {
       const touching = node
         ? schematic.wires.flatMap((wire) => {
             if (wire.a.node === node.id && wire.a.terminal === terminal.id) return [{ far: end(wire.b).text, label: wire.label }];
@@ -329,7 +332,8 @@ export function ioSchedule(project: Project, resolve: Resolve): IoRow[] {
         : [];
       return {
         device: placement.label ?? def.name,
-        channel: placement.terminalLabels?.[terminal.id] ?? terminal.name,
+        terminal: all.filter((t) => t.name === terminal.name).length > 1 ? terminal.id : terminal.name,
+        label: placement.terminalLabels?.[terminal.id] ?? '',
         side: terminal.side,
         conductor: terminal.conductor,
         connectedTo: touching.map((t) => t.far),

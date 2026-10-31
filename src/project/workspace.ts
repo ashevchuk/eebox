@@ -21,6 +21,7 @@ export const SETTING_KEYS = [
   'eebox:texts-export',
   'eebox:length-unit',
   'eebox:grid',
+  'eebox:dimensions',
   'eebox:minimap',
   'eebox:tour-done',
   'eebox:width-sidebar',

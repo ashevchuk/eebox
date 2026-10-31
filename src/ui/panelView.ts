@@ -106,7 +106,7 @@ export class PanelView implements View {
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
         guides: drag?.guides ?? plateDrag?.guides ?? [],
-        dimensions: this.session.marksVisible ? this.dimensionsOfSelection() : [],
+        dimensions: this.session.marksVisible && this.session.dimensionsShown ? this.dimensionsOfSelection() : [],
         gridMm: this.session.marksVisible ? this.session.gridMm : 0,
         draftDuct: this.ductDraft ? this.draftRect(this.ductDraft) : null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,

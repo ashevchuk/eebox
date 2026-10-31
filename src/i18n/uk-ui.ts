@@ -298,7 +298,7 @@ export const UI: Dictionary = {
   'There is nothing to cut yet.': `Різати поки нічого.`,
   'Wire lengths are estimates from where the terminals stand on the panel, with the slack of the panel and the reserve in the last column.': `Довжини проводів є оцінками за розташуванням клем на панелі, із запасом панелі та резервом в останньому стовпці.`,
   Device: `Пристрій`,
-  Channel: `Канал`,
+  'The first row must name the columns Device, Terminal and Label.': `Перший рядок має називати стовпці Device, Terminal і Label.`,
   Side: `Бік`,
   'Connected to': `З’єднано з`,
   'Place a controller to list its inputs and outputs.': `Поставте контролер, щоб побачити його входи й виходи.`,
