@@ -15,6 +15,9 @@ export const MIN_DUCT_SIZE_MM = 10;
 export const MAX_DUCT_SIZE_MM = 3000;
 /** The clearance kept around devices on the plate and ducts, in mm; none is not checked. */
 export const MAX_CLEARANCE_MM = 200;
+/** The slack added to each wire for bends and stripped ends, in mm: what a panel uses unless it sets its own, and the most it may set. */
+export const DEFAULT_WIRE_SLACK_MM = 100;
+export const MAX_WIRE_SLACK_MM = 1000;
 /** Mounting surfaces in one project, and the size one may have, in mm. */
 export const MAX_PLATES = 8;
 export const MIN_PLATE_SIZE_MM = 100;

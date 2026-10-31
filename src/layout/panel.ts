@@ -1,8 +1,10 @@
 import {
   DEFAULT_RAIL_LENGTH_UNITS,
   DEFAULT_RAIL_PITCH_MM,
+  DEFAULT_WIRE_SLACK_MM,
   FIRST_RAIL_Y_MM,
   MAX_CLEARANCE_MM,
+  MAX_WIRE_SLACK_MM,
   MIN_PLATE_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
@@ -113,6 +115,13 @@ export function setClearance(panel: Panel, mm: number): PanelEditResult {
   if (!Number.isFinite(mm) || mm < 0 || mm > MAX_CLEARANCE_MM) return failure('invalid-value');
   const { clearanceMm: _previous, ...rest } = panel;
   return { ok: true, panel: mm === 0 ? rest : { ...rest, clearanceMm: mm } };
+}
+
+/** Sets the slack added to each wire; the default slack is not stored. */
+export function setWireSlack(panel: Panel, mm: number): PanelEditResult {
+  if (!Number.isFinite(mm) || mm < 0 || mm > MAX_WIRE_SLACK_MM) return failure('invalid-value');
+  const { wireSlackMm: _previous, ...rest } = panel;
+  return { ok: true, panel: mm === DEFAULT_WIRE_SLACK_MM ? rest : { ...rest, wireSlackMm: mm } };
 }
 
 export function setPanelTitle(panel: Panel, text: string): PanelEditResult {

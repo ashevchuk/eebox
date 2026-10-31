@@ -7,7 +7,9 @@ import { EARTHING_SYSTEM_IDS } from '../electrical/earthing';
 import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
+  DEFAULT_WIRE_SLACK_MM,
   MAX_CLEARANCE_MM,
+  MAX_WIRE_SLACK_MM,
   MAX_PLATES,
   MAX_PLATE_SIZE_MM,
   MIN_PLATE_SIZE_MM,
@@ -93,6 +95,8 @@ const unitsCheck = widthCheck;
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
 const clearanceCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_CLEARANCE_MM ? null : `must be above 0 and at most ${MAX_CLEARANCE_MM} (mm), or left out`;
+const wireSlackCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_WIRE_SLACK_MM && v !== DEFAULT_WIRE_SLACK_MM ? null : `must be 0 to ${MAX_WIRE_SLACK_MM} (mm) and not ${DEFAULT_WIRE_SLACK_MM}, which is left out`;
 const railPositionCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_POSITION_MM ? null : `must be a number of mm from 0 to ${MAX_RAIL_POSITION_MM}`;
 const railLengthCheck = (v: unknown) =>
@@ -161,6 +165,7 @@ const PANEL_SPEC: FieldSpec = {
   rails: { required: true, check: arrayCheck },
   ducts: { required: false, check: arrayCheck },
   clearanceMm: { required: false, check: clearanceCheck },
+  wireSlackMm: { required: false, check: wireSlackCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -406,6 +411,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       rails,
       ...(panelRaw.ducts !== undefined ? { ducts } : {}),
       ...(panelRaw.clearanceMm !== undefined ? { clearanceMm: panelRaw.clearanceMm as number } : {}),
+      ...(panelRaw.wireSlackMm !== undefined ? { wireSlackMm: panelRaw.wireSlackMm as number } : {}),
       placements,
       combs,
       shelf,

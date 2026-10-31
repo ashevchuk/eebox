@@ -155,13 +155,13 @@ describe('wireList', () => {
     const labelled = setWireLabel(scene.schematic, scene.feed, '=1+1');
     if (!labelled.ok) throw new Error('setup');
     const csv = wireListToCsv(wireList({ panel: scene.panel, schematic: labelled.schematic }, resolve)).split('\r\n');
-    expect(csv[0]).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Current (A)');
+    expect(csv[0]).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Run (mm),Current (A)');
     expect(csv).toHaveLength(4);
     expect(csv[1]).toContain("'=1+1");
   });
 
   it('has nothing to list for a schematic without wires', () => {
     expect(wireList({ panel: panelOf([]), schematic: emptySchematic() }, resolve)).toEqual([]);
-    expect(wireListToCsv([])).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Current (A)\r\n');
+    expect(wireListToCsv([])).toBe('Wire,Label,From,To,Conductor,Cross-section (mm2),Length (m),Run (mm),Current (A)\r\n');
   });
 });

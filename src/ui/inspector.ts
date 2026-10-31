@@ -5,8 +5,11 @@ import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
 import { ALIGNMENTS, MIN_ITEMS_TO_SPREAD, alignFree, alignableCount, type Alignment } from '../layout/align';
 import { lookupsOf } from '../layout/lookups';
+import { wireRuns } from '../layout/wireLength';
 import {
+  DEFAULT_WIRE_SLACK_MM,
   MAX_CLEARANCE_MM,
+  MAX_WIRE_SLACK_MM,
   MAX_DUCT_SIZE_MM,
   MAX_PLATE_SIZE_MM,
   MAX_RAILS,
@@ -18,6 +21,7 @@ import {
 import {
   moveRail,
   setClearance,
+  setWireSlack,
   setPanelTitle,
   setRailCount,
   setRailLabel,
@@ -446,6 +450,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           integer('rows', 'Rows', panel.rails.filter((r) => r.plate === plateOn.id).length, 1, MAX_RAILS, 'a row must be empty to be removed'),
           readonly('size', 'Size', `longest row ${longest} units`),
           decimal('clearance', 'Clearance', panel.clearanceMm ?? 0, 0, MAX_CLEARANCE_MM, 'mm kept clear around devices on the plate and ducts; 0 checks nothing'),
+          decimal('wireSlack', 'Wire slack', panel.wireSlackMm ?? DEFAULT_WIRE_SLACK_MM, 0, MAX_WIRE_SLACK_MM, 'mm added to the length of each wire for bends and stripped ends'),
           readonly(
             'contents',
             'Contents',
@@ -573,6 +578,7 @@ export function inspect(ctx: InspectContext): InspectorView {
       const terminals = nodeTerminalsLookup(project.panel, resolve);
       const first = schematic.nodes.find((n) => n.id === wire.a.node);
       const conductor = first && terminals(first)?.find((t) => t.id === wire.a.terminal)?.conductor;
+      const run = wireRuns(project, resolve).get(wire.id);
       return {
         title: 'Wire',
         actions: wire.route ? [{ key: 'routeAutomatically', label: 'Route automatically' }] : [],
@@ -582,6 +588,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           { key: 'section', label: 'Cross-section', kind: 'select', value: wire.crossSectionMm2 === undefined ? '' : String(wire.crossSectionMm2), options: ['', ...CROSS_SECTIONS_MM2.map(String)], hint: 'mm2, for the ferrules; empty for the load cable' },
           readonly('from', 'From', end(wire.a)),
           readonly('to', 'To', end(wire.b)),
+          ...(run === undefined ? [] : [readonly('run', 'Estimated length', `${run} mm`)]),
           readonly('route', 'Route', wire.route ? `by hand, ${wire.route.length + 1} bends` : 'automatic'),
           ...(conductor ? [readonly('conductor', 'Conductor', conductor)] : []),
           readonly('id', 'Id', wire.id),
@@ -755,6 +762,12 @@ export function applyEdit(
         if (mm === null) return fail(NOT_A_DECIMAL);
         const result = setClearance(panel, mm);
         return result.ok ? withPanel(result.panel) : fail(`Clearance is 0 to ${MAX_CLEARANCE_MM} mm.`);
+      }
+      if (key === 'wireSlack') {
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = setWireSlack(panel, mm);
+        return result.ok ? withPanel(result.panel) : fail(`Wire slack is 0 to ${MAX_WIRE_SLACK_MM} mm.`);
       }
       if (key === 'rows') {
         const value = integerOf(raw);

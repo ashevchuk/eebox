@@ -126,6 +126,7 @@ export const DYNAMIC: Dictionary = {
   '{a} ({b}) is made for the plate, not for a rail.': `{a} ({b}) призначений для плити, а не для рейки.`,
   '{a} ({b}) is made for a DIN rail, not for the plate.': `{a} ({b}) призначений для DIN-рейки, а не для плити.`,
   'Clearance is 0 to {n} mm.': `Зазор — від 0 до {n} мм.`,
+  'Wire slack is 0 to {n} mm.': `Запас проводу — від 0 до {n} мм.`,
   'Positions are 0 to {a} mm and sizes {b} to {c} mm.': `Положення — від 0 до {a} мм, розміри — від {b} до {c} мм.`,
   'That duct cannot be made there.': `Тут цей канал зробити не можна.`,
   'Cable ducts': `Кабель-канали`,

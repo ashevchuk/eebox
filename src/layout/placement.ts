@@ -88,6 +88,8 @@ export interface Panel {
   ducts?: Duct[];
   /** How far devices on the plate and ducts are to be kept from other things, in mm; only when it is asked for. */
   clearanceMm?: number;
+  /** Extra length added to each wire for bends and stripped ends, in mm; when absent the default of `layout/wireLength.ts` applies. */
+  wireSlackMm?: number;
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */

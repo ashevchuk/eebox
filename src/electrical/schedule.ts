@@ -1,3 +1,4 @@
+import { wireRuns } from '../layout/wireLength';
 import type { Project } from '../project';
 import { cell } from '../project/bom';
 import { DEFAULT_CABLE_SETTINGS, type CableSettings, type InstallMethod } from './cables';
@@ -119,6 +120,8 @@ export interface WireRow {
   conductor: Conductor;
   sectionMm2?: number;
   lengthM?: number;
+  /** Estimated length of the wire between its terminals on the panel, in mm; absent when an end has no place on it. */
+  runMm?: number;
   currentA?: number;
 }
 
@@ -148,6 +151,7 @@ export function wireList(project: Project, resolve: Resolve): WireRow[] {
   const loadOf = (nodeId: string) => schematic.nodes.find((n) => n.id === nodeId && n.kind === 'load')?.load;
 
   const end = endNamer(project, resolve);
+  const runs = wireRuns(project, resolve);
 
   return schematic.wires.map((wire): WireRow => {
     const from = end(wire.a);
@@ -163,12 +167,13 @@ export function wireList(project: Project, resolve: Resolve): WireRow[] {
       conductor: from.conductor ?? to.conductor ?? 'L',
       ...(sectionMm2 !== undefined ? { sectionMm2 } : {}),
       ...(load?.lengthM !== undefined ? { lengthM: load.lengthM } : {}),
+      ...(runs.has(wire.id) ? { runMm: runs.get(wire.id) } : {}),
       ...(currentA !== undefined ? { currentA } : {}),
     };
   });
 }
 
-export const WIRE_HEADER = ['Wire', 'Label', 'From', 'To', 'Conductor', 'Cross-section (mm2)', 'Length (m)', 'Current (A)'] as const;
+export const WIRE_HEADER = ['Wire', 'Label', 'From', 'To', 'Conductor', 'Cross-section (mm2)', 'Length (m)', 'Run (mm)', 'Current (A)'] as const;
 
 export const wireCells = (row: WireRow): string[] => [
   row.wireId,
@@ -178,6 +183,7 @@ export const wireCells = (row: WireRow): string[] => [
   row.conductor,
   row.sectionMm2 === undefined ? '' : String(row.sectionMm2),
   row.lengthM === undefined ? '' : String(row.lengthM),
+  row.runMm === undefined ? '' : String(row.runMm),
   row.currentA === undefined ? '' : formatAmps(row.currentA),
 ];
 
