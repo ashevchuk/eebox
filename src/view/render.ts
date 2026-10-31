@@ -65,6 +65,31 @@ export interface Scene {
   draftDuct?: Rect | null;
   /** Distances from the selected thing to its neighbours; shown on the screen only. */
   dimensions?: readonly Dimension[];
+  /** The grid devices on the plate are drawn to, in mm; 0 or absent for none. Shown on the screen only. */
+  gridMm?: number;
+}
+
+/** A grid line closer than this on the screen would only be a grey wash. */
+const MIN_GRID_PX = 6;
+
+function drawGrid(ctx: CanvasRenderingContext2D, frame: Rect, gridMm: number, scale: number): void {
+  if (gridMm <= 0 || gridMm * scale < MIN_GRID_PX) return;
+  const inner = { x: FRAME_PADDING, y: FRAME_PADDING, width: frame.width - 2 * FRAME_PADDING, height: frame.height - 2 * FRAME_PADDING };
+  ctx.save();
+  ctx.strokeStyle = theme().frame;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1 / scale;
+  ctx.beginPath();
+  for (let x = inner.x; x <= inner.x + inner.width + 1e-6; x += gridMm) {
+    ctx.moveTo(x, inner.y);
+    ctx.lineTo(x, inner.y + inner.height);
+  }
+  for (let y = inner.y; y <= inner.y + inner.height + 1e-6; y += gridMm) {
+    ctx.moveTo(inner.x, y);
+    ctx.lineTo(inner.x + inner.width, y);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -444,6 +469,8 @@ export function render(
       }
     }
   }
+
+  if (scene.gridMm) drawGrid(ctx, frame, scene.gridMm, camera.scale);
 
   panel.rails.forEach((_r, rail) => {
     const r = railRect(panel, rail);

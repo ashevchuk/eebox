@@ -32,6 +32,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       ['Drag from the library', 'Put a module on a rail; others move aside'],
       ['Shift + click', 'Add to the selection'],
       ['Shift + drag on empty space', 'Select what is inside a rectangle'],
+      ['Alt + drag', 'Place a device or a duct on the plate freely, without drawing it to edges or to the grid'],
       ['Ctrl+A', 'Select all'],
       ['Ctrl+C, Ctrl+V', 'Copy and paste the selection'],
       ['Ctrl+D', 'Duplicate the selection'],

@@ -50,6 +50,7 @@ import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type Pr
 import { planModuleSwap, planModuleUpdate } from './project/sync';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
+import { GRID_SIZES_MM, loadGrid, saveGrid } from './project/gridStorage';
 import { loadLengthUnit, saveLengthUnit } from './project/lengthUnitStorage';
 import { EXPORT_TEXT_KEY, SCREEN_TEXT_KEY, loadTextVisibility, saveTextVisibility } from './project/textVisibilityStorage';
 import { makeResizable } from './ui/panelResize';
@@ -1306,6 +1307,18 @@ byId('duplicate-row').addEventListener('click', () => {
   showStatus(`Row ${rowNumber(project.panel, rail)} copied. Nodes > Sync modules puts the copies on the schematic.`);
 });
 byId('find').addEventListener('click', () => searchView.open());
+const gridSelect = byId<HTMLSelectElement>('view-grid');
+for (const size of GRID_SIZES_MM) {
+  const option = document.createElement('option');
+  option.value = String(size);
+  option.textContent = size === 0 ? 'Off' : String(size);
+  gridSelect.append(option);
+}
+gridSelect.addEventListener('change', () => {
+  session.gridMm = Number(gridSelect.value);
+  if (autosaveStore) saveGrid(autosaveStore, session.gridMm);
+  session.changed();
+});
 byId<HTMLInputElement>('view-minimap').addEventListener('change', (e) => {
   const shown = (e.target as HTMLInputElement).checked;
   minimap.visible = shown;
@@ -1562,6 +1575,8 @@ function applyStoredSettings(store: KeyValueStore): void {
   session.cableSettings = settings;
   if (problem) showStatus(problem, true);
   session.lengthUnit = loadLengthUnit(store);
+  session.gridMm = loadGrid(store);
+  byId<HTMLSelectElement>('view-grid').value = String(session.gridMm);
   session.exportTexts = loadTextVisibility(store, EXPORT_TEXT_KEY);
   session.texts = loadTextVisibility(store, SCREEN_TEXT_KEY);
   buildTextOptions(byId('view-text-options'), SCREEN_GROUPS, session.texts, setScreenTexts);

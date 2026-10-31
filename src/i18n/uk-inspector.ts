@@ -195,6 +195,8 @@ export const INSPECTOR: Dictionary = {
   'Shift + click': `Shift + клац`,
   'Add to the selection': `Додати до виділеного`,
   'Shift + drag on empty space': `Shift + перетягування по порожньому місцю`,
+  'Alt + drag': `Alt + перетягування`,
+  'Place a device or a duct on the plate freely, without drawing it to edges or to the grid': `Поставити пристрій чи канал на пластині вільно, без притягання до країв і до сітки`,
   'Select what is inside a rectangle': `Вибрати все всередині прямокутника`,
   'Select all': `Вибрати все`,
   'Ctrl+C, Ctrl+V': `Ctrl+C, Ctrl+V`,

@@ -12,6 +12,20 @@ export interface Snapped {
   guides: Guide[];
 }
 
+/**
+ * Rounds each axis of a snapped spot to a grid whose lines start at `origin`, unless that axis was already
+ * drawn to an edge: an edge wins over the grid. A grid of 0 changes nothing.
+ */
+export function snapToGrid(spot: Snapped, gridMm: number, origin: { x: number; y: number }): Snapped {
+  if (gridMm <= 0) return spot;
+  const round = (value: number, from: number) => from + Math.round((value - from) / gridMm) * gridMm;
+  return {
+    ...spot,
+    x: spot.guides.some((g) => g.axis === 'x') ? spot.x : round(spot.x, origin.x),
+    y: spot.guides.some((g) => g.axis === 'y') ? spot.y : round(spot.y, origin.y),
+  };
+}
+
 /** The three lines of a span that an edge or a centre can be drawn to. */
 const linesOf = (start: number, size: number): number[] => [start, start + size / 2, start + size];
 

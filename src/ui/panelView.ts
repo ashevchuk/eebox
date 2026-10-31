@@ -25,7 +25,7 @@ import { Camera } from '../view/Camera';
 import { FRAME_PADDING, combAtPoint, ductAt, ductRect, frameRect, itemsInRect, placementAt, placementRect, railAtPoint, railRect, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
 import { dimensionsOf, type Dimension } from '../view/dimensions';
 import { scopeToPlate } from '../layout/plates';
-import { snapRect, type Guide } from '../view/snap';
+import { snapRect, snapToGrid, type Guide } from '../view/snap';
 import { render, type Ghost } from '../view/render';
 import { groupSelection, selectedIds, toggleItem } from './selection';
 import { edgeLines, snapToEdges } from '../view/ruler';
@@ -106,6 +106,7 @@ export class PanelView implements View {
         ghost: drag?.ghost ?? null,
         guides: drag?.guides ?? plateDrag?.guides ?? [],
         dimensions: this.session.marksVisible ? this.dimensionsOfSelection() : [],
+        gridMm: this.session.marksVisible ? this.session.gridMm : 0,
         draftDuct: this.ductDraft ? this.draftRect(this.ductDraft) : null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
         ruler: this.session.ruler.line,
@@ -191,9 +192,9 @@ export class PanelView implements View {
   }
 
   /** The place on the plate a body held at `grab` takes when the pointer is at `world`, drawn to the nearby edges. */
-  private plateSpot(world: Point, grab: Point, size: { width: number; height: number }, except: { placements: readonly string[]; ducts: readonly string[] }): { x: number; y: number; guides: Guide[] } {
+  private plateSpot(world: Point, grab: Point, size: { width: number; height: number }, except: { placements: readonly string[]; ducts: readonly string[] }, free: boolean): { x: number; y: number; guides: Guide[] } {
     const raw = { x: world.x - grab.x, y: world.y - grab.y, ...size };
-    const snapped = snapRect(raw, this.snapTargets(except), PLATE_SNAP_PX / this.camera.scale);
+    const snapped = free ? { x: raw.x, y: raw.y, guides: [] } : snapToGrid(snapRect(raw, this.snapTargets(except), PLATE_SNAP_PX / this.camera.scale), this.session.gridMm, { x: FRAME_PADDING, y: FRAME_PADDING });
     const inside = (v: number) => Math.max(0, Math.min(MAX_RAIL_POSITION_MM, roundMm(v - FRAME_PADDING)));
     return { x: inside(snapped.x), y: inside(snapped.y), guides: snapped.guides };
   }
@@ -299,7 +300,7 @@ export class PanelView implements View {
     };
   }
 
-  pointerMove(_e: PointerEvent, world: Point, overCanvas: boolean): void {
+  pointerMove(e: PointerEvent, world: Point, overCanvas: boolean): void {
     if (this.measuring && this.session.ruler.line) {
       this.session.ruler.line = { a: this.session.ruler.line.a, b: this.snapped(world) };
       this.session.changed();
@@ -317,7 +318,7 @@ export class PanelView implements View {
     }
     const plate = this.plateDrag;
     if (plate) {
-      const spot = this.plateSpot(world, plate.grab, plate.size, plate);
+      const spot = this.plateSpot(world, plate.grab, plate.size, plate, e.altKey);
       const result = moveFreeGroup(this.session.project.panel, plate.placements, plate.ducts, spot.x - plate.origin.x, spot.y - plate.origin.y);
       plate.next = result.ok ? result.panel : null;
       plate.guides = spot.guides;
@@ -340,7 +341,7 @@ export class PanelView implements View {
       drag.next = result.ok ? result.panel : null;
     } else if (overCanvas && onPlateAllowed) {
       const size = { width: drag.widthUnits * MODULE_UNIT_MM, height: drag.def.heightMm };
-      const spot = this.plateSpot(world, drag.grab, size, { placements: drag.movingId ? [drag.movingId] : [], ducts: [] });
+      const spot = this.plateSpot(world, drag.grab, size, { placements: drag.movingId ? [drag.movingId] : [], ducts: [] }, e.altKey);
       const result = this.tryDropOnPlate(drag, full, spot);
       drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, x: spot.x, y: spot.y, valid: result.ok };
       drag.next = result.ok ? result.panel : null;

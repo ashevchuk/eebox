@@ -20,6 +20,7 @@ export const SETTING_KEYS = [
   'eebox:texts-screen',
   'eebox:texts-export',
   'eebox:length-unit',
+  'eebox:grid',
   'eebox:minimap',
   'eebox:tour-done',
   'eebox:width-sidebar',

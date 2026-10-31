@@ -65,6 +65,8 @@ export class Session {
   /** The kinds of text that PNG, SVG and print show, whatever the screen shows. */
   exportTexts: TextVisibility = ALL_TEXT;
   mode: Mode = 'panel';
+  /** The grid, in mm, that devices dragged on a plate are drawn to; 0 for none. */
+  gridMm = 0;
   /** The tool that draws a cable duct on the panel is on: the next press and drag makes one. */
   ductTool = false;
   /** The tool that puts a note on the drawing is on: the next press and drag on the drawing writes one. */
