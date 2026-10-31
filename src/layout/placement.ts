@@ -288,6 +288,35 @@ export function setTerminalLabel(panel: Panel, id: string, terminalId: string, t
   return { ok: true, panel: { ...panel, placements } };
 }
 
+/** The number a terminal label may carry: the label is the pattern with this replaced by 1, 2, 3 along the terminals. */
+export const LABEL_NUMBER_MARK = '{n}';
+const MAX_TERMINAL_LABELS_PER_MODULE = 64;
+
+/**
+ * Labels some terminals of a placed module in one go, in the order given: `pattern` with its `{n}`
+ * replaced by 1 for the first, 2 for the second and so on, as `X1:{n}` gives X1:1, X1:2.... An empty
+ * pattern clears their labels. Nothing changes if one of the labels would be invalid.
+ */
+export function fillTerminalLabels(panel: Panel, id: string, terminalIds: readonly string[], pattern: string): PlacementResult {
+  const current = panel.placements.find((p) => p.id === id);
+  if (!current) return { ok: false, error: { kind: 'unknown-placement' } };
+  const labels = { ...current.terminalLabels };
+  if (pattern.trim() === '') {
+    for (const terminalId of terminalIds) delete labels[terminalId];
+  } else {
+    if (!pattern.includes(LABEL_NUMBER_MARK)) return { ok: false, error: { kind: 'invalid-label' } };
+    for (const [index, terminalId] of terminalIds.entries()) {
+      const parsed = normalizeLabel(pattern.split(LABEL_NUMBER_MARK).join(String(index + 1)));
+      if (!parsed.ok || parsed.label === undefined) return { ok: false, error: { kind: 'invalid-label' } };
+      labels[terminalId] = parsed.label;
+    }
+  }
+  if (Object.keys(labels).length > MAX_TERMINAL_LABELS_PER_MODULE) return { ok: false, error: { kind: 'invalid-label' } };
+  const { terminalLabels: _previous, ...rest } = current;
+  const next: Placement = Object.keys(labels).length === 0 ? rest : { ...rest, terminalLabels: labels };
+  return { ok: true, panel: { ...panel, placements: panel.placements.map((p) => (p.id === id ? next : p)) } };
+}
+
 export function setPlacementLabel(panel: Panel, id: string, text: string): PlacementResult {
   const parsed = normalizeLabel(text);
   if (!parsed.ok) return { ok: false, error: { kind: 'invalid-label' } };

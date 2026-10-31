@@ -246,6 +246,9 @@ export const TERMINAL_PRESETS: readonly TerminalPreset[] = [
   preset('pen', 'PEN (neutral and earth in one)', ['PEN'], (taken) => suffixed(['PEN'], taken)),
   preset('dc', 'DC supply (24V, 0V)', ['DCP', 'DCN'], (taken) => suffixed(['24V', '0V'], taken)),
   preset('sensor', 'Sensor input (S1, S2)', ['C', 'C'], (taken) => suffixed(['S1', 'S2'], taken)),
+  preset('analog', 'Analog signal (SIG+, SIG-)', ['SP', 'SN'], (taken) => suffixed(['SIGP', 'SIGN'], taken)),
+  preset('shield', 'Cable shield (SH)', ['SH'], (taken) => suffixed(['SH'], taken)),
+  preset('bus', 'Serial bus (A, B)', ['RA', 'RB'], (taken) => suffixed(['A', 'B'], taken)),
   {
     id: 'row',
     label: 'Row of terminals (a count)',

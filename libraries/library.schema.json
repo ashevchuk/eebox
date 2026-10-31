@@ -75,7 +75,12 @@
         "PEN",
         "C",
         "DCP",
-        "DCN"
+        "DCN",
+        "SP",
+        "SN",
+        "SH",
+        "RA",
+        "RB"
       ],
       "description": "L is a phase decided by what feeds it; L1 to L3 are fixed phases."
     },

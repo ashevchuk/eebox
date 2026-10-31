@@ -275,4 +275,10 @@ export const UI: Dictionary = {
   'Width (mm)': `Ширина (мм)`,
   'Unit price': `Ціна за одиницю`,
   'DC plus and minus joined': `З’єднані плюс і мінус постійного струму`,
+  'different signal lines or a shield joined': `з’єднані різні сигнальні лінії або екран`,
+  Strip: `Клемник`,
+  Terminal: `Клема`,
+  'Top connects to': `Зверху з’єднана з`,
+  'Bottom connects to': `Знизу з’єднана з`,
+  'Place a terminal block and wire it to see where its terminals go.': `Поставте клемник і з’єднайте його, щоб побачити, куди йдуть його клеми.`,
 };

@@ -33,11 +33,13 @@ export type Mounting = (typeof MOUNTINGS)[number];
 
 /**
  * `L` is a phase that is decided by what feeds it; `L1`..`L3` are fixed phases. `C` is a control or
- * signal conductor, such as a relay contact; `DCP` and `DCN` are the plus and minus of a DC supply.
+ * control conductor, such as a relay contact; `DCP` and `DCN` are the plus and minus of a DC supply.
+ * `SP` and `SN` are the plus and minus of an analog signal such as a 4-20 mA loop, `SH` is the shield
+ * of its cable, `RA` and `RB` are the two lines of a serial bus such as RS-485.
  */
-export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'PEN', 'C', 'DCP', 'DCN'] as const;
+export const CONDUCTORS = ['L', 'L1', 'L2', 'L3', 'N', 'PE', 'PEN', 'C', 'DCP', 'DCN', 'SP', 'SN', 'SH', 'RA', 'RB'] as const;
 export type Conductor = (typeof CONDUCTORS)[number];
-export type ConductorFamily = 'phase' | 'N' | 'PE' | 'PEN' | 'control';
+export type ConductorFamily = 'phase' | 'N' | 'PE' | 'PEN' | 'control' | 'signal';
 
 /** A family that is several in one conductor: a PEN conductor is a neutral and a protective earth at once. */
 export const COMBINED_FAMILIES: Partial<Record<ConductorFamily, readonly ConductorFamily[]>> = { PEN: ['N', 'PE'] };
@@ -48,9 +50,16 @@ export function familiesMayShareNet(families: ReadonlySet<ConductorFamily>): boo
 }
 
 const CONTROL_CONDUCTORS: readonly Conductor[] = ['C', 'DCP', 'DCN'];
+const SIGNAL_CONDUCTORS: readonly Conductor[] = ['SP', 'SN', 'SH', 'RA', 'RB'];
 
 export const familyOf = (conductor: Conductor): ConductorFamily =>
-  conductor === 'N' || conductor === 'PE' || conductor === 'PEN' ? conductor : CONTROL_CONDUCTORS.includes(conductor) ? 'control' : 'phase';
+  conductor === 'N' || conductor === 'PE' || conductor === 'PEN'
+    ? conductor
+    : CONTROL_CONDUCTORS.includes(conductor)
+      ? 'control'
+      : SIGNAL_CONDUCTORS.includes(conductor)
+        ? 'signal'
+        : 'phase';
 
 /**
  * Whether a wire may join two conductors: those of one family, or any pair when one is `C`, the

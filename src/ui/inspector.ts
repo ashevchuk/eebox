@@ -25,6 +25,8 @@ import {
 } from '../layout/panel';
 import { takeOff } from '../layout/shelf';
 import {
+  LABEL_NUMBER_MARK,
+  fillTerminalLabels,
   isFree,
   isOnRail,
   movePlacement,
@@ -363,6 +365,21 @@ function positionFields(
   ];
 }
 
+/** The terminals of one side in the order along the module: the order a pattern numbers them in. */
+function sideTerminals(def: ModuleDef, width: number, side: 'top' | 'bottom') {
+  return terminalsOf(def, width).filter((t) => t.side === side).sort((a, b) => a.unit - b.unit || a.name.localeCompare(b.name, undefined, { numeric: true }));
+}
+
+/** One field for each side that has several terminals, which labels them all from a pattern. */
+function fillFields(def: ModuleDef | undefined, width: number): InspectorField[] {
+  if (!def) return [];
+  return (['top', 'bottom'] as const).flatMap((side) =>
+    sideTerminals(def, width, side).length > 1
+      ? [text(side === 'top' ? 'fillTop' : 'fillBottom', side === 'top' ? 'Label the top terminals' : 'Label the bottom terminals', '', 'X1:{n}')]
+      : [],
+  ).map((field) => ({ ...field, hint: `a pattern with {n} for the number, such as DI{n}; labels the ${field.key === 'fillTop' ? 'top' : 'bottom'} terminals in order along the module, an empty one clears them` }));
+}
+
 function terminalLabelFields(placement: Placement, def: ModuleDef | undefined, width: number): InspectorField[] {
   if (!def) return [];
   return terminalsOf(def, width).map((t) =>
@@ -435,6 +452,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...nodeFields,
           ...(node ? [] : [REPEAT_FIELD]),
           ...moduleDetails(def, width),
+          ...fillFields(def, width),
           ...terminalLabelFields(placement, def, width),
           readonly('id', 'Id', placement.id),
         ],
@@ -739,6 +757,13 @@ export function applyEdit(
         const def = resolve(placement.module);
         const result = setPlacementState(panel, placement.id, text, def ? positionsOf(def) : []);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key === 'fillTop' || key === 'fillBottom') {
+        const def = resolve(placement.module);
+        if (!def) return fail('The module is missing from the libraries.');
+        const ids = sideTerminals(def, widthOf(placement) ?? def.widthUnits, key === 'fillTop' ? 'top' : 'bottom').map((t) => t.id);
+        const result = fillTerminalLabels(panel, placement.id, ids, text);
+        return result.ok ? withPanel(result.panel) : fail(`Write a pattern with ${LABEL_NUMBER_MARK} in it, such as DI${LABEL_NUMBER_MARK}; every label is 1 to 60 characters and a module takes at most 64.`);
       }
       if (key.startsWith('terminal:')) {
         const result = setTerminalLabel(panel, placement.id, key.slice('terminal:'.length), text);

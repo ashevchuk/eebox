@@ -9,11 +9,20 @@ export interface ConductorColour {
 export type ColourScheme = Record<Conductor, ConductorColour>;
 export type Ground = 'dark' | 'light';
 
-const BASE: Pick<ColourScheme, 'L' | 'C' | 'DCP' | 'DCN'> = {
+const SIGNALS: Pick<ColourScheme, 'SP' | 'SN' | 'SH' | 'RA' | 'RB'> = {
+  SP: { color: '#0ea5e9' },
+  SN: { color: '#e5e7eb' },
+  SH: { color: '#9ca3af', stripe: '#374151' },
+  RA: { color: '#facc15' },
+  RB: { color: '#a3e635' },
+};
+
+const BASE: Pick<ColourScheme, 'L' | 'C' | 'DCP' | 'DCN' | 'SP' | 'SN' | 'SH' | 'RA' | 'RB'> = {
   L: { color: '#d97706' },
   C: { color: '#a78bfa' },
   DCP: { color: '#ef4444' },
   DCN: { color: '#22d3ee' },
+  ...SIGNALS,
 };
 const GREEN_YELLOW: ConductorColour = { color: '#2f9e44', stripe: '#f2d21b' };
 /** Blue like the neutral it is, striped green-yellow like the earth it is. */
@@ -53,6 +62,11 @@ export const CONTRAST_SCHEME: ColourScheme = {
   C: { color: '#94a3b8' },
   DCP: { color: '#ec4899' },
   DCN: { color: '#22d3ee' },
+  SP: { color: '#38bdf8' },
+  SN: { color: '#f1f5f9' },
+  SH: { color: '#cbd5e1', stripe: '#475569' },
+  RA: { color: '#fde047' },
+  RB: { color: '#bef264' },
 };
 
 export type SchemeId = 'eu' | 'pue' | 'contrast' | 'custom';

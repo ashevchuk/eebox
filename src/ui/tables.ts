@@ -1,6 +1,6 @@
 import type { CableSettings } from '../electrical/cables';
 import type { Resolve } from '../electrical/context';
-import { circuitSchedule, ferruleCounts, wireList } from '../electrical/schedule';
+import { circuitSchedule, ferruleCounts, terminalCells, terminalSchedule, TERMINAL_HEADER, wireList } from '../electrical/schedule';
 import type { Project } from '../project';
 import { bomTotals, buildBom, lineTotal } from '../project/bom';
 import { circuitSummaries, CHECK_IDS, type CheckStatus } from '../electrical/summary';
@@ -17,7 +17,7 @@ export interface Column {
 export type Cell = string | number;
 
 export interface Table {
-  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks';
+  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals';
   title: string;
   columns: Column[];
   rows: Cell[][];
@@ -147,6 +147,19 @@ export function sortedIndices(table: Table, column: number, descending: boolean)
 }
 
 const CHECK_LABELS: Record<(typeof CHECK_IDS)[number], string> = { cable: 'Cable', drop: 'Voltage drop', breaker: 'Breaker', rcd: 'RCD', earth: 'Earth' };
+/** Where the wires of each terminal of the terminal blocks go; not one of `tablesOf`, which are the lists that are also exported together. */
+export function terminalTable(project: Project, resolve: Resolve): Table {
+  const rows = terminalSchedule(project, resolve);
+  return {
+    id: 'terminals',
+    title: 'Terminals',
+    columns: TERMINAL_HEADER.map((label) => ({ label })),
+    rows: rows.map(terminalCells),
+    note: rows.length === 0 ? undefined : `${rows.length} terminal${rows.length === 1 ? '' : 's'}. A terminal that is not wired on a side shows nothing there.`,
+    empty: 'Place a terminal block and wire it to see where its terminals go.',
+  };
+}
+
 const RESULT_TEXT = { ok: 'Ok', attention: 'Needs attention', incomplete: 'Incomplete' } as const;
 const RESULT_MARK = { ok: 'ok', attention: 'warning', incomplete: 'unknown' } as const;
 

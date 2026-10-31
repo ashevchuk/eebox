@@ -14,6 +14,7 @@ import { findRuleFindings, ownerName } from './rules';
 export const NET_PROBLEM_TEXT = {
   'mixed-phases': 'different phases joined',
   'mixed-polarity': 'DC plus and minus joined',
+  'mixed-lines': 'different signal lines or a shield joined',
   'mixed-families': 'phase, neutral, earth or control conductors joined',
   'second-split': 'neutral and protective earth joined at more than one point',
 } as const;
@@ -57,6 +58,7 @@ function kindOfShort(conductors: Conductor[]): string {
   const phases = new Set(conductors.filter((c) => familyOf(c) === 'phase' && c !== 'L'));
   if (phases.size > 1) return NET_PROBLEM_TEXT['mixed-phases'];
   if (conductors.includes('DCP') && conductors.includes('DCN')) return NET_PROBLEM_TEXT['mixed-polarity'];
+  if (new Set(conductors.filter((c) => familyOf(c) === 'signal')).size > 1) return NET_PROBLEM_TEXT['mixed-lines'];
   return NET_PROBLEM_TEXT['mixed-families'];
 }
 

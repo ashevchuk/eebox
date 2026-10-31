@@ -31,6 +31,11 @@ const MEANING: Record<Conductor, string> = {
   C: 'contact, signal',
   DCP: 'DC plus',
   DCN: 'DC minus',
+  SP: 'signal plus',
+  SN: 'signal minus',
+  SH: 'shield',
+  RA: 'bus line A',
+  RB: 'bus line B',
 };
 
 const GROUND_CSS: Record<Ground, string> = { dark: '#0b0c10', light: '#ffffff' };

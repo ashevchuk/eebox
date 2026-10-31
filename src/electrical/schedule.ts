@@ -4,6 +4,7 @@ import { DEFAULT_CABLE_SETTINGS, type CableSettings, type InstallMethod } from '
 import type { Conductor } from '../library/types';
 import { formatAmps, loadReports, wireCurrents } from './loads';
 import { nodeTerminalsLookup } from './nodeTerminals';
+import { terminalsOf } from './terminals';
 import { ownerName } from './rules';
 import type { Resolve } from './context';
 
@@ -121,18 +122,11 @@ export interface WireRow {
   currentA?: number;
 }
 
-/**
- * Every wire with its ends named by the label of the module or node and the label or name of the
- * terminal. The cross-section is the wire's own or that of the cable of the load it leads to, and the
- * length that of the load's cable.
- */
-export function wireList(project: Project, resolve: Resolve): WireRow[] {
+/** Names the end of a wire by the label of its module or node and the label or name of its terminal. */
+function endNamer(project: Project, resolve: Resolve): (ref: { node: string; terminal: string }) => { text: string; conductor?: Conductor } {
   const { schematic, panel } = project;
   const terminalsOf = nodeTerminalsLookup(panel, resolve);
-  const currents = wireCurrents(project, resolve);
-  const loadOf = (nodeId: string) => schematic.nodes.find((n) => n.id === nodeId && n.kind === 'load')?.load;
-
-  const end = (ref: { node: string; terminal: string }): { text: string; conductor?: Conductor } => {
+  return (ref) => {
     const node = schematic.nodes.find((n) => n.id === ref.node);
     if (!node) return { text: `${ref.node} ${ref.terminal}` };
     const terminal = terminalsOf(node)?.find((t) => t.id === ref.terminal);
@@ -141,6 +135,19 @@ export function wireList(project: Project, resolve: Resolve): WireRow[] {
     const side = ref.terminal.split(':')[0];
     return { text: `${placement?.label ?? node.label} ${name} (${side})`, ...(terminal ? { conductor: terminal.conductor } : {}) };
   };
+}
+
+/**
+ * Every wire with its ends named by the label of the module or node and the label or name of the
+ * terminal. The cross-section is the wire's own or that of the cable of the load it leads to, and the
+ * length that of the load's cable.
+ */
+export function wireList(project: Project, resolve: Resolve): WireRow[] {
+  const { schematic } = project;
+  const currents = wireCurrents(project, resolve);
+  const loadOf = (nodeId: string) => schematic.nodes.find((n) => n.id === nodeId && n.kind === 'load')?.load;
+
+  const end = endNamer(project, resolve);
 
   return schematic.wires.map((wire): WireRow => {
     const from = end(wire.a);
@@ -218,4 +225,62 @@ function labelCell(value: string | number): string {
 export function wireEndLabelsToCsv(labels: WireEndLabel[]): string {
   const line = (cells: ReadonlyArray<string | number>) => cells.map(labelCell).join(';');
   return `${[line(WIRE_LABEL_HEADER), ...labels.map((l) => line([l.text, l.detail, l.copies]))].join('\r\n')}\r\n`;
+}
+
+/** One terminal of a terminal block, or the pair that is joined inside it, with what is wired to each side. */
+export interface TerminalRow {
+  /** The block: its label on the panel, else the name of its module. */
+  strip: string;
+  /** The number or label of the terminal, as it is printed on the block. */
+  terminal: string;
+  conductor: Conductor;
+  /** The other ends of the wires on the top side, such as `PLC DI1 (top)`. */
+  top: string[];
+  bottom: string[];
+}
+
+export const TERMINAL_HEADER = ['Strip', 'Terminal', 'Conductor', 'Top connects to', 'Bottom connects to'] as const;
+
+export const terminalCells = (row: TerminalRow): string[] => [row.strip, row.terminal, row.conductor, row.top.join('; '), row.bottom.join('; ')];
+
+/**
+ * The schedule of the terminal blocks (kind `terminal`): a row for each terminal, or for each pair of
+ * terminals that the block joins inside, in the order along the block, and where its wires go on each
+ * side. This is what a fitter wires from and a panel builder checks against.
+ */
+export function terminalSchedule(project: Project, resolve: Resolve): TerminalRow[] {
+  const { schematic, panel } = project;
+  const end = endNamer(project, resolve);
+  const rows: TerminalRow[] = [];
+  for (const placement of panel.placements) {
+    const def = resolve(placement.module);
+    if (def?.kind !== 'terminal') continue;
+    const node = schematic.nodes.find((n) => n.kind === 'module' && n.placementId === placement.id);
+    const strip = placement.label ?? def.name;
+    const groups = new Map<string, ReturnType<typeof terminalsOf>>();
+    for (const terminal of terminalsOf(def, placement.widthUnits ?? def.widthUnits)) {
+      const key = terminal.net ?? terminal.id;
+      groups.set(key, [...(groups.get(key) ?? []), terminal]);
+    }
+    const ordered = [...groups.values()].sort((a, b) => Math.min(...a.map((t) => t.unit)) - Math.min(...b.map((t) => t.unit)));
+    for (const group of ordered) {
+      const labelled = group.find((t) => placement.terminalLabels?.[t.id] !== undefined) ?? group[0]!;
+      const endsOn = (side: 'top' | 'bottom'): string[] =>
+        !node
+          ? []
+          : schematic.wires.flatMap((wire) => {
+              const mine = group.filter((t) => t.side === side).map((t) => t.id);
+              if (wire.a.node === node.id && mine.includes(wire.a.terminal)) return [end(wire.b).text];
+              if (wire.b.node === node.id && mine.includes(wire.b.terminal)) return [end(wire.a).text];
+              return [];
+            });
+      rows.push({ strip, terminal: placement.terminalLabels?.[labelled.id] ?? labelled.name, conductor: group[0]!.conductor, top: endsOn('top'), bottom: endsOn('bottom') });
+    }
+  }
+  return rows;
+}
+
+export function terminalScheduleToCsv(rows: TerminalRow[]): string {
+  const line = (cells: readonly string[]) => cells.map(cell).join(',');
+  return `${[line(TERMINAL_HEADER), ...rows.map((row) => line(terminalCells(row)))].join('\r\n')}\r\n`;
 }
