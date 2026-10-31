@@ -229,7 +229,8 @@ let pinchLocked = false;
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP_PX = 10;
 let longPress: { pointerId: number; x: number; y: number; timer: number } | null = null;
-let menuOpenedAt = 0;
+/** When a long press last opened the menu, so that the event the browser sends for the same press does not open it a second time. */
+let menuOpenedAt = -Infinity;
 function cancelLongPress(): void {
   if (longPress) window.clearTimeout(longPress.timer);
   longPress = null;
@@ -242,6 +243,7 @@ function fireLongPress(): void {
   panFrom = null;
   const rect = canvas.getBoundingClientRect();
   const world = activeView().camera.screenToWorld({ x: press.x - rect.left, y: press.y - rect.top }, stageWrap.clientWidth, stageWrap.clientHeight);
+  menuOpenedAt = performance.now();
   openContextMenu(press.x, press.y, world);
 }
 
@@ -593,7 +595,6 @@ function runContextItem(item: MenuItem): void {
 
 /** Opens the menu at a screen point; `world` is where to select first, or null to act on what is selected. */
 function openContextMenu(x: number, y: number, world: Point | null): void {
-  menuOpenedAt = performance.now();
   activeView().cancel?.();
   if (world) activeView().selectAt(world);
   const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = session;
