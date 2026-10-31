@@ -1,6 +1,6 @@
 import type { CableSettings } from '../electrical/cables';
 import type { Resolve } from '../electrical/context';
-import { circuitSchedule, ferruleCounts, terminalCells, terminalSchedule, TERMINAL_HEADER, wireList } from '../electrical/schedule';
+import { circuitSchedule, ferruleCounts, ioCells, ioSchedule, IO_HEADER, terminalCells, terminalSchedule, TERMINAL_HEADER, wireList } from '../electrical/schedule';
 import type { Project } from '../project';
 import { bomTotals, buildBom, lineTotal } from '../project/bom';
 import { circuitSummaries, CHECK_IDS, type CheckStatus } from '../electrical/summary';
@@ -17,7 +17,7 @@ export interface Column {
 export type Cell = string | number;
 
 export interface Table {
-  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals';
+  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals' | 'io';
   title: string;
   columns: Column[];
   rows: Cell[][];
@@ -157,6 +157,19 @@ export function terminalTable(project: Project, resolve: Resolve): Table {
     rows: rows.map(terminalCells),
     note: rows.length === 0 ? undefined : `${rows.length} terminal${rows.length === 1 ? '' : 's'}. A terminal that is not wired on a side shows nothing there.`,
     empty: 'Place a terminal block and wire it to see where its terminals go.',
+  };
+}
+
+/** The channels of the controllers and where each one is wired; shown like the terminal table, outside `tablesOf`. */
+export function ioTable(project: Project, resolve: Resolve): Table {
+  const rows = ioSchedule(project, resolve);
+  return {
+    id: 'io',
+    title: 'Inputs and outputs',
+    columns: IO_HEADER.map((label) => ({ label })),
+    rows: rows.map(ioCells),
+    note: rows.length === 0 ? undefined : `${rows.length} terminal${rows.length === 1 ? '' : 's'} of controllers. A channel that is not wired shows nothing in the last two columns.`,
+    empty: 'Place a controller to list its inputs and outputs.',
   };
 }
 

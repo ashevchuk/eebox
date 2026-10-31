@@ -290,3 +290,56 @@ export function terminalScheduleToCsv(rows: TerminalRow[]): string {
   const line = (cells: readonly string[]) => cells.map(cell).join(',');
   return `${[line(TERMINAL_HEADER), ...rows.map((row) => line(terminalCells(row)))].join('\r\n')}\r\n`;
 }
+
+export interface IoRow {
+  /** The controller: its label, or its module name. */
+  device: string;
+  /** The channel: the label of the terminal, or its name, such as DI3. */
+  channel: string;
+  side: 'top' | 'bottom';
+  conductor: Conductor;
+  /** Where the wires on this terminal go. */
+  connectedTo: string[];
+  /** The labels of those wires. */
+  wires: string[];
+}
+
+export const IO_HEADER = ['Device', 'Channel', 'Side', 'Conductor', 'Connected to', 'Wire'] as const;
+
+export const ioCells = (row: IoRow): string[] => [row.device, row.channel, row.side, row.conductor, row.connectedTo.join('; '), row.wires.join('; ')];
+
+/**
+ * The inputs and outputs of the controllers (kind `plc`): a row for each of their terminals, in the order of
+ * the module, with where its wires go. This is the list a programmer addresses channels from.
+ */
+export function ioSchedule(project: Project, resolve: Resolve): IoRow[] {
+  const { schematic, panel } = project;
+  const end = endNamer(project, resolve);
+  return panel.placements.flatMap((placement) => {
+    const def = resolve(placement.module);
+    if (def?.kind !== 'plc') return [];
+    const node = schematic.nodes.find((n) => n.kind === 'module' && n.placementId === placement.id);
+    return terminalsOf(def, placement.widthUnits ?? def.widthUnits).map((terminal): IoRow => {
+      const touching = node
+        ? schematic.wires.flatMap((wire) => {
+            if (wire.a.node === node.id && wire.a.terminal === terminal.id) return [{ far: end(wire.b).text, label: wire.label }];
+            if (wire.b.node === node.id && wire.b.terminal === terminal.id) return [{ far: end(wire.a).text, label: wire.label }];
+            return [];
+          })
+        : [];
+      return {
+        device: placement.label ?? def.name,
+        channel: placement.terminalLabels?.[terminal.id] ?? terminal.name,
+        side: terminal.side,
+        conductor: terminal.conductor,
+        connectedTo: touching.map((t) => t.far),
+        wires: touching.flatMap((t) => (t.label ? [t.label] : [])),
+      };
+    });
+  });
+}
+
+export function ioScheduleToCsv(rows: IoRow[]): string {
+  const line = (cells: readonly string[]) => cells.map(cell).join(',');
+  return `${[line(IO_HEADER), ...rows.map((row) => line(ioCells(row)))].join('\r\n')}\r\n`;
+}

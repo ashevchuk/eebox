@@ -284,4 +284,11 @@ export const UI: Dictionary = {
   'Top connects to': `Зверху з’єднана з`,
   'Bottom connects to': `Знизу з’єднана з`,
   'Place a terminal block and wire it to see where its terminals go.': `Поставте клемник і з’єднайте його, щоб побачити, куди йдуть його клеми.`,
+  'Inputs and outputs': `Входи й виходи`,
+  Device: `Пристрій`,
+  Channel: `Канал`,
+  Side: `Бік`,
+  'Connected to': `З’єднано з`,
+  'Place a controller to list its inputs and outputs.': `Поставте контролер, щоб побачити його входи й виходи.`,
+  'There are no controllers yet.': `Контролерів ще нема.`,
 };

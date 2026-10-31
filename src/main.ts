@@ -24,7 +24,7 @@ import { openHelpDialog } from './ui/helpDialog';
 import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
 import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
 import { openProjectsDialog } from './ui/projectsDialog';
-import { summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
+import { summaryTable, tablesOf, ioTable, terminalTable, type Table } from './ui/tables';
 import { applyEdit } from './ui/inspector';
 import { openTablesDialog } from './ui/tablesDialog';
 import { drawHint } from './view/hint';
@@ -64,7 +64,7 @@ import { confirmDialog } from './ui/dialog';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, duplicateModule, newLibrary, removeModule, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
-import { circuitSchedule, ferruleCounts, scheduleToCsv, terminalSchedule, terminalScheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
+import { circuitSchedule, ferruleCounts, scheduleToCsv, ioSchedule, ioScheduleToCsv, terminalSchedule, terminalScheduleToCsv, wireEndLabels, wireEndLabelsToCsv, wireList, wireListToCsv } from './electrical/schedule';
 import { LIGHT_THEME, setColourScheme } from './view/theme';
 import { fillLabelSheet } from './ui/labelSheet';
 import { MY_LIBRARY_ID, emptyMyLibrary } from './library/myModules';
@@ -981,6 +981,16 @@ function exportTerminals(): void {
   downloadBlob(new Blob(['\uFEFF', terminalScheduleToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-terminals.csv`);
 }
 
+function exportIo(): void {
+  const rows = ioSchedule(session.project, session.resolve);
+  if (rows.length === 0) {
+    showStatus('There are no controllers yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', ioScheduleToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-io.csv`);
+}
+
 function exportWires(): void {
   const rows = wireList(session.project, session.resolve);
   if (rows.length === 0) {
@@ -1340,6 +1350,7 @@ byId('export-bom').addEventListener('click', exportBom);
 byId('export-circuits').addEventListener('click', exportCircuits);
 byId('export-wires').addEventListener('click', exportWires);
 byId('export-terminals').addEventListener('click', exportTerminals);
+byId('export-io').addEventListener('click', exportIo);
 byId('export-wire-labels').addEventListener('click', exportWireLabels);
 for (const preset of ['source1', 'source3', 'sourcePen1', 'sourcePen', 'load1', 'load3', 'earthElectrode'] as const) {
   byId(`add-${preset}`).addEventListener('click', () => {
@@ -1369,6 +1380,7 @@ buildTextOptions(byId('view-text-options'), SCREEN_GROUPS, session.texts, setScr
 const currentTables = () => [
   ...tablesOf(session.project, session.resolve, session.cableSettings),
   ...(terminalSchedule(session.project, session.resolve).length > 0 ? [terminalTable(session.project, session.resolve)] : []),
+  ...(ioSchedule(session.project, session.resolve).length > 0 ? [ioTable(session.project, session.resolve)] : []),
 ];
 
 /** A typed value in a cell is an edit in the inspector of the object the row stands for. */

@@ -146,6 +146,8 @@ export const PAGE: Dictionary = {
     'Написати нотатку на кресленні: натисніть там, на що вона вказує, і потягніть туди, де має стояти, або просто клацніть; Esc скасовує',
   Duct: `Канал`,
   'Terminal schedule (CSV)': `Розклад клем (CSV)`,
+  'Inputs and outputs (CSV)': `Входи й виходи (CSV)`,
+  'Every terminal of the controllers with where its wires go, to address the channels from': `Кожна клема контролерів із тим, куди йдуть її проводи, щоб адресувати канали`,
   'Every terminal of the terminal blocks with where its wires go, top and bottom': `Кожна клема клемників із тим, куди йдуть її проводи, зверху й знизу`,
   'Draw a cable duct on the panel: press at one corner and drag to the opposite one; Esc stops': `Накреслити кабель-канал на щиті: натисніть в одному куті й тягніть до протилежного; Esc зупиняє`,
   'Measure on the panel: drag from point to point; ends snap to edges (R)': 'Міряти на щиті: тягніть від точки до точки; кінці прилипають до країв (R)',
