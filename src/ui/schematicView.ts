@@ -57,7 +57,7 @@ import { theme } from '../view/theme';
 import type { TextVisibility } from '../view/textVisibility';
 import { FONT_FAMILY } from '../view/font';
 import { LEVER_COLORS } from '../view/render';
-import { nodeGroupSelection, selectedNodes, selectedWires, toggleNode, toggleWire, wireGroupSelection } from './selection';
+import { nodeGroupSelection, nodesOfPlacements, selectedNodes, selectedWires, toggleNode, toggleWire, wireGroupSelection } from './selection';
 import type { Session } from './session';
 import type { View } from './view';
 
@@ -185,8 +185,7 @@ export class SchematicView implements View {
     ctx.scale(this.camera.scale, this.camera.scale);
 
     const frame = this.frame();
-    const { placementId } = this.session.selection;
-    const chosenNodes = new Set(selectedNodes(this.session.selection));
+    const chosenNodes = new Set([...selectedNodes(this.session.selection), ...nodesOfPlacements(this.session.selection, frame.schematic.nodes)]);
     const chosenWires = new Set(selectedWires(this.session.selection));
     this.drawCombLinks(ctx, frame);
     const routes = routeWires(frame.schematic, frame.layout);
@@ -207,7 +206,7 @@ export class SchematicView implements View {
     }
     this.drawWireEditing(ctx, frame, routes);
     for (const { node } of frame.layout.values()) {
-      const selected = chosenNodes.has(node.id) || (node.placementId !== undefined && node.placementId === placementId);
+      const selected = chosenNodes.has(node.id);
       const dead = power.deadNodes.has(node.id);
       if (dead) {
         ctx.save();

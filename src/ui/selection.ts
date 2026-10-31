@@ -32,6 +32,23 @@ export function groupSelection(placements: string[], combs: string[], ducts: str
   return { placementIds: placements, combIds: combs, ...(ducts.length > 0 ? { ductIds: ducts } : {}) };
 }
 
+interface NodeLink {
+  id: string;
+  placementId?: string;
+}
+
+/** The placements that the selected nodes stand for, so a selection made on the schematic can be shown on the panel. */
+export function placementsOfNodes(selection: Selection, nodes: readonly NodeLink[]): string[] {
+  const chosen = new Set(selectedNodes(selection));
+  return nodes.flatMap((n) => (chosen.has(n.id) && n.placementId !== undefined ? [n.placementId] : []));
+}
+
+/** The nodes that stand for the selected placements, so a selection made on the panel can be shown on the schematic. */
+export function nodesOfPlacements(selection: Selection, nodes: readonly NodeLink[]): string[] {
+  const chosen = new Set(selectedIds(selection).placements);
+  return nodes.filter((n) => n.placementId !== undefined && chosen.has(n.placementId)).map((n) => n.id);
+}
+
 /** Ids of the selected nodes of the schematic, whether it is one or a group. */
 export function selectedNodes(selection: Selection): string[] {
   return selection.nodeIds ?? (selection.nodeId ? [selection.nodeId] : []);

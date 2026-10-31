@@ -27,7 +27,7 @@ import { dimensionsOf, type Dimension } from '../view/dimensions';
 import { scopeToPlate } from '../layout/plates';
 import { snapRect, snapToGrid, type Guide } from '../view/snap';
 import { render, type Ghost } from '../view/render';
-import { groupSelection, selectedIds, toggleItem } from './selection';
+import { groupSelection, placementsOfNodes, selectedIds, toggleItem } from './selection';
 import { edgeLines, snapToEdges } from '../view/ruler';
 import type { Session } from './session';
 import type { View } from './view';
@@ -101,7 +101,7 @@ export class PanelView implements View {
         selectedPlacementId: this.session.selection.placementId ?? null,
         selectedCombId: this.session.selection.combId ?? null,
         selectedRail: this.session.selection.rail !== undefined && this.session.selection.rail >= this.session.scope.offset && this.session.selection.rail < this.session.scope.offset + this.session.scope.panel.rails.length ? this.session.selection.rail - this.session.scope.offset : null,
-        selectedIds: new Set([...chosenIds.placements, ...chosenIds.combs, ...chosenIds.ducts]),
+        selectedIds: new Set([...chosenIds.placements, ...placementsOfNodes(this.session.selection, this.session.project.schematic.nodes), ...chosenIds.combs, ...chosenIds.ducts]),
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
         guides: drag?.guides ?? plateDrag?.guides ?? [],
