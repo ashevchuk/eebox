@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeMeasurement, edgeLines, measurement, snapToEdges } from '../src/view/ruler';
 import { moduleRect } from '../src/view/geometry';
-import { combAt, panelOf, place, resolve, widthOf } from './fixtures';
+import { combAt, panelOf, place, resolve, sizes, widthOf } from './fixtures';
 
 describe('measurement', () => {
   it('gives the length in mm and in module units, and its two parts', () => {
@@ -31,8 +31,8 @@ describe('describeMeasurement', () => {
 
 describe('snapToEdges', () => {
   const panel = { ...panelOf([place('p1', 'mcb1', 0, 2), place('p2', 'mcb1', 0, 5)]), combs: [combAt('c1', 'comb1', 0, 2)] };
-  const edges = edgeLines(panel, widthOf, () => ({ widthUnits: 6, side: 'top' }));
-  const first = moduleRect(panel, 0, 2, 1);
+  const edges = edgeLines(panel, sizes, () => ({ widthUnits: 6, side: 'top' }));
+  const first = moduleRect(panel, 0, 2, 1, 90);
 
   it('lists the edges of modules, combs, rails and the frame', () => {
     expect(edges.xs).toContain(first.x);
@@ -53,7 +53,7 @@ describe('snapToEdges', () => {
   });
 
   it('measures the gap between two modules exactly once both ends have snapped', () => {
-    const second = moduleRect(panel, 0, 5, 1);
+    const second = moduleRect(panel, 0, 5, 1, 90);
     const a = snapToEdges({ x: first.x + first.width + 1, y: first.y + 20 }, edges, 3);
     const b = snapToEdges({ x: second.x - 1, y: first.y + 20 }, edges, 3);
     expect(measurement({ a, b }).lengthMm).toBeCloseTo(second.x - (first.x + first.width), 6);

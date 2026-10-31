@@ -7,7 +7,7 @@ import { validateLibrary } from '../src/library/validate';
 const clamp = (widthMm: number) => {
   const widthUnits = unitsFromMm(widthMm);
   const terminals = blockTerminals({ top: 1, bottom: 1, conductor: 'L', joined: true }, widthUnits, false);
-  return validateLibrary({ schemaVersion: 1, id: 'clamps', name: 'Clamps', modules: [{ id: 'clamp', kind: 'terminal', name: 'Clamp', widthUnits, poles: 1, terminals }] });
+  return validateLibrary({ schemaVersion: 1, id: 'clamps', name: 'Clamps', modules: [{ id: 'clamp', kind: 'terminal', name: 'Clamp', widthUnits, heightMm: 90, mounting: 'rail', poles: 1, terminals }] });
 };
 
 describe('terminals on very narrow modules', () => {

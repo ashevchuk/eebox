@@ -8,7 +8,7 @@ const minimalLibrary = () => ({
   schemaVersion: 1,
   id: 'mine',
   name: 'Mine',
-  modules: [{ id: 'm1', kind: 'breaker', name: 'M1', widthUnits: 1, poles: 1 }],
+  modules: [{ id: 'm1', kind: 'breaker', name: 'M1', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1 }],
 });
 
 function errorPaths(raw: unknown): string[] {
@@ -34,13 +34,13 @@ describe('library validation', () => {
 
   it('reports the path of a bad nested field', () => {
     const lib = minimalLibrary();
-    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 0.05, poles: 1 });
+    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 0.05, heightMm: 90, mounting: 'rail', poles: 1 });
     expect(errorPaths(lib)).toEqual(['modules[1].widthUnits']);
   });
 
   it('accepts a width that is a fraction of a unit, as a relay of 22.5 mm is', () => {
     const lib = minimalLibrary();
-    lib.modules.push({ id: 'm2', kind: 'relay', name: 'M2', widthUnits: 1.2857, poles: 1 });
+    lib.modules.push({ id: 'm2', kind: 'relay', name: 'M2', widthUnits: 1.2857, heightMm: 90, mounting: 'rail', poles: 1 });
     expect(validateLibrary(lib).ok).toBe(true);
   });
 
@@ -129,7 +129,7 @@ describe('importLibraryText', () => {
   it('replaces a different library with the same id after the user agrees, and shows what differs', async () => {
     const storage = new MemoryLibraryStorage();
     await importLibraryText(storage, mine(), BUNDLED, always);
-    const updated = mine({ name: 'Mine v2', version: '2', modules: [{ id: 'm1', kind: 'breaker', name: 'M1', widthUnits: 2, poles: 1 }] });
+    const updated = mine({ name: 'Mine v2', version: '2', modules: [{ id: 'm1', kind: 'breaker', name: 'M1', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1 }] });
     let shown: unknown;
     const outcome = await importLibraryText(storage, updated, BUNDLED, async (_incoming, _before, diff) => ((shown = diff), true));
     expect(outcome.kind).toBe('replaced');
@@ -280,7 +280,7 @@ describe('library metadata', () => {
 describe('price and currency of a module', () => {
   const withModule = (extra: Record<string, unknown>) => {
     const lib = minimalLibrary();
-    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 1, poles: 1, ...extra } as never);
+    lib.modules.push({ id: 'm2', kind: 'breaker', name: 'M2', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ...extra } as never);
     return lib;
   };
 

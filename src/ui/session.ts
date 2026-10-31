@@ -118,6 +118,7 @@ export class Session {
   readonly widthOf = this.lookups.widthOf;
   readonly resizeOf = this.lookups.resizeOf;
   readonly combLookup = this.lookups.combLookup;
+  readonly sizes = this.lookups.sizes;
 
   /** The notes a drawing shows: those being dragged, or those of the project. */
   notesOf(mode: Mode): Annotation[] | undefined {

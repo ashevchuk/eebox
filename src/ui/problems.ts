@@ -5,8 +5,8 @@ import type { Project } from '../project';
 import { computeLayout } from '../schematic/geometry';
 import { routeWires } from '../schematic/router';
 import type { Bounds } from '../view/Camera';
-import { combRect, moduleRect } from '../view/geometry';
-import type { Placement } from '../layout/placement';
+import { lookupsOf } from '../layout/lookups';
+import { combRect, placementRect } from '../view/geometry';
 import type { Mode, Selection } from './session';
 
 export interface ProblemEntry {
@@ -52,10 +52,10 @@ function panelFocus(project: Project, resolve: Resolve, objects: Objects): Focus
   const placements = project.panel.placements.filter((p) => objects.placements.includes(p.id));
   const combs = project.panel.combs.filter((c) => objects.combs?.includes(c.id));
   if (placements.length + combs.length === 0) return undefined;
-  const widthOf = (item: { module: Placement['module']; widthUnits?: number }) => item.widthUnits ?? resolve(item.module)?.widthUnits ?? 1;
+  const { sizes, widthOf } = lookupsOf(resolve);
   const boxes = [
-    ...placements.map((p) => moduleRect(project.panel, p.rail, p.slot, widthOf(p))),
-    ...combs.map((c) => combRect(project.panel, c.rail, c.slot, widthOf(c), resolve(c.module)?.comb?.side ?? 'top')),
+    ...placements.map((p) => placementRect(project.panel, sizes, p)),
+    ...combs.map((c) => combRect(project.panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
   ].map((r) => ({ minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height }));
   const selection: Selection =
     placements.length + combs.length === 1

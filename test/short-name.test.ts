@@ -8,7 +8,7 @@ import { SvgContext } from '../src/view/svgContext';
 import { applyEditorEdit, describeEditor } from '../src/ui/libraryEditor';
 import { railPreviewScene } from '../src/ui/moduleDesigner';
 
-const module = (shortName?: string): ModuleDef => ({ id: 'm', kind: 'breaker', name: 'MCB 1P B6 (copy)', widthUnits: 2, poles: 1, ...(shortName !== undefined ? { shortName } : {}) });
+const module = (shortName?: string): ModuleDef => ({ id: 'm', kind: 'breaker', name: 'MCB 1P B6 (copy)', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, ...(shortName !== undefined ? { shortName } : {}) });
 const library = (m: ModuleDef): Library => ({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [m], enclosures: [] });
 const problems = (m: ModuleDef) => {
   const result = validateLibrary(library(m));

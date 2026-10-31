@@ -8,7 +8,7 @@ const def = (overrides: Partial<ModuleDef> = {}): ModuleDef => ({
   id: 'm',
   kind: 'breaker',
   name: 'M',
-  widthUnits: 3,
+  widthUnits: 3, heightMm: 90, mounting: 'rail',
   poles: 3,
   ...overrides,
 });
@@ -83,7 +83,7 @@ const library = (module: Record<string, unknown>) => ({
   schemaVersion: 1,
   id: 'lib',
   name: 'Lib',
-  modules: [{ id: 'm', kind: 'breaker', name: 'M', widthUnits: 3, poles: 3, ...module }],
+  modules: [{ id: 'm', kind: 'breaker', name: 'M', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3, ...module }],
 });
 
 function errorPaths(raw: unknown): string[] {
@@ -165,7 +165,7 @@ describe('resizable modules', () => {
     id: 'bar',
     kind: 'busbar',
     name: 'Bar',
-    widthUnits: 6,
+    widthUnits: 6, heightMm: 90, mounting: 'rail',
     poles: 1,
     resizable: { minUnits: 2, maxUnits: 24 },
     terminals: [
@@ -207,7 +207,7 @@ describe('resizable modules', () => {
 
   it('keeps a single terminal single when the copy is wider, and scales only groups with a count', () => {
     const relay: ModuleDef = {
-      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
+      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
       terminals: [
         { name: 'A1', conductor: 'L', side: 'top' },
         { name: '14', conductor: 'C', side: 'bottom' },
@@ -224,7 +224,7 @@ describe('resizable modules', () => {
   });
 
   it('spreads the poles of a resizable module without terminals over the width', () => {
-    const plain: ModuleDef = { id: 'p', kind: 'busbar', name: 'P', widthUnits: 3, poles: 3, resizable: { minUnits: 3, maxUnits: 12 } };
+    const plain: ModuleDef = { id: 'p', kind: 'busbar', name: 'P', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3, resizable: { minUnits: 3, maxUnits: 12 } };
     expect(terminalsOf(plain, 9).filter((t) => t.side === 'top').map((t) => t.unit)).toEqual([0, 3, 6]);
   });
 });
@@ -232,7 +232,7 @@ describe('resizable modules', () => {
 describe('resizable validation', () => {
   const lib = (module: Record<string, unknown>) => ({
     schemaVersion: 1, id: 'lib', name: 'Lib',
-    modules: [{ id: 'm', kind: 'busbar', name: 'M', widthUnits: 6, poles: 1, resizable: { minUnits: 2, maxUnits: 24 }, ...module }],
+    modules: [{ id: 'm', kind: 'busbar', name: 'M', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, resizable: { minUnits: 2, maxUnits: 24 }, ...module }],
   });
   const errorPaths = (raw: unknown) => {
     const result = validateLibrary(raw);
@@ -298,7 +298,7 @@ describe('resizable validation', () => {
 
   it('places a negative position at the right edge of every width', () => {
     const relay: ModuleDef = {
-      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
+      id: 'r', kind: 'relay', name: 'R', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
       terminals: [{ name: 'A1', conductor: 'L', side: 'top', unit: 0 }, { name: '14', conductor: 'C', side: 'bottom', unit: -1 }],
     };
     const unitOf = (width: number, id: string) => terminalsOf(relay, width).find((t) => t.id === id)?.unit;

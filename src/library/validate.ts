@@ -24,6 +24,9 @@ import { positionProblem } from './positions';
 import {
   CONDUCTORS,
   MODULE_KINDS,
+  MOUNTINGS,
+  MIN_MODULE_HEIGHT_MM,
+  MAX_MODULE_HEIGHT_MM,
   SCHEMA_VERSION,
   TERMINAL_SIDES,
   TRIP_CURVES,
@@ -71,6 +74,11 @@ export const widthCheck: FieldCheck = (v) =>
     ? null
     : `must be a number of units from ${MIN_WIDTH_UNITS} to ${MAX_RAIL_LENGTH_UNITS} (1 unit is 17.5 mm)`;
 
+export const heightCheck: FieldCheck = (v) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= MIN_MODULE_HEIGHT_MM && v <= MAX_MODULE_HEIGHT_MM
+    ? null
+    : `must be a number of mm from ${MIN_MODULE_HEIGHT_MM} to ${MAX_MODULE_HEIGHT_MM}`;
+
 export const positiveNumber: FieldCheck = (v) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : 'must be a positive number';
 
@@ -106,6 +114,8 @@ export const MODULE_SPEC: FieldSpec = {
   name: { required: true, check: nonEmptyString },
   shortName: { required: false, check: shortNameCheck },
   widthUnits: { required: true, check: widthCheck },
+  heightMm: { required: true, check: heightCheck },
+  mounting: { required: true, check: oneOf(MOUNTINGS) },
   poles: { required: true, check: oneOf([1, 2, 3, 4]) },
   sku: { required: false, check: nonEmptyString },
   ratedCurrentA: { required: false, check: positiveNumber },

@@ -30,7 +30,7 @@ import {
 import { MODULE_TEMPLATES } from '../src/ui/moduleTemplates';
 
 const relay: ModuleDef = {
-  id: 'relay', kind: 'relay', name: 'Relay', widthUnits: 2, poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
+  id: 'relay', kind: 'relay', name: 'Relay', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 2, resizable: { minUnits: 1, maxUnits: 4 },
   terminals: [
     { name: 'A1', conductor: 'L', side: 'top', unit: 0 },
     { name: 'A2', conductor: 'N', side: 'top', unit: 0 },
@@ -63,15 +63,15 @@ describe('designerLayout', () => {
 
   it('knows which entry of the list each pin comes from, also for a group, and none when derived', () => {
     const bar: ModuleDef = {
-      id: 'bar', kind: 'busbar', name: 'Bar', widthUnits: 6, poles: 1, resizable: { minUnits: 2, maxUnits: 12 },
+      id: 'bar', kind: 'busbar', name: 'Bar', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, resizable: { minUnits: 2, maxUnits: 12 },
       terminals: [{ name: 'N', conductor: 'N', side: 'top', count: 3 }, { name: 'B', conductor: 'N', side: 'bottom', count: 2 }],
     };
     expect(designerLayout(bar).pins.map((p) => p.source)).toEqual([0, 0, 0, 1, 1]);
-    expect(designerLayout({ id: 'm', kind: 'breaker', name: 'M', widthUnits: 1, poles: 2 }).pins.map((p) => p.source)).toEqual([null, null, null, null]);
+    expect(designerLayout({ id: 'm', kind: 'breaker', name: 'M', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2 }).pins.map((p) => p.source)).toEqual([null, null, null, null]);
   });
 
   it('has no pins for a comb', () => {
-    const comb: ModuleDef = { id: 'c', kind: 'comb', name: 'C', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } };
+    const comb: ModuleDef = { id: 'c', kind: 'comb', name: 'C', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, comb: { pattern: ['L'], side: 'top' } };
     expect(designerLayout(comb).pins).toEqual([]);
   });
 });
@@ -101,7 +101,7 @@ describe('pinAt and slotAt', () => {
 
 describe('storedUnit', () => {
   it('counts from the left on a fixed module and keeps the unit on the module', () => {
-    const fixed: ModuleDef = { id: 'f', kind: 'breaker', name: 'F', widthUnits: 3, poles: 1 };
+    const fixed: ModuleDef = { id: 'f', kind: 'breaker', name: 'F', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 1 };
     expect([0, 2, 7, -1].map((u) => storedUnit(fixed, u))).toEqual([0, 2, 2, 0]);
   });
 
@@ -115,7 +115,7 @@ describe('storedUnit', () => {
 
 describe('addTerminalAt', () => {
   it('adds a terminal with a free name at a unit and side, and a module with derived terminals gets them listed', () => {
-    const plain: ModuleDef = { id: 'm', kind: 'breaker', name: 'M', widthUnits: 2, poles: 1 };
+    const plain: ModuleDef = { id: 'm', kind: 'breaker', name: 'M', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1 };
     const result = addTerminalAt(libraryOf(plain), 'm', 1, 'bottom');
     if (!result.ok) throw new Error(result.message);
     const terminals = result.draft.modules[0]!.terminals!;
@@ -133,7 +133,7 @@ describe('addTerminalAt', () => {
   });
 
   it('refuses a module that does not exist and a comb', () => {
-    const comb: ModuleDef = { id: 'c', kind: 'comb', name: 'C', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } };
+    const comb: ModuleDef = { id: 'c', kind: 'comb', name: 'C', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, comb: { pattern: ['L'], side: 'top' } };
     expect(addTerminalAt(libraryOf(), 'x', 0, 'top')).toEqual({ ok: false, message: 'That module does not exist.' });
     expect(addTerminalAt(libraryOf(comb), 'c', 0, 'top')).toEqual({ ok: false, message: 'A comb has no terminals.' });
   });
@@ -167,7 +167,7 @@ describe('moveTerminal', () => {
 });
 
 describe('addPreset', () => {
-  const plain: ModuleDef = { id: 'm', kind: 'relay', name: 'M', widthUnits: 3, poles: 1, terminals: [] };
+  const plain: ModuleDef = { id: 'm', kind: 'relay', name: 'M', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 1, terminals: [] };
   const names = (draft: Library, side: 'top' | 'bottom') => draft.modules[0]!.terminals!.filter((t) => t.side === side).map((t) => t.name);
   const add = (draft: Library, id: string, side: 'top' | 'bottom' = 'bottom') => {
     const result = addPreset(draft, 'm', id, 1, side);
@@ -221,7 +221,7 @@ describe('addPreset', () => {
   it('refuses an unknown kind, an unknown module and a comb', () => {
     expect(addPreset(libraryOf(plain), 'm', 'nope', 0, 'top')).toMatchObject({ ok: false });
     expect(addPreset(libraryOf(), 'm', 'coil', 0, 'top')).toMatchObject({ ok: false });
-    const comb: ModuleDef = { id: 'm', kind: 'comb', name: 'C', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } };
+    const comb: ModuleDef = { id: 'm', kind: 'comb', name: 'C', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, comb: { pattern: ['L'], side: 'top' } };
     expect(addPreset(libraryOf(comb), 'm', 'coil', 0, 'top')).toEqual({ ok: false, message: 'A comb has no terminals.' });
   });
 
@@ -233,7 +233,7 @@ describe('addPreset', () => {
 
 describe('joining terminals inside the module', () => {
   const three: ModuleDef = {
-    id: 'm', kind: 'terminal', name: 'M', widthUnits: 3, poles: 1,
+    id: 'm', kind: 'terminal', name: 'M', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 1,
     terminals: [{ name: 'A', conductor: 'N', side: 'top', unit: 0 }, { name: 'B', conductor: 'N', side: 'top', unit: 1 }, { name: 'C', conductor: 'N', side: 'bottom', unit: 2 }],
   };
   const nets = (draft: Library) => draft.modules[0]!.terminals!.map((t) => t.net);
@@ -290,7 +290,7 @@ describe('joining terminals inside the module', () => {
 });
 
 describe('makeVariants', () => {
-  const breaker: ModuleDef = { id: 'mcb', kind: 'breaker', name: 'MCB', widthUnits: 1, poles: 1, ratedCurrentA: 10 };
+  const breaker: ModuleDef = { id: 'mcb', kind: 'breaker', name: 'MCB', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ratedCurrentA: 10 };
 
   it('makes one copy per rating after the original, with the rating in id, name and data', () => {
     const result = makeVariants(libraryOf(breaker), 'mcb', [6, 16]);
@@ -337,7 +337,7 @@ describe('railPreviewScene', () => {
   });
 
   it('gives a module that is not resizable its own width', () => {
-    const fixed: ModuleDef = { id: 'f', kind: 'breaker', name: 'F', widthUnits: 3, poles: 3 };
+    const fixed: ModuleDef = { id: 'f', kind: 'breaker', name: 'F', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3 };
     expect(railPreviewScene(fixed, 3).panel.placements[0]).not.toHaveProperty('widthUnits');
   });
 });
@@ -366,7 +366,7 @@ describe('templates and the My modules library', () => {
 
 describe('repairPositions', () => {
   const fixed = (resizable: ModuleDef['resizable'], terminals: TerminalDef[], widthUnits = 3): ModuleDef => ({
-    id: 'm', kind: 'relay', name: 'M', widthUnits, poles: 1, ...(resizable ? { resizable } : {}), terminals,
+    id: 'm', kind: 'relay', name: 'M', widthUnits, heightMm: 90, mounting: 'rail', poles: 1, ...(resizable ? { resizable } : {}), terminals,
   });
   const at = (unit: number, name = 'A'): TerminalDef => ({ name, conductor: 'L', side: 'top', unit });
   const units = (draft: Library) => draft.modules[0]!.terminals!.map((t) => t.unit);
@@ -455,7 +455,7 @@ describe('evenPositions', () => {
 });
 
 describe('addRow', () => {
-  const block: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1, terminals: [] };
+  const block: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, terminals: [] };
   const spec = { side: 'bottom' as const, count: 6, conductor: 'N' as const, prefix: 'OUT', joined: true };
   const entries = (draft: Library) => draft.modules[0]!.terminals!;
 
@@ -504,7 +504,7 @@ describe('addRow', () => {
 
 describe('spreadSide', () => {
   const crowded: ModuleDef = {
-    id: 'm', kind: 'terminal', name: 'M', widthUnits: 2, poles: 1,
+    id: 'm', kind: 'terminal', name: 'M', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1,
     terminals: [
       { name: 'C', conductor: 'N', side: 'bottom', unit: 1 },
       { name: 'A', conductor: 'N', side: 'bottom', unit: 0 },
@@ -527,7 +527,7 @@ describe('spreadSide', () => {
 });
 
 describe('makeBlock', () => {
-  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1 };
+  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1 };
   const shape = (draft: Library) => draft.modules[0]!.terminals!.map((t) => `${t.side}:${t.name}`);
 
   it('builds one input on top and six outputs below, all one point', () => {
@@ -561,7 +561,7 @@ describe('makeBlock', () => {
     expect(makeBlock(libraryOf(plain), 'blk', { top: 60, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
     expect(makeBlock(libraryOf(plain), 'blk', { top: 1.5, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
     expect(makeBlock(libraryOf(), 'blk', { top: 1, bottom: 1, conductor: 'L', joined: true })).toMatchObject({ ok: false });
-    const comb: ModuleDef = { id: 'blk', kind: 'comb', name: 'C', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } };
+    const comb: ModuleDef = { id: 'blk', kind: 'comb', name: 'C', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, comb: { pattern: ['L'], side: 'top' } };
     expect(makeBlock(libraryOf(comb), 'blk', { top: 1, bottom: 1, conductor: 'L', joined: true })).toEqual({ ok: false, message: 'A comb has no terminals.' });
   });
 
@@ -578,7 +578,7 @@ describe('makeBlock', () => {
 });
 
 describe('conductors of a whole module', () => {
-  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1 };
+  const plain: ModuleDef = { id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1 };
   const block = (conductor: Conductor): ModuleDef => ({ ...plain, terminals: [{ name: 'A', conductor, side: 'top' }, { name: 'B', conductor, side: 'bottom' }] });
 
   it('puts one conductor on every terminal, also of a module whose terminals come from its poles', () => {
@@ -607,7 +607,7 @@ describe('conductors of a whole module', () => {
 });
 
 describe('the layout of a crowded module', () => {
-  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, poles: 1, terminals: [] };
+  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, terminals: [] };
 
   it('draws smaller pins and marks the layout crowded when eight terminals stand in two units', () => {
     const result = addRow(libraryOf(eight), 'e', { side: 'bottom', count: 8, conductor: 'N', prefix: 'T', joined: false });
@@ -621,7 +621,7 @@ describe('the layout of a crowded module', () => {
   });
 
   it('keeps full size pins when there is room', () => {
-    const layout = designerLayout({ id: 'p', kind: 'breaker', name: 'P', widthUnits: 2, poles: 1 });
+    const layout = designerLayout({ id: 'p', kind: 'breaker', name: 'P', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1 });
     expect(layout.pinRadius).toBe(6);
     expect(layout.crowded).toBe(false);
   });
@@ -632,7 +632,7 @@ describe('the layout of a crowded module', () => {
 });
 
 describe('pin labels and the centre of a net', () => {
-  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, poles: 1, terminals: [] };
+  const eight: ModuleDef = { id: 'e', kind: 'terminal', name: 'E', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, terminals: [] };
   const withRow = (prefix: string) => {
     const result = addRow(libraryOf(eight), 'e', { side: 'bottom', count: 8, conductor: 'N', prefix, joined: false });
     if (!result.ok) throw new Error(result.message);

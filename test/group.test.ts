@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CombLookup } from '../src/layout/combs';
 import { moveGroup } from '../src/layout/group';
 import { itemsInRect, moduleRect, rectBetween } from '../src/view/geometry';
-import { combAt, panelOf, place, resolve, widthOf } from './fixtures';
+import { combAt, panelOf, place, resolve, sizes, widthOf } from './fixtures';
 
 const lookup: CombLookup = { widthOf, sideOf: (m) => resolve(m)?.comb?.side };
 
@@ -47,14 +47,14 @@ describe('selecting with a rectangle', () => {
   const combInfo = () => ({ widthUnits: 6, side: 'top' as const });
 
   it('picks everything the rectangle touches', () => {
-    const first = moduleRect(panel, 0, 0, 1);
-    const second = moduleRect(panel, 0, 5, 1);
+    const first = moduleRect(panel, 0, 0, 1, 90);
+    const second = moduleRect(panel, 0, 5, 1, 90);
     const area = rectBetween({ x: first.x + 2, y: first.y + 2 }, { x: second.x + 2, y: second.y + 2 });
-    expect(itemsInRect(panel, widthOf, combInfo, area)).toEqual({ placements: ['p1', 'p2'], combs: ['c1'] });
+    expect(itemsInRect(panel, sizes, combInfo, area)).toEqual({ placements: ['p1', 'p2'], combs: ['c1'] });
   });
 
   it('works whichever corner the drag starts from, and finds nothing in empty space', () => {
     expect(rectBetween({ x: 10, y: 10 }, { x: 0, y: 4 })).toEqual({ x: 0, y: 4, width: 10, height: 6 });
-    expect(itemsInRect(panel, widthOf, combInfo, { x: -500, y: -500, width: 10, height: 10 })).toEqual({ placements: [], combs: [] });
+    expect(itemsInRect(panel, sizes, combInfo, { x: -500, y: -500, width: 10, height: 10 })).toEqual({ placements: [], combs: [] });
   });
 });

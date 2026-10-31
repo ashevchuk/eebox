@@ -1,6 +1,10 @@
 import type { ArtShape } from './art';
 export const SCHEMA_VERSION = 1;
 export const MODULE_UNIT_MM = 17.5;
+/** The height of a standard DIN-rail module: the face of a breaker. Taller or shorter devices say so in `heightMm`. */
+export const DIN_MODULE_HEIGHT_MM = 90;
+export const MIN_MODULE_HEIGHT_MM = 20;
+export const MAX_MODULE_HEIGHT_MM = 600;
 
 export const MODULE_KINDS = [
   'breaker',
@@ -15,9 +19,17 @@ export const MODULE_KINDS = [
   'comb',
   'switch',
   'relay',
+  'softstarter',
+  'vfd',
+  'plc',
+  'transformer',
   'other',
 ] as const;
 export type ModuleKind = (typeof MODULE_KINDS)[number];
+
+/** Where a device can be fixed: clipped on a DIN rail, screwed to the mounting plate, or either. */
+export const MOUNTINGS = ['rail', 'plate', 'both'] as const;
+export type Mounting = (typeof MOUNTINGS)[number];
 
 /**
  * `L` is a phase that is decided by what feeds it; `L1`..`L3` are fixed phases. `C` is a control or
@@ -115,6 +127,9 @@ export interface ModuleDef {
   shortName?: string;
   /** Width in 17.5 mm units. */
   widthUnits: number;
+  /** Height of the face in mm; a standard DIN module is 90. */
+  heightMm: number;
+  mounting: Mounting;
   poles: 1 | 2 | 3 | 4;
   sku?: string;
   ratedCurrentA?: number;

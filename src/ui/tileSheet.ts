@@ -25,7 +25,7 @@ export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: V
     const def = session.resolve(item.module);
     return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
   };
-  const { bounds, rects } = printArea(session.project.panel, session.widthOf, combInfo, (text) => measuring.measureText(text).width);
+  const { bounds, rects } = printArea(session.project.panel, session.sizes, combInfo, (text) => measuring.measureText(text).width);
   const widthMm = bounds.maxX - bounds.minX;
   const heightMm = bounds.maxY - bounds.minY;
   session.bareDrawing = true;

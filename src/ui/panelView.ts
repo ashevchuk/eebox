@@ -53,7 +53,7 @@ export class PanelView implements View {
   constructor(private readonly session: Session) {}
 
   fitBounds(): Bounds {
-    const frame = frameRect(this.session.project.panel);
+    const frame = frameRect(this.session.project.panel, this.session.sizes);
     return withNoteBounds({ minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height }, this.session.project.panel.annotations);
   }
 
@@ -109,7 +109,7 @@ export class PanelView implements View {
       const def = this.session.resolve(item.module);
       return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
     };
-    const edges = edgeLines(this.session.project.panel, this.session.widthOf, info);
+    const edges = edgeLines(this.session.project.panel, this.session.sizes, info);
     return snapToEdges(world, edges, RULER_SNAP_PX / this.camera.scale);
   }
 
@@ -153,7 +153,7 @@ export class PanelView implements View {
       }
       return true;
     }
-    const hit = placementAt(panel, this.session.widthOf, world);
+    const hit = placementAt(panel, this.session.sizes, world);
     if (!hit && e.shiftKey) {
       this.band = { from: world, to: world };
       return true;
@@ -225,7 +225,7 @@ export class PanelView implements View {
       const area: Rect = rectBetween(this.band.from, this.band.to);
       this.band = null;
       const panel = this.session.project.panel;
-      const found = itemsInRect(panel, this.session.widthOf, (item) => {
+      const found = itemsInRect(panel, this.session.sizes, (item) => {
         const def = this.session.resolve(item.module);
         return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
       }, area);

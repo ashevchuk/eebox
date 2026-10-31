@@ -13,6 +13,10 @@ export const KIND_LABELS: Record<ModuleKind, string> = {
   comb: 'Combs',
   switch: 'Switches',
   relay: 'Relays',
+  softstarter: 'Soft starters',
+  vfd: 'Frequency drives',
+  plc: 'Controllers',
+  transformer: 'Transformers',
   other: 'Other',
 };
 

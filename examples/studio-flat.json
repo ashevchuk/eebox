@@ -355,6 +355,8 @@
       "kind": "switch",
       "name": "Main switch 2P 40A",
       "widthUnits": 2,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 40,
       "art": [
@@ -376,6 +378,8 @@
       "kind": "busbar",
       "name": "Earth bar 12 terminals",
       "widthUnits": 6,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 1,
       "resizable": {
         "minUnits": 2,
@@ -469,6 +473,8 @@
       "kind": "rcbo",
       "name": "RCBO 1P+N C10 30mA",
       "widthUnits": 2,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 10,
       "curve": "C",
@@ -513,6 +519,8 @@
       "kind": "rcbo",
       "name": "RCBO 1P+N C16 30mA",
       "widthUnits": 2,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 16,
       "curve": "C",
@@ -557,6 +565,8 @@
       "kind": "rcbo",
       "name": "RCBO 1P+N B13 30mA",
       "widthUnits": 2,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 13,
       "curve": "B",
@@ -601,6 +611,8 @@
       "kind": "comb",
       "name": "Comb L+N, 12 units",
       "widthUnits": 12,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 2,
       "comb": {
         "pattern": [

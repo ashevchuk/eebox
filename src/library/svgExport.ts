@@ -1,7 +1,6 @@
 import { ART_ANCHORS, MIN_ART_PERIOD_UNITS, type ArtAnchor, type ArtShape } from './art';
 import { MODULE_UNIT_MM, type ModuleDef } from './types';
 
-export const FACE_HEIGHT_MM = 90;
 /** Where the baseline of a text lies below the middle of its letters, as a share of their height; the importer takes it off again. */
 export const BASELINE_BELOW_MIDDLE = 0.35;
 
@@ -56,7 +55,7 @@ function element(shape: ArtShape): string {
 export function artToSvg(def: ModuleDef): string {
   const width = def.widthUnits * MODULE_UNIT_MM;
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${num(width)}mm" height="${FACE_HEIGHT_MM}mm" viewBox="0 0 ${num(width)} ${FACE_HEIGHT_MM}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${num(width)}mm" height="${num(def.heightMm)}mm" viewBox="0 0 ${num(width)} ${num(def.heightMm)}">`,
     `<title>${escapeXml(def.name)}</title>`,
     ...(def.art ?? []).map((shape) => `  ${element(shape)}`),
     '</svg>',

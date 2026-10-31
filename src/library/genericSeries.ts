@@ -1,5 +1,5 @@
 import { genericArt } from './genericArt';
-import type { ModuleDef, TerminalDef } from './types';
+import { DIN_MODULE_HEIGHT_MM, type ModuleDef, type TerminalDef } from './types';
 
 /**
  * The bundled library, built from standard rating series. Nothing here comes from a manufacturer's
@@ -21,14 +21,17 @@ const MCB_BREAKING_CAPACITY_KA = 6;
 const RESIZABLE_BAR = { minUnits: 2, maxUnits: 24 };
 const RESIZABLE_COMB = { minUnits: 2, maxUnits: 54 };
 
+/** What the series below describe: modules of the standard height that clip on a rail. */
+type DinModule = Omit<ModuleDef, 'heightMm' | 'mounting'>;
+
 const poleLabel = (poles: 1 | 2 | 3 | 4) => `${poles}P`;
 const POLES = [1, 2, 3, 4] as const;
 
-function breakers(): ModuleDef[] {
+function breakers(): DinModule[] {
   return POLES.flatMap((poles) =>
     MCB_CURVES.flatMap((curve) =>
       MCB_RATINGS.map(
-        (rating): ModuleDef => ({
+        (rating): DinModule => ({
           id: `mcb-${poles}p-${curve.toLowerCase()}${rating}`,
           kind: 'breaker',
           name: `MCB ${poleLabel(poles)} ${curve}${rating}`,
@@ -43,11 +46,11 @@ function breakers(): ModuleDef[] {
   );
 }
 
-function rcds(): ModuleDef[] {
+function rcds(): DinModule[] {
   return ([2, 4] as const).flatMap((poles) =>
     RCD_RATINGS.flatMap((rating) =>
       RCD_SENSITIVITIES_MA.map(
-        (ma): ModuleDef => ({
+        (ma): DinModule => ({
           id: `rcd-${poles}p-${rating}-${ma}`,
           kind: 'rcd',
           name: `RCD ${poleLabel(poles)} ${rating}A ${ma}mA`,
@@ -61,11 +64,11 @@ function rcds(): ModuleDef[] {
   );
 }
 
-function rcbos(): ModuleDef[] {
+function rcbos(): DinModule[] {
   return RCBO_CURVES.flatMap((curve) =>
     RCBO_RATINGS.flatMap((rating) =>
       RCBO_SENSITIVITIES_MA.map(
-        (ma): ModuleDef => ({
+        (ma): DinModule => ({
           id: `rcbo-1pn-${curve.toLowerCase()}${rating}-${ma}`,
           kind: 'rcbo',
           name: `RCBO 1P+N ${curve}${rating} ${ma}mA`,
@@ -81,10 +84,10 @@ function rcbos(): ModuleDef[] {
   );
 }
 
-function switches(): ModuleDef[] {
+function switches(): DinModule[] {
   return POLES.flatMap((poles) =>
     SWITCH_RATINGS.map(
-      (rating): ModuleDef => ({
+      (rating): DinModule => ({
         id: `main-switch-${poles}p-${rating}`,
         kind: 'switch',
         name: `Main switch ${poleLabel(poles)} ${rating}A`,
@@ -96,7 +99,7 @@ function switches(): ModuleDef[] {
   );
 }
 
-function surgeProtectors(): ModuleDef[] {
+function surgeProtectors(): DinModule[] {
   const variants: Array<[string, string, 1 | 2 | 3 | 4]> = [
     ['1p', '1P', 1],
     ['1pn', '1P+N', 2],
@@ -112,7 +115,7 @@ function surgeProtectors(): ModuleDef[] {
   }));
 }
 
-function contactors(): ModuleDef[] {
+function contactors(): DinModule[] {
   const terminals: TerminalDef[] = [
     { name: 'L1', conductor: 'L1', side: 'top', unit: 0 },
     { name: 'L2', conductor: 'L2', side: 'top', unit: 1 },
@@ -138,8 +141,8 @@ function contactors(): ModuleDef[] {
   }));
 }
 
-function bars(): ModuleDef[] {
-  const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): ModuleDef => ({
+function bars(): DinModule[] {
+  const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): DinModule => ({
     id,
     kind: 'busbar',
     name,
@@ -172,8 +175,8 @@ function bars(): ModuleDef[] {
   ];
 }
 
-function combs(): ModuleDef[] {
-  const comb = (id: string, name: string, poles: 1 | 2 | 3 | 4, pattern: Array<'L' | 'L1' | 'L2' | 'L3' | 'N'>): ModuleDef => ({
+function combs(): DinModule[] {
+  const comb = (id: string, name: string, poles: 1 | 2 | 3 | 4, pattern: Array<'L' | 'L1' | 'L2' | 'L3' | 'N'>): DinModule => ({
     id,
     kind: 'comb',
     name,
@@ -208,7 +211,7 @@ const monitoringLogic = (sensed: string[]): NonNullable<ModuleDef['logic']> => (
 });
 
 /** Monitoring relays measure the supply on their top terminals and switch a contact at the bottom. */
-function monitoringRelays(): ModuleDef[] {
+function monitoringRelays(): DinModule[] {
   return [
     {
       id: 'vrelay-1p',
@@ -259,7 +262,7 @@ const suppliedSwitch = (flag: string, label: string): Logic => ({
 });
 
 /** Lighting relays switch one phase: the load current enters at the top and leaves at the bottom. */
-function lightingRelays(): ModuleDef[] {
+function lightingRelays(): DinModule[] {
   return [
     {
       id: 'impulse-relay-1p',
@@ -308,7 +311,7 @@ function lightingRelays(): ModuleDef[] {
  * Timer relays with one change-over contact. Time is not simulated: the flag says whether the delay
  * has run out, and the person sets it to see the circuit before and after.
  */
-function timerRelays(): ModuleDef[] {
+function timerRelays(): DinModule[] {
   const terminals = [top('A1', 'L'), top('A2', 'N'), bottom('15', 'C'), bottom('16', 'C'), bottom('18', 'C')];
   const supplied: Logic['inputs'] = { V: { terminals: ['top:A1', 'top:A2'], when: 'all' } };
   const changeOver = (energised: string): Logic['contacts'] => [
@@ -337,7 +340,7 @@ function timerRelays(): ModuleDef[] {
   ];
 }
 
-function metersAndSmallDevices(): ModuleDef[] {
+function metersAndSmallDevices(): DinModule[] {
   return [
     { id: 'kwh-1p-40', kind: 'meter', name: 'Energy meter 1P 40 A', widthUnits: 2, poles: 2, ratedCurrentA: 40 },
     { id: 'kwh-3p-63', kind: 'meter', name: 'Energy meter 3P+N 63 A', widthUnits: 4, poles: 4, ratedCurrentA: 63 },
@@ -386,10 +389,10 @@ const CHANGEOVER_VARIANTS = [
  * Manual changeover switches I-0-II for a backup input: two supplies on top, one output at the
  * bottom. Nothing joins the inputs inside the module, so two different sources never end up on one net.
  */
-function changeoverSwitches(): ModuleDef[] {
+function changeoverSwitches(): DinModule[] {
   return CHANGEOVER_VARIANTS.flatMap(({ poles, conductors, ratings }) =>
     ratings.map(
-      (rating): ModuleDef => ({
+      (rating): DinModule => ({
         id: `changeover-${poles}p-${rating}`,
         kind: 'switch',
         name: `Changeover switch I-0-II ${poleLabel(poles)} ${rating}A`,
@@ -407,7 +410,7 @@ function changeoverSwitches(): ModuleDef[] {
 }
 
 /** Watches two supplies and gives dry contacts to close the contactor of either and to start a generator. */
-function transferController(): ModuleDef[] {
+function transferController(): DinModule[] {
   const sense = (suffix: string) => (['L1', 'L2', 'L3', 'N'] as const).map((c) => top(`${c}${suffix}`, c));
   const contact = (name: string) => [bottom(`${name}1`, 'C'), bottom(`${name}2`, 'C')];
   return [
@@ -451,6 +454,8 @@ const WIDTH_RANGES: Record<string, readonly [number, number]> = {
 const RELAY_WIDTH_RANGE = [1, 4] as const;
 const CHANGEOVER_EXTRA_UNITS = 6;
 
+const onRail = (def: DinModule): ModuleDef => ({ ...def, heightMm: DIN_MODULE_HEIGHT_MM, mounting: 'rail' });
+
 function withWidthRange(def: ModuleDef): ModuleDef {
   if (def.resizable) return def;
   const range =
@@ -481,7 +486,7 @@ export function genericModules(): ModuleDef[] {
     ...transferController(),
     ...bars(),
     ...combs(),
-  ].map(withWidthRange).map(withArt);
+  ].map(onRail).map(withWidthRange).map(withArt);
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -494,7 +499,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '9';
+export const GENERIC_LIBRARY_VERSION = '10';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

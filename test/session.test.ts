@@ -50,7 +50,7 @@ describe('Session', () => {
 });
 
 describe('Session and the stored module definitions', () => {
-  const def = (name: string): ModuleDef => ({ id: 'm', kind: 'breaker', name, widthUnits: 1, poles: 1 });
+  const def = (name: string): ModuleDef => ({ id: 'm', kind: 'breaker', name, widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1 });
   const ref = { libraryId: 'lib', moduleId: 'm' };
   const libraryWith = (name: string): Library => ({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [def(name)], enclosures: [] });
 

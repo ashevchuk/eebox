@@ -3,7 +3,6 @@ import { MAX_XML_LENGTH } from '../library/xml';
 import { importSvg, type SvgImport } from '../library/svgImport';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import { shapeElement, svgElement } from './artSvg';
-import { FACE_HEIGHT_MM } from './artEditor';
 
 const PREVIEW_SCALE_PX_PER_MM = 2.2;
 const DEFAULT_MARGIN_MM = 2;
@@ -39,6 +38,7 @@ function numberInput(value: number, min: number, max: number, step = 0.5): HTMLI
 export function openSvgImportDialog(host: SvgImportHost): void {
   const { module } = host;
   const widthMm = module.widthUnits * MODULE_UNIT_MM;
+  const heightMm = module.heightMm;
   const dialog = document.createElement('dialog');
   dialog.className = 'app-dialog svg-import-dialog';
   const title = document.createElement('h2');
@@ -81,10 +81,10 @@ export function openSvgImportDialog(host: SvgImportHost): void {
 
   const drawPreview = (shapes: ArtShape[]) => {
     const k = PREVIEW_SCALE_PX_PER_MM;
-    const svg = svgElement('svg', { width: widthMm * k, height: FACE_HEIGHT_MM * k, class: 'designer-svg' });
-    svg.append(svgElement('rect', { x: 0, y: 0, width: widthMm * k, height: FACE_HEIGHT_MM * k, fill: '#e5e7eb', stroke: '#6b7280' }));
+    const svg = svgElement('svg', { width: widthMm * k, height: heightMm * k, class: 'designer-svg' });
+    svg.append(svgElement('rect', { x: 0, y: 0, width: widthMm * k, height: heightMm * k, fill: '#e5e7eb', stroke: '#6b7280' }));
     const clip = svgElement('clipPath', { id: 'svg-import-clip' });
-    clip.append(svgElement('rect', { x: 0, y: 0, width: widthMm * k, height: FACE_HEIGHT_MM * k }));
+    clip.append(svgElement('rect', { x: 0, y: 0, width: widthMm * k, height: heightMm * k }));
     const group = svgElement('g', { 'clip-path': 'url(#svg-import-clip)' });
     for (const shape of shapes) group.append(shapeElement({ ...shape, anchor: undefined, period: undefined } as ArtShape, k));
     svg.append(clip, group);

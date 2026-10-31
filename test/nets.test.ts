@@ -169,7 +169,7 @@ describe('findNetProblems', () => {
 describe('combContacts with a terminal between two units', () => {
   it('lets a comb pin touch the terminal in the unit its centre falls in', () => {
     const block: ModuleDef = {
-      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, poles: 1,
+      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1,
       terminals: [
         { name: 'A', conductor: 'L1', side: 'top', unit: 0.25 },
         { name: 'B', conductor: 'L2', side: 'top', unit: 0.75 },
@@ -183,7 +183,7 @@ describe('combContacts with a terminal between two units', () => {
 
   it('touches only the first terminal of a unit, however many fall in it', () => {
     const block: ModuleDef = {
-      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 1, poles: 1,
+      id: 'blk', kind: 'terminal', name: 'Block', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1,
       terminals: [{ name: 'A', conductor: 'L1', side: 'top', unit: -0.2 }, { name: 'B', conductor: 'L1', side: 'top', unit: 0.3 }],
     };
     const panel = panelOf([place('p1', 'blk', 0, 0)], [combAt('c1', 'comb3', 0, 0)]);

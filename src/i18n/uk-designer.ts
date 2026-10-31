@@ -15,6 +15,9 @@ export const DESIGNER: Dictionary = {
   'Short name': `Коротка назва`,
   'drawn on the face instead of the name': `малюється на панелі замість назви`,
   'Width, mm': `Ширина, мм`,
+  'Height, mm': `Висота, мм`,
+  Mounting: `Монтаж`,
+  'the real height of the device; a standard DIN module is 90': `справжня висота пристрою; стандартний DIN-модуль має 90`,
   'Part number': `Артикул`,
   'Narrowest copy': `Найвужча копія`,
   'Widest copy': `Найширша копія`,
@@ -133,6 +136,13 @@ export const DESIGNER: Dictionary = {
   'Power supply, 24 V DC': `Блок живлення, 24 В DC`,
   'Changeover switch for a backup input': `Перемикач резервного вводу`,
   'PEN splitting block': `Блок розділення PEN`,
+  'Contactor, large, with a coil': `Контактор великий, із котушкою`,
+  'Soft starter, 3 phases': `Пристрій плавного пуску, 3 фази`,
+  'Frequency drive, 3 phases': `Частотний перетворювач, 3 фази`,
+  'Meter for a plate, 3 phases and neutral': `Лічильник на плиту, 3 фази і нуль`,
+  'Controller with 8 inputs and 8 outputs': `Контролер із 8 входами та 8 виходами`,
+  'Control transformer, one phase': `Трансформатор керування, одна фаза`,
+  'Power supply, 24 V DC, large': `Блок живлення, 24 В DC, великий`,
   // face editor
   'Click a shape to select it, Shift+click to add, drag over empty space to select what is inside; drag a selection to move it, pull a handle to resize. Delete removes, the arrow keys nudge, Ctrl+C and Ctrl+V copy to another module.':
     `Клацніть фігуру, щоб вибрати; Shift+клац додає; перетягування по порожньому місцю вибирає все всередині; тягніть вибране, щоб пересунути, маркер — щоб змінити розмір. Delete видаляє, стрілки підсувають, Ctrl+C і Ctrl+V копіюють на інший модуль.`,

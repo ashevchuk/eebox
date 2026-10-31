@@ -34,7 +34,7 @@ const library = (art: ArtShape[] = []): Library => ({
   schemaVersion: 1,
   id: 'lib',
   name: 'Lib',
-  modules: [{ id: 'm', kind: 'other', name: 'M', widthUnits: 2, poles: 1, ...(art.length > 0 ? { art } : {}) }],
+  modules: [{ id: 'm', kind: 'other', name: 'M', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, ...(art.length > 0 ? { art } : {}) }],
   enclosures: [],
 });
 const artOf = (draft: Library) => draft.modules[0]!.art;

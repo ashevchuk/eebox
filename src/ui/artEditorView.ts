@@ -6,7 +6,6 @@ import { LEVER_COLORS } from '../view/render';
 import { conductorStyle } from '../view/theme';
 import {
   ART_TOOLS,
-  FACE_HEIGHT_MM,
   addShape,
   addShapes,
   addVertex,
@@ -251,23 +250,23 @@ export class ArtEditorView {
 
   private drawStage(module: ModuleDef): void {
     const widthMm = module.widthUnits * MODULE_UNIT_MM;
-    const scale = Math.min(MAX_SCALE_PX_PER_MM, STAGE_WIDTH_PX / widthMm, STAGE_HEIGHT_PX / FACE_HEIGHT_MM) * this.zoom;
+    const scale = Math.min(MAX_SCALE_PX_PER_MM, STAGE_WIDTH_PX / widthMm, STAGE_HEIGHT_PX / module.heightMm) * this.zoom;
     this.scale = scale;
     const margin = 12;
-    const svg = svgElement('svg', { width: widthMm * scale + 2 * margin, height: FACE_HEIGHT_MM * scale + 2 * margin, class: 'designer-svg' }) as SVGSVGElement;
+    const svg = svgElement('svg', { width: widthMm * scale + 2 * margin, height: module.heightMm * scale + 2 * margin, class: 'designer-svg' }) as SVGSVGElement;
     svg.style.maxWidth = 'none';
     const face = svgElement('g', { transform: `translate(${margin} ${margin})` });
     svg.append(face);
-    face.append(svgElement('rect', { x: 0, y: 0, width: widthMm * scale, height: FACE_HEIGHT_MM * scale, fill: '#e5e7eb', stroke: '#6b7280' }));
+    face.append(svgElement('rect', { x: 0, y: 0, width: widthMm * scale, height: module.heightMm * scale, fill: '#e5e7eb', stroke: '#6b7280' }));
     face.append(svgElement('rect', { x: 0, y: 0, width: widthMm * scale, height: BAND_MM * scale, fill: LEVER_COLORS[module.kind] }));
     for (let unit = 1; unit < module.widthUnits; unit++) {
       const x = unit * MODULE_UNIT_MM * scale;
-      face.append(svgElement('line', { x1: x, y1: 0, x2: x, y2: FACE_HEIGHT_MM * scale, stroke: '#9ca3af', 'stroke-dasharray': '3 4' }));
+      face.append(svgElement('line', { x1: x, y1: 0, x2: x, y2: module.heightMm * scale, stroke: '#9ca3af', 'stroke-dasharray': '3 4' }));
     }
 
     const art = this.shown();
     const clip = svgElement('clipPath', { id: 'face-clip' });
-    clip.append(svgElement('rect', { x: 0, y: 0, width: widthMm * scale, height: FACE_HEIGHT_MM * scale }));
+    clip.append(svgElement('rect', { x: 0, y: 0, width: widthMm * scale, height: module.heightMm * scale }));
     face.append(clip);
     const drawing = svgElement('g', { 'clip-path': 'url(#face-clip)' });
     for (const { shape } of placeArtFrom(art, module.widthUnits, module.widthUnits)) drawing.append(shapeElement(shape, scale));
@@ -295,12 +294,12 @@ export class ArtEditorView {
       const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
       const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * 5;
       const x = (terminal.unit + 0.5) * MODULE_UNIT_MM + offset;
-      const y = terminal.side === 'top' ? 7 : FACE_HEIGHT_MM - 6;
+      const y = terminal.side === 'top' ? 7 : module.heightMm - 6;
       const style = conductorStyle(terminal.conductor);
       face.append(svgElement('circle', { cx: x * scale, cy: y * scale, r: 2.4 * scale, fill: style.color, stroke: style.outline ?? '#14161d', 'stroke-width': 1, 'pointer-events': 'none', opacity: 0.85 }));
     }
     const cx = (module.widthUnits * MODULE_UNIT_MM * scale) / 2;
-    const cy = (FACE_HEIGHT_MM * scale) / 2 + 4 * scale;
+    const cy = (module.heightMm * scale) / 2 + 4 * scale;
     face.append(svgElement('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 6 * scale, 'font-family': FONT_FAMILY, fill: '#14161d', opacity: 0.35, transform: `rotate(-90 ${cx} ${cy})`, 'pointer-events': 'none' }, module.shortName ?? module.name));
   }
 
@@ -418,7 +417,7 @@ export class ArtEditorView {
     label.className = 'face-align-label';
     label.textContent = chosen.length > 1 ? 'Align to each other' : 'Align on the face';
     this.alignBar.append(label);
-    const face: Box = { x1: 0, y1: 0, x2: module.widthUnits * MODULE_UNIT_MM, y2: FACE_HEIGHT_MM };
+    const face: Box = { x1: 0, y1: 0, x2: module.widthUnits * MODULE_UNIT_MM, y2: module.heightMm };
     for (const [how, name] of ALIGN_BUTTONS) {
       this.alignBar.append(button(name, () => this.changeChosen(alignShapes(chosen, how, chosen.length > 1 ? undefined : face)), `Line the shapes up on ${how}`));
     }

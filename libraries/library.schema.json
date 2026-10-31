@@ -93,6 +93,8 @@
         "kind",
         "name",
         "widthUnits",
+        "heightMm",
+        "mounting",
         "poles"
       ],
       "properties": {
@@ -113,6 +115,10 @@
             "comb",
             "switch",
             "relay",
+            "softstarter",
+            "vfd",
+            "plc",
+            "transformer",
             "other"
           ]
         },
@@ -132,6 +138,20 @@
           "minimum": 0.1,
           "description": "Width in 17.5 mm units; a fraction is fine, as a relay of 22.5 mm is 1.2857 units wide.",
           "maximum": 144
+        },
+        "heightMm": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 600,
+          "description": "Height of the face in mm; a standard DIN module is 90."
+        },
+        "mounting": {
+          "enum": [
+            "rail",
+            "plate",
+            "both"
+          ],
+          "description": "Where the device is fixed: clipped on a DIN rail, screwed to the mounting plate, or either."
         },
         "poles": {
           "enum": [

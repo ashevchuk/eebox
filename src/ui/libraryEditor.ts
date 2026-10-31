@@ -12,7 +12,7 @@ import {
   type ModuleKind,
   type TerminalDef,
 } from '../library/types';
-import { SCHEMA_VERSION } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, MOUNTINGS, SCHEMA_VERSION, type Mounting } from '../library/types';
 import { mmFromUnits, roundUnits, unitsFromMm } from '../layout/units';
 import { validateLibrary, type ValidationError } from '../library/validate';
 import type { InspectorAction, InspectorField, InspectorView } from './inspector';
@@ -76,7 +76,7 @@ const DEFAULT_BAR_TERMINALS: TerminalDef[] = [
 ];
 
 function defaultModule(kind: ModuleKind, id: string): ModuleDef {
-  const base: ModuleDef = { id, kind, name: `New ${kind}`, widthUnits: 1, poles: 1 };
+  const base: ModuleDef = { id, kind, name: `New ${kind}`, widthUnits: 1, heightMm: DIN_MODULE_HEIGHT_MM, mounting: 'rail', poles: 1 };
   if (kind === 'comb') {
     return { ...base, name: 'New comb', widthUnits: 6, comb: { ...DEFAULT_COMB, pattern: [...DEFAULT_COMB.pattern] }, resizable: { minUnits: 2, maxUnits: 54 } };
   }
@@ -146,6 +146,8 @@ function moduleView(module: ModuleDef): InspectorView {
     select('kind', 'Kind', module.kind, MODULE_KINDS),
     number('widthUnits', 'Width', module.widthUnits, 'units of 17.5 mm; a fraction is fine'),
     number('widthMm', 'Width, mm', mmFromUnits(module.widthUnits), 'the real width of the device; this and the line above are one setting'),
+    number('heightMm', 'Height, mm', module.heightMm, `the real height of the device; a standard DIN module is ${DIN_MODULE_HEIGHT_MM}`),
+    select('mounting', 'Mounting', module.mounting, MOUNTINGS),
     select('poles', 'Poles', String(module.poles), ['1', '2', '3', '4']),
     text('sku', 'Part number', module.sku ?? ''),
     number('ratedCurrentA', 'Rated current', optional(module.ratedCurrentA), 'A'),
@@ -307,6 +309,14 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       const units = key === 'widthMm' ? unitsFromMm(parsed.value) : roundUnits(parsed.value);
       return apply((m) => ({ ...m, widthUnits: units }));
     }
+    case 'heightMm': {
+      const parsed = optionalNumber(raw, false);
+      if (!parsed.ok || parsed.value === undefined) return fail(parsed.ok ? NOT_A_NUMBER : parsed.message);
+      const heightMm = parsed.value;
+      return apply((m) => ({ ...m, heightMm }));
+    }
+    case 'mounting':
+      return apply((m) => ({ ...m, mounting: raw as Mounting }));
     case 'poles':
       return apply((m) => ({ ...m, poles: Number(raw) as ModuleDef['poles'] }));
     case 'sku':

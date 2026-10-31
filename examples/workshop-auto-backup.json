@@ -500,6 +500,8 @@
       "kind": "relay",
       "name": "Automatic transfer controller 3P+N",
       "widthUnits": 4,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 4,
       "terminals": [
         {
@@ -652,6 +654,8 @@
       "kind": "contactor",
       "name": "Contactor 3P 40A, 230V coil",
       "widthUnits": 3,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 3,
       "ratedCurrentA": 40,
       "terminals": [
@@ -787,6 +791,8 @@
       "kind": "rcd",
       "name": "RCD 4P 40A 30mA",
       "widthUnits": 4,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 40,
       "residualCurrentMa": 30,

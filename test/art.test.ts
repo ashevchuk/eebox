@@ -63,7 +63,7 @@ describe('the validation of the art of a module', () => {
   });
 
   it('is part of the validation of a library, with the path of the module', () => {
-    const module: ModuleDef = { id: 'm', kind: 'other', name: 'M', widthUnits: 1, poles: 1, art: [{ ...rect, fill: 'red' }] };
+    const module: ModuleDef = { id: 'm', kind: 'other', name: 'M', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, art: [{ ...rect, fill: 'red' }] };
     const library: Library = { schemaVersion: 1, id: 'l', name: 'L', modules: [module], enclosures: [] };
     const result = validateLibrary(library);
     expect(result.ok).toBe(false);

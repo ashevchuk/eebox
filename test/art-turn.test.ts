@@ -118,7 +118,7 @@ describe('a text that is turned', () => {
 });
 
 describe('a text that is turned, through an SVG', () => {
-  const module = (rotation: number | undefined): ModuleDef => ({ id: 'm', kind: 'other', name: 'M', widthUnits: 2, poles: 1, art: [{ ...text, ...(rotation !== undefined ? { rotation } : {}) }] });
+  const module = (rotation: number | undefined): ModuleDef => ({ id: 'm', kind: 'other', name: 'M', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1, art: [{ ...text, ...(rotation !== undefined ? { rotation } : {}) }] });
   const back = (def: ModuleDef) => {
     const result = importSvg(artToSvg(def), { widthMm: 35, leftMm: 0, topMm: 0, anchor: 'left', room: MAX_ART_SHAPES });
     if (!result.ok) throw new Error(result.message);

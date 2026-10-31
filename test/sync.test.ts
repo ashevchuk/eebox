@@ -49,7 +49,7 @@ describe('moduleDifferences', () => {
   });
 
   it('ignores the order of fields, nested ones too', () => {
-    const reordered = JSON.parse(JSON.stringify({ widthUnits: NBAR.widthUnits, terminals: NBAR.terminals!.map((t) => ({ count: t.count, side: t.side, conductor: t.conductor, name: t.name, net: t.net })), poles: NBAR.poles, name: NBAR.name, kind: NBAR.kind, id: NBAR.id, resizable: { maxUnits: 12, minUnits: 2 } }));
+    const reordered = JSON.parse(JSON.stringify({ widthUnits: NBAR.widthUnits, heightMm: NBAR.heightMm, mounting: NBAR.mounting, terminals: NBAR.terminals!.map((t) => ({ count: t.count, side: t.side, conductor: t.conductor, name: t.name, net: t.net })), poles: NBAR.poles, name: NBAR.name, kind: NBAR.kind, id: NBAR.id, resizable: { maxUnits: 12, minUnits: 2 } }));
     expect(moduleDifferences(project(), snapshotOf('nbar'), library({ nbar: reordered })).changed).toEqual([]);
   });
 

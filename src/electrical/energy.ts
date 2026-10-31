@@ -8,7 +8,7 @@ import { freeNodeTerminals } from './nodeTerminals';
 import { terminalsOf } from './terminals';
 
 /** Devices that can interrupt a circuit by hand; for a contactor this stands in for its coil. */
-export const SWITCHING_KINDS: readonly ModuleDef['kind'][] = ['breaker', 'rcd', 'rcbo', 'switch', 'contactor'];
+export const SWITCHING_KINDS: readonly ModuleDef['kind'][] = ['breaker', 'rcd', 'rcbo', 'switch', 'contactor', 'softstarter', 'vfd'];
 
 export const CLOSED = 'closed';
 export const OPEN = 'open';

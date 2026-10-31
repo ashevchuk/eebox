@@ -9,7 +9,7 @@ import { buildProjectFile, parseProjectJson } from '../src/project/file';
 import { panelOf, place } from './fixtures';
 
 const breaker: ModuleDef = {
-  id: 'c16', kind: 'breaker', name: 'MCB C16', widthUnits: 1, poles: 1, ratedCurrentA: 16, curve: 'C', breakingCapacityKA: 6,
+  id: 'c16', kind: 'breaker', name: 'MCB C16', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ratedCurrentA: 16, curve: 'C', breakingCapacityKA: 6,
 };
 const defs: Record<string, ModuleDef> = { c16: breaker, rcbo: { ...breaker, id: 'rcbo', kind: 'rcbo', residualCurrentMa: 30 } };
 const resolve = (r: ModuleRef): ModuleDef | undefined => defs[r.moduleId];

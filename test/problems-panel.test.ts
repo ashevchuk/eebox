@@ -38,7 +38,7 @@ describe('where to look at a finding', () => {
   it('shows a placed module on the panel, selected, and takes its box as the thing to show', () => {
     const project = scene();
     const focus = focusOf(project, resolve, finding({ placements: ['p2'] }), 'schematic');
-    const r = moduleRect(project.panel, 0, 4, 1);
+    const r = moduleRect(project.panel, 0, 4, 1, 90);
     expect(focus).toMatchObject({ mode: 'panel', selection: { placementId: 'p2' }, bounds: { minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height } });
   });
 
@@ -46,7 +46,7 @@ describe('where to look at a finding', () => {
     const project = scene();
     const focus = focusOf(project, resolve, finding({ placements: ['p1', 'p2'] }), 'panel')!;
     expect(focus.selection).toEqual({ placementIds: ['p1', 'p2'] });
-    expect(focus.bounds.maxX).toBeGreaterThan(moduleRect(project.panel, 0, 4, 1).x);
+    expect(focus.bounds.maxX).toBeGreaterThan(moduleRect(project.panel, 0, 4, 1, 90).x);
   });
 
   it('shows a wire on the schematic, selected, with the box of its route', () => {

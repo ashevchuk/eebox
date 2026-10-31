@@ -1,5 +1,5 @@
 import { createPanel } from '../src/layout/panel';
-import type { CombPlacement, ModuleRef, Panel, Placement } from '../src/layout/placement';
+import type { CombPlacement, ModuleRef, Panel, Placement, Sizes } from '../src/layout/placement';
 import type { ModuleDef } from '../src/library/types';
 
 /** The panel with the given row labels, one per rail; an empty text leaves the row unlabelled. */
@@ -15,12 +15,12 @@ export const withRailPitches = (panel: Panel, pitches: number[]): Panel => {
 };
 
 export const defs: Record<string, ModuleDef> = {
-  mcb1: { id: 'mcb1', kind: 'breaker', name: 'MCB 1P', widthUnits: 1, poles: 1 },
+  mcb1: { id: 'mcb1', kind: 'breaker', name: 'MCB 1P', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1 },
   breaker16: {
     id: 'breaker16',
     kind: 'breaker',
     name: 'MCB 1P C16',
-    widthUnits: 1,
+    widthUnits: 1, heightMm: 90, mounting: 'rail',
     poles: 1,
     ratedCurrentA: 16,
     curve: 'C',
@@ -28,12 +28,12 @@ export const defs: Record<string, ModuleDef> = {
     residualCurrentMa: 30,
     sku: 'SKU-16',
   },
-  mcb3: { id: 'mcb3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, poles: 3 },
+  mcb3: { id: 'mcb3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3 },
   relay: {
     id: 'relay',
     kind: 'relay',
     name: 'Voltage relay',
-    widthUnits: 1,
+    widthUnits: 1, heightMm: 90, mounting: 'rail',
     poles: 2,
     resizable: { minUnits: 1, maxUnits: 4 },
     terminals: [
@@ -42,13 +42,13 @@ export const defs: Record<string, ModuleDef> = {
       { name: '14', conductor: 'C', side: 'bottom' },
     ],
   },
-  rcd4: { id: 'rcd4', kind: 'rcd', name: 'RCD 4P', widthUnits: 4, poles: 4 },
-  rcbo: { id: 'rcbo', kind: 'rcbo', name: 'RCBO 1P+N', widthUnits: 2, poles: 2 },
+  rcd4: { id: 'rcd4', kind: 'rcd', name: 'RCD 4P', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 4 },
+  rcbo: { id: 'rcbo', kind: 'rcbo', name: 'RCBO 1P+N', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 2 },
   contactor: {
     id: 'contactor',
     kind: 'contactor',
     name: 'Contactor',
-    widthUnits: 3,
+    widthUnits: 3, heightMm: 90, mounting: 'rail',
     poles: 3,
     terminals: [
       { name: 'L1', conductor: 'L1', side: 'top', unit: 0 },
@@ -62,7 +62,7 @@ export const defs: Record<string, ModuleDef> = {
     id: 'nbar',
     kind: 'busbar',
     name: 'N bar',
-    widthUnits: 3,
+    widthUnits: 3, heightMm: 90, mounting: 'rail',
     poles: 1,
     resizable: { minUnits: 2, maxUnits: 12 },
     terminals: [
@@ -70,12 +70,12 @@ export const defs: Record<string, ModuleDef> = {
       { name: 'Nb', conductor: 'N', side: 'bottom', net: 'N', count: 3 },
     ],
   },
-  comb3: { id: 'comb3', kind: 'comb', name: 'Comb 3ph', widthUnits: 6, poles: 3, comb: { pattern: ['L1', 'L2', 'L3'], side: 'top' } },
+  comb3: { id: 'comb3', kind: 'comb', name: 'Comb 3ph', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 3, comb: { pattern: ['L1', 'L2', 'L3'], side: 'top' } },
   comb1: {
     id: 'comb1',
     kind: 'comb',
     name: 'Comb 1ph',
-    widthUnits: 6,
+    widthUnits: 6, heightMm: 90, mounting: 'rail',
     poles: 1,
     comb: { pattern: ['L'], side: 'top' },
     resizable: { minUnits: 2, maxUnits: 12 },
@@ -84,12 +84,12 @@ export const defs: Record<string, ModuleDef> = {
     id: 'fixedbar',
     kind: 'busbar',
     name: 'Fixed bar',
-    widthUnits: 3,
+    widthUnits: 3, heightMm: 90, mounting: 'rail',
     poles: 1,
     terminals: [{ name: 'PE', conductor: 'PE', side: 'top', net: 'PE', count: 3 }],
   },
-  combLN: { id: 'combLN', kind: 'comb', name: 'Comb L+N', widthUnits: 4, poles: 2, comb: { pattern: ['L', 'N'], side: 'top' } },
-  combBottom: { id: 'combBottom', kind: 'comb', name: 'Comb bottom', widthUnits: 6, poles: 3, comb: { pattern: ['L1', 'L2', 'L3'], side: 'bottom' } },
+  combLN: { id: 'combLN', kind: 'comb', name: 'Comb L+N', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 2, comb: { pattern: ['L', 'N'], side: 'top' } },
+  combBottom: { id: 'combBottom', kind: 'comb', name: 'Comb bottom', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 3, comb: { pattern: ['L1', 'L2', 'L3'], side: 'bottom' } },
 };
 
 export const ref = (moduleId: string): ModuleRef => ({ libraryId: 'lib', moduleId });
@@ -97,6 +97,9 @@ export const resolve = (r: ModuleRef): ModuleDef | undefined => (r.libraryId ===
 
 export const widthOf = (item: { module: ModuleRef; widthUnits?: number }): number | undefined =>
   item.widthUnits ?? resolve(item.module)?.widthUnits;
+
+/** The sizes the geometry asks for; every module of the fixtures is as high as a standard DIN module. */
+export const sizes: Sizes = { widthOf, heightOf: () => 90 };
 
 export const resizeOf = (m: ModuleRef) => {
   const def = resolve(m);

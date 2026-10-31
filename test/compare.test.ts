@@ -3,7 +3,7 @@ import { describeDiff, diffLibraries, isUnchanged, planImport } from '../src/lib
 import type { Library, ModuleDef } from '../src/library/types';
 
 const mod = (id: string, name = id.toUpperCase(), extra: Partial<ModuleDef> = {}): ModuleDef => ({
-  id, kind: 'breaker', name, widthUnits: 1, poles: 1, ...extra,
+  id, kind: 'breaker', name, widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ...extra,
 });
 const library = (modules: ModuleDef[], extra: Partial<Library> = {}): Library => ({
   schemaVersion: 1, id: 'mine', name: 'Mine', modules, enclosures: [], ...extra,
@@ -12,7 +12,7 @@ const library = (modules: ModuleDef[], extra: Partial<Library> = {}): Library =>
 describe('diffLibraries', () => {
   it('finds nothing between equal libraries, whatever the field order', () => {
     const a = library([mod('a', 'A', { sku: 'S', ratedCurrentA: 16 })]);
-    const b = library([{ ratedCurrentA: 16, sku: 'S', poles: 1, widthUnits: 1, name: 'A', kind: 'breaker', id: 'a' }]);
+    const b = library([{ ratedCurrentA: 16, sku: 'S', poles: 1, widthUnits: 1, heightMm: 90, mounting: 'rail', name: 'A', kind: 'breaker', id: 'a' }]);
     expect(isUnchanged(diffLibraries(a, b))).toBe(true);
   });
 

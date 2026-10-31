@@ -46,12 +46,12 @@ const field = (s: EditorState, key: string) => describeEditor(s).fields.find((f)
 const sample = (): Library => ({
   ...newLibrary('mine', 'Mine'),
   modules: [
-    { id: 'mcb', kind: 'breaker', name: 'MCB', widthUnits: 1, poles: 1, ratedCurrentA: 16, curve: 'C' },
+    { id: 'mcb', kind: 'breaker', name: 'MCB', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ratedCurrentA: 16, curve: 'C' },
     {
-      id: 'bar', kind: 'busbar', name: 'Bar', widthUnits: 6, poles: 1, resizable: { minUnits: 2, maxUnits: 24 },
+      id: 'bar', kind: 'busbar', name: 'Bar', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, resizable: { minUnits: 2, maxUnits: 24 },
       terminals: [{ name: 'N', conductor: 'N', side: 'top', net: 'N', count: 6 }],
     },
-    { id: 'comb', kind: 'comb', name: 'Comb', widthUnits: 6, poles: 1, comb: { pattern: ['L'], side: 'top' } },
+    { id: 'comb', kind: 'comb', name: 'Comb', widthUnits: 6, heightMm: 90, mounting: 'rail', poles: 1, comb: { pattern: ['L'], side: 'top' } },
   ],
   enclosures: [{ id: 'box', name: 'Box', railLengthsUnits: [12, 12] }],
 });

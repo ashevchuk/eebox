@@ -11,8 +11,8 @@ import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { addNode, connectAll, syncModuleNodes } from '../src/schematic/model';
 import { withRailPitches } from './fixtures';
 
-const C16: ModuleDef = { id: 'c16', kind: 'breaker', name: 'MCB 1P C16', widthUnits: 1, poles: 1, ratedCurrentA: 16, curve: 'C', sku: 'SKU-1' };
-const RCD: ModuleDef = { id: 'rcd', kind: 'rcd', name: 'RCD 2P', widthUnits: 2, poles: 2 };
+const C16: ModuleDef = { id: 'c16', kind: 'breaker', name: 'MCB 1P C16', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ratedCurrentA: 16, curve: 'C', sku: 'SKU-1' };
+const RCD: ModuleDef = { id: 'rcd', kind: 'rcd', name: 'RCD 2P', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 2 };
 const defs: Record<string, ModuleDef> = { 'lib/c16': C16, 'lib/rcd': RCD };
 const resolve = (ref: ModuleRef) => defs[`${ref.libraryId}/${ref.moduleId}`];
 const ref = (moduleId: string): ModuleRef => ({ libraryId: 'lib', moduleId });
@@ -245,7 +245,7 @@ describe('combs in the project file', () => {
     id: 'comb',
     kind: 'comb',
     name: 'Comb 3-phase',
-    widthUnits: 6,
+    widthUnits: 6, heightMm: 90, mounting: 'rail',
     poles: 3,
     comb: { pattern: ['L1', 'L2', 'L3'], side: 'top' },
   };
@@ -335,7 +335,7 @@ describe('schematic in the project file', () => {
   it('warns when different phases are wired together', () => {
     const project = sampleProject();
     const modules = {
-      'lib/m3': { id: 'm3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, poles: 3 },
+      'lib/m3': { id: 'm3', kind: 'breaker', name: 'MCB 3P', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3 },
     } as const;
     const panel = { ...createPanel([12]), placements: [{ id: 'p1', module: ref('m3'), rail: 0, slot: 0 }] };
     const schematic = {

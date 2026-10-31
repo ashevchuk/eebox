@@ -46,7 +46,7 @@ describe('matchesQuery', () => {
   });
 
   it('finds by part number when a module has one', () => {
-    const withSku: ModuleDef = { id: 'x', kind: 'breaker', name: 'Plain', widthUnits: 1, poles: 1, sku: 'ZX-9000' };
+    const withSku: ModuleDef = { id: 'x', kind: 'breaker', name: 'Plain', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, sku: 'ZX-9000' };
     expect(matchesQuery(withSku, 'zx-9')).toBe(true);
     expect(matchesQuery(withSku, 'zx-8')).toBe(false);
   });

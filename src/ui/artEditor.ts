@@ -26,7 +26,6 @@ export interface Point {
 export const ART_TOOLS = ['select', 'line', 'rect', 'ellipse', 'polyline', 'text'] as const;
 export type ArtTool = (typeof ART_TOOLS)[number];
 
-export const FACE_HEIGHT_MM = 90;
 export const GRID_MM = 0.5;
 /** Nothing is drawn smaller than this, so a shape can always be picked up again. */
 export const MIN_EXTENT_MM = 0.5;

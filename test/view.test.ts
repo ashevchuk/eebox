@@ -16,7 +16,7 @@ import {
   snapToSlot,
 } from '../src/view/geometry';
 import { History } from '../src/view/history';
-import { withRailPitches } from './fixtures';
+import { sizes, withRailPitches } from './fixtures';
 
 const placement = (id: string, rail: number, slot: number): Placement => ({
   id,
@@ -57,16 +57,16 @@ describe('snapToSlot', () => {
 });
 
 describe('placementAt', () => {
-  const widthOf = () => 2;
+  const sizes = { widthOf: () => 2, heightOf: () => 90 };
   const target = panel(placement('a', 0, 3), placement('b', 1, 0));
 
   it('finds the module under the point', () => {
-    const rect = moduleRect(target, 0, 3, 2);
-    expect(placementAt(target, widthOf, { x: rect.x + 5, y: rect.y + 5 })?.id).toBe('a');
+    const rect = moduleRect(target, 0, 3, 2, 90);
+    expect(placementAt(target, sizes, { x: rect.x + 5, y: rect.y + 5 })?.id).toBe('a');
   });
 
   it('returns undefined on empty rail space', () => {
-    expect(placementAt(target, widthOf, at(8, 0))).toBeUndefined();
+    expect(placementAt(target, sizes, at(8, 0))).toBeUndefined();
   });
 });
 
@@ -148,14 +148,14 @@ describe('panel geometry with custom pitches', () => {
 
   it('centres modules and rails on the same line', () => {
     const p = uneven();
-    const module = moduleRect(p, 1, 0, 1);
+    const module = moduleRect(p, 1, 0, 1, 90);
     const rail = railRect(p, 1);
     expect(module.y + module.height / 2).toBe(rail.y + rail.height / 2);
   });
 
   it('grows the frame by exactly the added spacing', () => {
-    const base = frameRect(createPanel([10, 10, 10])).height;
-    expect(frameRect(uneven()).height).toBe(base + (200 - DEFAULT_RAIL_PITCH_MM) + (120 - DEFAULT_RAIL_PITCH_MM));
+    const base = frameRect(createPanel([10, 10, 10]), sizes).height;
+    expect(frameRect(uneven(), sizes).height).toBe(base + (200 - DEFAULT_RAIL_PITCH_MM) + (120 - DEFAULT_RAIL_PITCH_MM));
   });
 
   it('snaps to the nearest rail and ignores the empty gap between rows', () => {
@@ -167,30 +167,30 @@ describe('panel geometry with custom pitches', () => {
   });
 
   it('keeps the default frame height of the single-pitch layout', () => {
-    expect(frameRect(createPanel([10, 10])).height).toBe(2 * FRAME_PADDING + 2 * ROW_MARGIN + DEFAULT_RAIL_PITCH_MM);
-    expect(frameRect(createPanel([])).height).toBe(FRAME_PADDING);
+    expect(frameRect(createPanel([10, 10]), sizes).height).toBe(2 * FRAME_PADDING + 2 * ROW_MARGIN + DEFAULT_RAIL_PITCH_MM);
+    expect(frameRect(createPanel([]), sizes).height).toBe(FRAME_PADDING);
   });
 });
 
 describe('labelRoom', () => {
   it('stops above the combs that overhang the next row', () => {
     const panel = createPanel([10, 10]);
-    expect(labelRoom(panel, 0)).toBe(DEFAULT_RAIL_PITCH_MM - 90 - 10 - 8);
+    expect(labelRoom(panel, 0, 90)).toBe(DEFAULT_RAIL_PITCH_MM - 90 - 10 - 8);
   });
 
   it('runs to the end of the frame under the last row', () => {
     const panel = createPanel([10, 10]);
-    expect(labelRoom(panel, 1)).toBe(ROW_MARGIN + FRAME_PADDING - 45 - 8);
+    expect(labelRoom(panel, 1, 90)).toBe(ROW_MARGIN + FRAME_PADDING - 45 - 8);
   });
 
   it('grows with the spacing between rows', () => {
     const wide = withRailPitches(createPanel([10, 10]), [250]);
-    expect(labelRoom(wide, 0)).toBe(labelRoom(createPanel([10, 10]), 0) + 100);
+    expect(labelRoom(wide, 0, 90)).toBe(labelRoom(createPanel([10, 10]), 0, 90) + 100);
   });
 
   it('never goes negative', () => {
     const tight = withRailPitches(createPanel([10, 10]), [90]);
-    expect(labelRoom(tight, 0)).toBe(0);
+    expect(labelRoom(tight, 0, 90)).toBe(0);
   });
 });
 

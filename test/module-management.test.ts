@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Library, ModuleDef } from '../src/library/types';
 import { duplicateModule, removeModule } from '../src/ui/libraryEditor';
 
-const module = (id: string): ModuleDef => ({ id, kind: 'other', name: `Module ${id}`, widthUnits: 1, poles: 1 });
+const module = (id: string): ModuleDef => ({ id, kind: 'other', name: `Module ${id}`, widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1 });
 const library = (...ids: string[]): Library => ({ schemaVersion: 1, id: 'mine', name: 'Mine', modules: ids.map(module), enclosures: [] });
 
 describe('taking a module out of a library', () => {

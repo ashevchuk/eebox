@@ -17,7 +17,7 @@ const shapes: ArtShape[] = [
   { kind: 'text', x: 3, y: 85, text: 'left', size: 3, fill: '#222222' },
   { kind: 'text', x: 30, y: 85, text: 'right', size: 3, fill: '#222222', align: 'right', anchor: 'right' },
 ];
-const module = (art: ArtShape[], widthUnits = 2): ModuleDef => ({ id: 'm', kind: 'other', name: 'Test <module> & "co"', widthUnits, poles: 1, art });
+const module = (art: ArtShape[], widthUnits = 2): ModuleDef => ({ id: 'm', kind: 'other', name: 'Test <module> & "co"', widthUnits, heightMm: 90, mounting: 'rail', poles: 1, art });
 const clean = (list: ArtShape[]) => JSON.parse(JSON.stringify(list)) as ArtShape[];
 
 describe('the art of a module as an SVG', () => {

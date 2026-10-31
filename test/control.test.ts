@@ -11,7 +11,7 @@ import { panelOf, place } from './fixtures';
 
 const defs: Record<string, ModuleDef> = {
   changeover: {
-    id: 'changeover', kind: 'switch', name: 'Changeover 2P', widthUnits: 4, poles: 2, ratedCurrentA: 40,
+    id: 'changeover', kind: 'switch', name: 'Changeover 2P', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 2, ratedCurrentA: 40,
     terminals: [
       { name: 'La', conductor: 'L', side: 'top' }, { name: 'Na', conductor: 'N', side: 'top' },
       { name: 'Lb', conductor: 'L', side: 'top' }, { name: 'Nb', conductor: 'N', side: 'top' },
@@ -19,14 +19,14 @@ const defs: Record<string, ModuleDef> = {
     ],
   },
   relay: {
-    id: 'relay', kind: 'relay', name: 'Relay', widthUnits: 1, poles: 2,
+    id: 'relay', kind: 'relay', name: 'Relay', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2,
     terminals: [
       { name: 'L', conductor: 'L', side: 'top' }, { name: 'N', conductor: 'N', side: 'top' },
       { name: '11', conductor: 'C', side: 'bottom' }, { name: '14', conductor: 'C', side: 'bottom' },
     ],
   },
   psu: {
-    id: 'psu', kind: 'psu', name: 'PSU 24 V', widthUnits: 2, poles: 2,
+    id: 'psu', kind: 'psu', name: 'PSU 24 V', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 2,
     terminals: [
       { name: 'L', conductor: 'L', side: 'top' },
       { name: '24V', conductor: 'DCP', side: 'bottom' }, { name: '0V', conductor: 'DCN', side: 'bottom' },

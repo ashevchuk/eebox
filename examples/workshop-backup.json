@@ -495,6 +495,8 @@
       "kind": "switch",
       "name": "Changeover switch I-0-II 4P 63A",
       "widthUnits": 6,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 63,
       "terminals": [
@@ -582,6 +584,8 @@
       "kind": "rcd",
       "name": "RCD 4P 40A 30mA",
       "widthUnits": 4,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 40,
       "residualCurrentMa": 30,
@@ -624,6 +628,8 @@
       "kind": "busbar",
       "name": "Neutral bar 12 terminals",
       "widthUnits": 6,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 1,
       "resizable": {
         "minUnits": 2,
@@ -708,6 +714,8 @@
       "kind": "busbar",
       "name": "Earth bar 12 terminals",
       "widthUnits": 6,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 1,
       "resizable": {
         "minUnits": 2,
@@ -801,6 +809,8 @@
       "kind": "breaker",
       "name": "MCB 3P C16",
       "widthUnits": 3,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 3,
       "ratedCurrentA": 16,
       "curve": "C",
@@ -822,6 +832,8 @@
       "kind": "breaker",
       "name": "MCB 1P B10",
       "widthUnits": 1,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 1,
       "ratedCurrentA": 10,
       "curve": "B",
@@ -843,6 +855,8 @@
       "kind": "comb",
       "name": "Comb 3-phase, 12 units",
       "widthUnits": 12,
+      "heightMm": 90,
+      "mounting": "rail",
       "poles": 3,
       "comb": {
         "pattern": [

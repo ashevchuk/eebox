@@ -12,14 +12,14 @@ import { combAt, defs as fixtureDefs, panelOf, place } from './fixtures';
 const defs: Record<string, ModuleDef> = {
   ...fixtureDefs,
   changeover: {
-    id: 'changeover', kind: 'switch', name: 'Changeover', widthUnits: 4, poles: 2, ratedCurrentA: 40,
+    id: 'changeover', kind: 'switch', name: 'Changeover', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 2, ratedCurrentA: 40,
     terminals: [
       { name: 'La', conductor: 'L', side: 'top' }, { name: 'Na', conductor: 'N', side: 'top' },
       { name: 'Lb', conductor: 'L', side: 'top' }, { name: 'Nb', conductor: 'N', side: 'top' },
       { name: 'L', conductor: 'L', side: 'bottom' }, { name: 'N', conductor: 'N', side: 'bottom' },
     ],
   },
-  meter: { id: 'meter', kind: 'meter', name: 'Meter', widthUnits: 2, poles: 2 },
+  meter: { id: 'meter', kind: 'meter', name: 'Meter', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 2 },
 };
 const resolve = (r: ModuleRef): ModuleDef | undefined => defs[r.moduleId];
 

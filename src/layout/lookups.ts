@@ -1,4 +1,4 @@
-import type { ModuleRef, ResizeOf, WidthOf } from './placement';
+import type { HeightOf, ModuleRef, ResizeOf, Sizes, WidthOf } from './placement';
 import type { CombLookup } from './combs';
 import type { ModuleDef } from '../library/types';
 
@@ -7,11 +7,14 @@ export function lookupsOf(resolve: (ref: ModuleRef) => ModuleDef | undefined): {
   widthOf: WidthOf;
   resizeOf: ResizeOf;
   combLookup: CombLookup;
+  heightOf: HeightOf;
+  sizes: Sizes;
 } {
   const widthOf: WidthOf = (item) => item.widthUnits ?? resolve(item.module)?.widthUnits;
   const resizeOf: ResizeOf = (ref) => {
     const def = resolve(ref);
     return def?.resizable ? { ...def.resizable, baseUnits: def.widthUnits } : undefined;
   };
-  return { widthOf, resizeOf, combLookup: { widthOf, sideOf: (ref) => resolve(ref)?.comb?.side } };
+  const heightOf: HeightOf = (item) => resolve(item.module)?.heightMm;
+  return { widthOf, resizeOf, combLookup: { widthOf, sideOf: (ref) => resolve(ref)?.comb?.side }, heightOf, sizes: { widthOf, heightOf } };
 }

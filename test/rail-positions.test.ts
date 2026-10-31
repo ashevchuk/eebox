@@ -18,7 +18,7 @@ import {
   rowLabelX,
   snapToSlot,
 } from '../src/view/geometry';
-import { resolve } from './fixtures';
+import { resolve, sizes } from './fixtures';
 
 const GAP_MM = 40;
 const unwrap = (result: ReturnType<typeof setRailPosition>): Panel => {
@@ -41,13 +41,13 @@ describe('rails with their own position', () => {
 
   it('starts the modules of a rail at the left end of that rail', () => {
     const panel = sideBySide();
-    expect(moduleRect(panel, 1, 2, 1).x).toBe(railRect(panel, 1).x + 2 * MODULE_UNIT_MM);
+    expect(moduleRect(panel, 1, 2, 1, 90).x).toBe(railRect(panel, 1).x + 2 * MODULE_UNIT_MM);
   });
 
   it('makes the frame as wide as the farthest end of a rail and as tall as the lowest rail', () => {
     const panel = sideBySide();
-    expect(frameRect(panel).width).toBe(12 * MODULE_UNIT_MM + GAP_MM + 2 * FRAME_PADDING);
-    expect(frameRect(panel).height).toBe(FRAME_PADDING + FIRST_RAIL_Y_MM + ROW_MARGIN + FRAME_PADDING);
+    expect(frameRect(panel, sizes).width).toBe(12 * MODULE_UNIT_MM + GAP_MM + 2 * FRAME_PADDING);
+    expect(frameRect(panel, sizes).height).toBe(FRAME_PADDING + FIRST_RAIL_Y_MM + ROW_MARGIN + FRAME_PADDING);
   });
 
   it('puts the label of a row in the margin to the left of that row', () => {
@@ -78,7 +78,7 @@ describe('rails standing side by side', () => {
   it('does not let a rail below take room from a label that stands beside it', () => {
     const stacked = createPanel([6, 6]);
     const beside = sideBySide();
-    expect(labelRoom(beside, 0)).toBeGreaterThan(labelRoom(stacked, 0));
+    expect(labelRoom(beside, 0, 90)).toBeGreaterThan(labelRoom(stacked, 0, 90));
   });
 });
 

@@ -21,7 +21,7 @@ import {
 } from '../src/ui/artEditor';
 
 const rect = (x: number, y: number, width = 10, height = 4): ArtShape => ({ kind: 'rect', x, y, width, height, fill: '#112233' });
-const library = (art: ArtShape[]): Library => ({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [{ id: 'm', kind: 'other', name: 'M', widthUnits: 3, poles: 1, ...(art.length > 0 ? { art } : {}) }], enclosures: [] });
+const library = (art: ArtShape[]): Library => ({ schemaVersion: 1, id: 'lib', name: 'Lib', modules: [{ id: 'm', kind: 'other', name: 'M', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 1, ...(art.length > 0 ? { art } : {}) }], enclosures: [] });
 const artOf = (draft: Library) => draft.modules[0]!.art ?? [];
 const boxes = (shapes: ArtShape[]) => shapes.map((s) => boundsOf(s));
 

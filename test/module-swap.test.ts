@@ -7,7 +7,7 @@ import { planModuleSwap } from '../src/project/sync';
 import { addNode, connect, emptySchematic, syncModuleNodes } from '../src/schematic/model';
 import { defs, panelOf, place, ref, resolve } from './fixtures';
 
-const designed: ModuleDef = { id: 'designed', kind: 'breaker', name: 'Designed', widthUnits: 1, poles: 1, terminals: [{ name: 'L', conductor: 'L', side: 'top' }], art: [{ kind: 'rect', x: 1, y: 1, width: 2, height: 2, fill: '#000000' }] };
+const designed: ModuleDef = { id: 'designed', kind: 'breaker', name: 'Designed', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, terminals: [{ name: 'L', conductor: 'L', side: 'top' }], art: [{ kind: 'rect', x: 1, y: 1, width: 2, height: 2, fill: '#000000' }] };
 const designedRef = { libraryId: 'mine', moduleId: 'designed' };
 const resolveAll = (r: { libraryId: string; moduleId: string }) => (r.libraryId === 'mine' ? designed : resolve(r));
 

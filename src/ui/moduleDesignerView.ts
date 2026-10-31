@@ -1,8 +1,8 @@
 import { stableStringify } from '../library/equality';
-import { CONDUCTORS, TERMINAL_SIDES, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type TerminalSide, type TripCurve } from '../library/types';
+import { CONDUCTORS, DIN_MODULE_HEIGHT_MM, TERMINAL_SIDES, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type TerminalSide, type TripCurve } from '../library/types';
 import { validateLibrary } from '../library/validate';
 import { Camera } from '../view/Camera';
-import { railRect } from '../view/geometry';
+import { moduleRect, railRect } from '../view/geometry';
 import { History } from '../view/history';
 import { render } from '../view/render';
 import { conductorStyle, theme } from '../view/theme';
@@ -64,6 +64,7 @@ const MAX_ZOOM = 2.5;
 const STAGE_WIDTH_PX = 560;
 const STAGE_HEIGHT_PX = 400;
 const RAIL_PREVIEW = { width: 520, height: 150 };
+const MAX_RAIL_PREVIEW_HEIGHT = 360;
 /** A light outline, so dark text stays readable where it runs past a narrow module onto the dark ground. */
 const HALO = { stroke: '#e5e7eb', 'stroke-width': 3, 'paint-order': 'stroke' };
 const NET_COLOR = '#7c3aed';
@@ -513,14 +514,22 @@ export class ModuleDesignerView {
     if (!ctx) return;
     const { panel, resolve } = railPreviewScene(this.module, this.shownWidth);
     const rail = railRect(panel, 0);
+    const body = moduleRect(panel, 0, 1, this.shownWidth, this.module.heightMm);
+    const height = Math.max(RAIL_PREVIEW.height, Math.min(MAX_RAIL_PREVIEW_HEIGHT, Math.round((RAIL_PREVIEW.height * this.module.heightMm) / DIN_MODULE_HEIGHT_MM)));
+    if (this.railCanvas.height !== height) this.railCanvas.height = height;
     const camera = new Camera();
     camera.fit(
-      { minX: rail.x - RAIL_MARGIN_MM, minY: rail.y - RAIL_MARGIN_MM, maxX: rail.x + rail.width + RAIL_MARGIN_MM, maxY: rail.y + rail.height + RAIL_MARGIN_MM },
+      {
+        minX: rail.x - RAIL_MARGIN_MM,
+        minY: Math.min(rail.y, body.y) - RAIL_MARGIN_MM,
+        maxX: rail.x + rail.width + RAIL_MARGIN_MM,
+        maxY: Math.max(rail.y + rail.height, body.y + body.height) + RAIL_MARGIN_MM,
+      },
       RAIL_PREVIEW.width,
-      RAIL_PREVIEW.height,
+      height,
       0,
     );
-    render(ctx, camera, { panel, resolve, selectedPlacementId: null, selectedCombId: null, selectedRail: null, moving: null, ghost: null }, RAIL_PREVIEW.width, RAIL_PREVIEW.height, 1);
+    render(ctx, camera, { panel, resolve, selectedPlacementId: null, selectedCombId: null, selectedRail: null, moving: null, ghost: null }, RAIL_PREVIEW.width, height, 1);
   }
 
   private point(e: PointerEvent, svg: SVGElement): { x: number; y: number } {

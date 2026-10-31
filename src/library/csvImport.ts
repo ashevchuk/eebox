@@ -1,6 +1,6 @@
 import { unitsFromMm } from '../layout/units';
 import { blockTerminals } from './terminalLayouts';
-import { CONDUCTORS, MODULE_KINDS, SCHEMA_VERSION, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type ModuleKind, type TripCurve } from './types';
+import { CONDUCTORS, DIN_MODULE_HEIGHT_MM, MODULE_KINDS, SCHEMA_VERSION, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type ModuleKind, type TripCurve } from './types';
 import { validateLibrary, type ValidationError } from './validate';
 
 const DELIMITERS = [';', '\t', ','] as const;
@@ -164,6 +164,8 @@ export function libraryFromCsv(text: string, options: CsvImport): CsvResult {
       kind,
       name,
       widthUnits,
+      heightMm: DIN_MODULE_HEIGHT_MM,
+      mounting: 'rail',
       poles: poles as ModuleDef['poles'],
       ...(sku ? { sku } : {}),
       ...(rated !== undefined ? { ratedCurrentA: rated } : {}),

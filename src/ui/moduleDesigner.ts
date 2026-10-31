@@ -3,13 +3,16 @@ import { createPanel } from '../layout/panel';
 import { fixedRange, isValidPosition, leftPosition } from '../library/positions';
 import { blockTerminals, evenPositions, rowEntries, type BlockSpec, type RowSpec } from '../library/terminalLayouts';
 import type { ModuleRef, Panel, Placement } from '../layout/placement';
-import type { Conductor, Library, ModuleDef, TerminalDef, TerminalSide, TripCurve } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, type Conductor, type Library, type ModuleDef, type TerminalDef, type TerminalSide, type TripCurve } from '../library/types';
 
 export const UNIT_PX = 44;
 const MARGIN = 28;
 /** The drawing is never narrower than this, so the caption under a very narrow module fits. */
 const MIN_STAGE_WIDTH_PX = 150;
+/** The drawn body of a standard module; a taller or shorter device is drawn in proportion, within these bounds. */
 const BODY_HEIGHT = 190;
+const MIN_BODY_HEIGHT = 120;
+const MAX_BODY_HEIGHT = 400;
 const PIN_INSET = 18;
 const PIN_SPACING_PX = 13;
 const PIN_HIT_RADIUS = 10;
@@ -42,7 +45,8 @@ export interface DesignerLayout {
 
 /** Where a module and its terminals are drawn in the designer, in pixels. */
 export function designerLayout(def: ModuleDef, widthUnits: number = def.widthUnits): DesignerLayout {
-  const body = { x: MARGIN, y: MARGIN, width: widthUnits * UNIT_PX, height: BODY_HEIGHT };
+  const bodyHeight = Math.max(MIN_BODY_HEIGHT, Math.min(MAX_BODY_HEIGHT, (BODY_HEIGHT * def.heightMm) / DIN_MODULE_HEIGHT_MM));
+  const body = { x: MARGIN, y: MARGIN, width: widthUnits * UNIT_PX, height: bodyHeight };
   const terminals = terminalsOf(def, widthUnits);
   const sources = terminalSources(def, widthUnits);
   const pins = terminals.map((terminal, i): DesignerPin => {

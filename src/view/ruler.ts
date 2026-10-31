@@ -1,7 +1,7 @@
 import { MODULE_UNIT_MM, type TerminalSide } from '../library/types';
-import type { CombPlacement, Panel, WidthOf } from '../layout/placement';
+import type { CombPlacement, Panel, Sizes } from '../layout/placement';
 import type { Point } from './Camera';
-import { combRect, frameRect, moduleRect, railRect } from './geometry';
+import { combRect, frameRect, placementRect, railRect } from './geometry';
 
 export interface RulerLine {
   a: Point;
@@ -41,7 +41,7 @@ export interface EdgeLines {
 /** The x and y of every edge a measurement may start or end on: modules, combs, rails and the frame. */
 export function edgeLines(
   panel: Panel,
-  widthOf: WidthOf,
+  sizes: Sizes,
   combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
 ): EdgeLines {
   const xs: number[] = [];
@@ -50,9 +50,9 @@ export function edgeLines(
     xs.push(r.x, r.x + r.width);
     ys.push(r.y, r.y + r.height);
   };
-  add(frameRect(panel));
+  add(frameRect(panel, sizes));
   panel.rails.forEach((_r, rail) => add(railRect(panel, rail)));
-  for (const p of panel.placements) add(moduleRect(panel, p.rail, p.slot, widthOf(p) ?? 1));
+  for (const p of panel.placements) add(placementRect(panel, sizes, p));
   for (const c of panel.combs) {
     const info = combInfoOf(c);
     if (info) add(combRect(panel, c.rail, c.slot, info.widthUnits, info.side));

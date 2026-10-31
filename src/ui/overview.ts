@@ -4,7 +4,8 @@ import type { Project } from '../project';
 import { computeLayout, schematicBounds, boundsWithRoutes } from '../schematic/geometry';
 import { routeWires } from '../schematic/router';
 import type { Bounds, Point } from '../view/Camera';
-import { combRect, frameRect, moduleRect } from '../view/geometry';
+import { lookupsOf } from '../layout/lookups';
+import { combRect, frameRect, placementRect } from '../view/geometry';
 import type { Mode } from './session';
 
 export interface OverviewBox {
@@ -30,12 +31,12 @@ const boxOf = (r: { x: number; y: number; width: number; height: number }): Boun
 export function overviewOf(project: Project, resolve: Resolve, mode: Mode): Overview {
   if (mode === 'panel') {
     const { panel } = project;
-    const widthOf = (item: { module: Parameters<Resolve>[0]; widthUnits?: number }) => item.widthUnits ?? resolve(item.module)?.widthUnits ?? 1;
+    const { sizes, widthOf } = lookupsOf(resolve);
     return {
-      bounds: boxOf(frameRect(panel)),
+      bounds: boxOf(frameRect(panel, sizes)),
       boxes: [
-        ...panel.placements.map((p) => ({ box: boxOf(moduleRect(panel, p.rail, p.slot, widthOf(p))), color: MODULE_COLOR })),
-        ...panel.combs.map((c) => ({ box: boxOf(combRect(panel, c.rail, c.slot, widthOf(c), resolve(c.module)?.comb?.side ?? 'top')), color: COMB_COLOR })),
+        ...panel.placements.map((p) => ({ box: boxOf(placementRect(panel, sizes, p)), color: MODULE_COLOR })),
+        ...panel.combs.map((c) => ({ box: boxOf(combRect(panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')), color: COMB_COLOR })),
       ],
       paths: [],
     };

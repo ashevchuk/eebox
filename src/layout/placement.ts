@@ -58,6 +58,15 @@ export interface Panel {
 /** The width of a placed item: its own override, else the width its module has in the library. */
 export type WidthOf = (item: { module: ModuleRef; widthUnits?: number }) => number | undefined;
 
+/** The height in mm of a placed item: what its module's face measures in the library. */
+export type HeightOf = (item: { module: ModuleRef }) => number | undefined;
+
+/** How big a placed item is, which the drawing and the hit tests need and the placement rules do not. */
+export interface Sizes {
+  widthOf: WidthOf;
+  heightOf: HeightOf;
+}
+
 /** What a library allows for the width of copies of a module; undefined when it cannot be resized. */
 export interface ResizeInfo {
   minUnits: number;

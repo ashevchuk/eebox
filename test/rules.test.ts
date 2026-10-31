@@ -10,10 +10,10 @@ import { defs, panelOf, place } from './fixtures';
 
 const local: Record<string, ModuleDef> = {
   ...defs,
-  main32: { id: 'main32', kind: 'switch', name: 'Main 32 A', widthUnits: 3, poles: 3, ratedCurrentA: 32 },
-  mcb3x40: { id: 'mcb3x40', kind: 'breaker', name: 'MCB 3P 40 A', widthUnits: 3, poles: 3, ratedCurrentA: 40 },
-  mcb1x25: { id: 'mcb1x25', kind: 'breaker', name: 'MCB 1P 25 A', widthUnits: 1, poles: 1, ratedCurrentA: 25 },
-  mcb3x16: { id: 'mcb3x16', kind: 'breaker', name: 'MCB 3P 16 A', widthUnits: 3, poles: 3, ratedCurrentA: 16 },
+  main32: { id: 'main32', kind: 'switch', name: 'Main 32 A', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3, ratedCurrentA: 32 },
+  mcb3x40: { id: 'mcb3x40', kind: 'breaker', name: 'MCB 3P 40 A', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3, ratedCurrentA: 40 },
+  mcb1x25: { id: 'mcb1x25', kind: 'breaker', name: 'MCB 1P 25 A', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1, ratedCurrentA: 25 },
+  mcb3x16: { id: 'mcb3x16', kind: 'breaker', name: 'MCB 3P 16 A', widthUnits: 3, heightMm: 90, mounting: 'rail', poles: 3, ratedCurrentA: 16 },
 };
 const resolve = (r: ModuleRef): ModuleDef | undefined => local[r.moduleId];
 

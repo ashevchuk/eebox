@@ -10,7 +10,7 @@ import { addNode, connect, emptySchematic, setSourceOff, syncModuleNodes, type S
 import { panelOf, place } from './fixtures';
 
 const relay: ModuleDef = {
-  id: 'relay', kind: 'relay', name: 'Voltage relay', widthUnits: 1, poles: 2,
+  id: 'relay', kind: 'relay', name: 'Voltage relay', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2,
   terminals: [
     { name: 'L', conductor: 'L', side: 'top' }, { name: 'N', conductor: 'N', side: 'top' },
     { name: '11', conductor: 'C', side: 'bottom' }, { name: '12', conductor: 'C', side: 'bottom' }, { name: '14', conductor: 'C', side: 'bottom' },
@@ -24,7 +24,7 @@ const relay: ModuleDef = {
   },
 };
 const contactor: ModuleDef = {
-  id: 'contactor', kind: 'contactor', name: 'Contactor', widthUnits: 1, poles: 1,
+  id: 'contactor', kind: 'contactor', name: 'Contactor', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 1,
   terminals: [
     { name: 'A1', conductor: 'L', side: 'top' }, { name: 'A2', conductor: 'N', side: 'top' },
     { name: 'P1', conductor: 'L', side: 'top' }, { name: 'T1', conductor: 'L', side: 'bottom' },
@@ -179,12 +179,12 @@ describe('logic in a library', () => {
 
 describe('flags: latched and timed devices', () => {
   const impulse: ModuleDef = {
-    id: 'impulse', kind: 'relay', name: 'Impulse relay', widthUnits: 1, poles: 2,
+    id: 'impulse', kind: 'relay', name: 'Impulse relay', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2,
     terminals: [{ name: '1', conductor: 'L', side: 'top' }, { name: '2', conductor: 'L', side: 'bottom' }],
     logic: { inputs: {}, flags: { on: { label: 'Output on', default: true } }, contacts: [{ between: ['top:1', 'bottom:2'], closedWhen: 'on' }] },
   };
   const delayed: ModuleDef = {
-    id: 'delayed', kind: 'relay', name: 'On-delay', widthUnits: 1, poles: 2,
+    id: 'delayed', kind: 'relay', name: 'On-delay', widthUnits: 1, heightMm: 90, mounting: 'rail', poles: 2,
     terminals: [
       { name: 'A1', conductor: 'L', side: 'top' }, { name: 'A2', conductor: 'N', side: 'top' },
       { name: '15', conductor: 'C', side: 'bottom' }, { name: '18', conductor: 'C', side: 'bottom' },

@@ -4,7 +4,8 @@ import { drawConductorDot } from './conductorDraw';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
-import { MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
+import { lookupsOf } from '../layout/lookups';
 import type { ModuleRef, Panel } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
@@ -13,7 +14,7 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, MODULE_HEIGHT, combRect, frameRect, labelRoom, moduleRect, railRect, rowLabelX, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, combRect, frameRect, labelRoom, moduleRect, placementRect, railRect, rowLabelX, type Rect } from './geometry';
 
 export interface Ghost {
   module: ModuleDef;
@@ -64,6 +65,10 @@ export const LEVER_COLORS: Record<ModuleKind, string> = {
   comb: '#334155',
   switch: '#ea580c',
   relay: '#7c3aed',
+  softstarter: '#0e7490',
+  vfd: '#0369a1',
+  plc: '#15803d',
+  transformer: '#a16207',
   other: '#64748b',
 };
 
@@ -118,6 +123,8 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts
   ctx.restore();
 }
 
+const sizesOf = (scene: Scene) => lookupsOf(scene.resolve).sizes;
+
 const itemWidth = (scene: Scene, item: { module: ModuleRef; widthUnits?: number }): number =>
   item.widthUnits ?? scene.resolve(item.module)?.widthUnits ?? 1;
 
@@ -161,8 +168,8 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
   });
   for (const placement of panel.placements) {
     if (!placement.label || !texts.moduleLabels) continue;
-    const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
-    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail), 'right', theme().label);
+    const r = placementRect(panel, sizesOf(scene), placement);
+    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, labelRoom(panel, placement.rail, r.height), 'right', theme().label);
   }
   ctx.font = LABEL_FONT;
   ctx.fillStyle = theme().label;
@@ -225,7 +232,7 @@ function drawModule(
   widthUnits: number,
   texts: TextVisibility,
 ): void {
-  const r = moduleRect(panel, rail, slot, widthUnits);
+  const r = moduleRect(panel, rail, slot, widthUnits, def?.heightMm ?? DIN_MODULE_HEIGHT_MM);
   if (!def) {
     fillRect(ctx, r, COLORS.missing);
     return;
@@ -248,7 +255,7 @@ function drawFace(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthU
 /** A picture of a module for a list, as large as fits in a square of `sizePx`; the name is left out, it is too small to read. */
 export function drawThumbnail(canvas: HTMLCanvasElement, def: ModuleDef, sizePx: number): void {
   const widthMm = def.widthUnits * MODULE_UNIT_MM;
-  const heightMm = def.comb ? COMB_HEIGHT : MODULE_HEIGHT;
+  const heightMm = def.comb ? COMB_HEIGHT : def.heightMm;
   const scale = Math.min(sizePx / widthMm, sizePx / heightMm);
   const ratio = window.devicePixelRatio || 1;
   const width = Math.max(1, Math.round(widthMm * scale));
@@ -319,7 +326,7 @@ export function render(
   ctx.scale(camera.scale, camera.scale);
 
   const { panel } = scene;
-  const frame = frameRect(panel);
+  const frame = frameRect(panel, sizesOf(scene));
   const texts = scene.texts ?? ALL_TEXT;
   if (!scene.bare) {
     fillRect(ctx, frame, theme().frameFill);
@@ -367,13 +374,13 @@ export function render(
     drawModule(ctx, panel, scene.resolve(placement.module), placement.rail, placement.slot, itemWidth(scene, placement), texts);
     const mark = scene.marked?.get(placement.id);
     if (mark) {
-      const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
+      const r = placementRect(panel, sizesOf(scene), placement);
       ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
     }
     if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
-      const r = moduleRect(panel, placement.rail, placement.slot, itemWidth(scene, placement));
+      const r = placementRect(panel, sizesOf(scene), placement);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
       ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
@@ -400,7 +407,7 @@ export function render(
     const color = valid ? COLORS.ghostOk : COLORS.ghostBad;
     const area = module.comb
       ? combRect(panel, rail, slot, widthUnits, module.comb.side)
-      : moduleRect(panel, rail, slot, widthUnits);
+      : moduleRect(panel, rail, slot, widthUnits, module.heightMm);
     fillRect(ctx, area, color);
   }
 

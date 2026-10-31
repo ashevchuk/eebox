@@ -16,7 +16,7 @@ const splitter: ModuleDef = {
   id: 'split',
   kind: 'busbar',
   name: 'PEN splitting block',
-  widthUnits: 6,
+  widthUnits: 6, heightMm: 90, mounting: 'rail',
   poles: 1,
   terminals: [
     { name: 'PEN', conductor: 'PEN', side: 'top', net: 'PEN', count: 2 },
@@ -28,7 +28,7 @@ const bond: ModuleDef = {
   id: 'bond',
   kind: 'busbar',
   name: 'N-PE bond',
-  widthUnits: 2,
+  widthUnits: 2, heightMm: 90, mounting: 'rail',
   poles: 1,
   terminals: [
     { name: 'N', conductor: 'N', side: 'top', net: 'B' },
@@ -39,7 +39,7 @@ const penBreaker: ModuleDef = {
   id: 'penbreaker',
   kind: 'breaker',
   name: 'Breaker with PEN',
-  widthUnits: 2,
+  widthUnits: 2, heightMm: 90, mounting: 'rail',
   poles: 2,
   terminals: [
     { name: 'PEN', conductor: 'PEN', side: 'top' },
