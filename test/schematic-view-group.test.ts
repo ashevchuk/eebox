@@ -57,6 +57,7 @@ describe('several wires selected together', () => {
   it('move together by the same amount when one of them is pulled, in one step of history; a wire that is not alongside stays', () => {
     const { session, view, paths, grip } = scene();
     const before = ['w1', 'w2', 'w3'].map((id) => segmentsOf(paths().get(id)!).find((s) => !s.vertical)!.a.y);
+    const thirdBefore = paths().get('w3');
     for (const id of ['w1', 'w2', 'w3']) {
       view.pointerDown(shift, grip(id));
       view.pointerUp(shift, grip(id));
@@ -70,7 +71,9 @@ describe('several wires selected together', () => {
     expect(second).toBeDefined();
     expect(first! - before[0]!).toBeCloseTo(second! - before[1]!, 6);
     expect(second! - before[1]!).toBeLessThan(-20);
-    expect(third).toBeUndefined();
+    // The wire that is not alongside is drawn where it was; it may be held there by a route of its own.
+    expect(paths().get('w3')).toEqual(thirdBefore);
+    expect(third === undefined || third === before[2]).toBe(true);
     session.undo();
     expect(routes(session)).toEqual([undefined, undefined, undefined]);
   });
@@ -110,7 +113,7 @@ describe('several wires selected together', () => {
     expect(view2.actions.map((a) => a.key)).toEqual(['routeAutomatically']);
     const cleared = applyAction(context, 'routeAutomatically');
     if (!cleared.ok) throw new Error(cleared.message);
-    expect(cleared.project.schematic.wires.some((w) => w.route)).toBe(false);
+    expect(cleared.project.schematic.wires.filter((w) => ['w1', 'w2'].includes(w.id)).some((w) => w.route)).toBe(false);
   });
 });
 

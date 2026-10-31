@@ -1,3 +1,4 @@
+import { holdOthersStill, holdingRoute } from '../schematic/hold';
 import { energy, type Energy } from '../electrical/energy';
 import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
@@ -154,6 +155,10 @@ export class SchematicView implements View {
     companions: Array<Companion & { lanes: Lanes }>;
     targets: Record<'x' | 'y', SnapTarget[]>;
     guide: { axis: 'x' | 'y'; value: number } | null;
+    /** Where every wire was drawn when the pull began, so the others can be kept there. */
+    before: Map<string, Point[]>;
+    /** The routes that show the other automatic wires where they are while one is pulled, so they do not jump about. */
+    hold: Map<string, Lanes>;
   } | null = null;
   /** A rubber band being dragged over the schematic to select wires. */
   /** A rubber band being dragged over empty space: with Shift it takes wires, with Ctrl nodes. */
@@ -376,6 +381,12 @@ export class SchematicView implements View {
             }),
           ).map((c) => ({ ...c, lanes: c.drag.lanes }))
         : [];
+    const hold = new Map<string, Lanes>();
+    for (const other of frame.schematic.wires) {
+      if (other.route || moving.has(other.id)) continue;
+      const lanes = holdingRoute(routes.get(other.id), frame.schematic, frame.layout, other.id);
+      if (lanes) hold.set(other.id, lanes);
+    }
     this.wireDrag = {
       wireId: wire.id,
       ...ends,
@@ -386,6 +397,8 @@ export class SchematicView implements View {
       companions,
       targets: { x: laneTargets('x', frame.layout, routes, moving), y: laneTargets('y', frame.layout, routes, moving) },
       guide: null,
+      before: routes,
+      hold,
     };
   }
 
@@ -487,7 +500,11 @@ export class SchematicView implements View {
           changed = true;
         }
       }
-      if (changed) this.session.commit({ ...project, schematic });
+      if (changed) {
+        // The others stay where they were drawn, not where the router would now put them.
+        schematic = holdOthersStill(schematic, this.frame().layout, pulled.before, new Set(moves.map(([id]) => id)));
+        this.session.commit({ ...project, schematic });
+      }
       this.session.changed();
       return;
     }
@@ -653,7 +670,7 @@ export class SchematicView implements View {
     const withNode: Schematic = moving
       ? { ...schematic, nodes: schematic.nodes.map((n) => (moving.group.has(n.id) ? { ...n, x: moving.group.get(n.id)!.x + shift.dx, y: moving.group.get(n.id)!.y + shift.dy } : n)) }
       : schematic;
-    const routed = dragged ? new Map([[dragged.wireId, dragged.lanes], ...dragged.companions.map((c): [string, Lanes] => [c.wire, c.lanes])]) : null;
+    const routed = dragged ? new Map([...dragged.hold, [dragged.wireId, dragged.lanes], ...dragged.companions.map((c): [string, Lanes] => [c.wire, c.lanes])]) : null;
     const shown: Schematic = routed
       ? { ...withNode, wires: withNode.wires.map((w) => (routed.has(w.id) ? { ...w, route: routed.get(w.id)! } : w)) }
       : withNode;
