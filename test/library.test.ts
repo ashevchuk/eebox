@@ -1,3 +1,4 @@
+import { GENERATOR } from '../src/generator';
 import { describe, expect, it } from 'vitest';
 import genericIecText from '../libraries/generic-iec.json?raw';
 import { MemoryLibraryStorage, importLibraryText, seedBundledLibrary } from '../src/library/storage';
@@ -90,7 +91,7 @@ describe('library export/import', () => {
     const first = parseLibraryJson(genericIecText);
     if (!first.ok) throw new Error('bundled library must be valid');
     const second = parseLibraryJson(exportLibraryJson(first.library));
-    expect(second).toEqual(first);
+    expect(second).toEqual({ ok: true, library: { ...first.library, generator: GENERATOR } });
   });
 });
 
@@ -248,7 +249,7 @@ describe('library metadata', () => {
   it('round-trips the metadata through export', () => {
     const first = validateLibrary(withMeta({ version: '3', vendor: 'V', url: 'http://example.com', description: 'D' }));
     if (!first.ok) throw new Error('should load');
-    expect(parseLibraryJson(exportLibraryJson(first.library))).toEqual(first);
+    expect(parseLibraryJson(exportLibraryJson(first.library))).toEqual({ ok: true, library: { ...first.library, generator: GENERATOR } });
   });
 
   it('accepts a $schema pointer and drops it, so editors can validate the file', () => {

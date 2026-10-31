@@ -45,6 +45,11 @@
       "minLength": 1,
       "maxLength": 300
     },
+    "generator": {
+      "type": "string",
+      "pattern": "^eebox \\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.]+)?$",
+      "description": "The application that wrote the file, such as eebox 0.7.0. Written on export; optional on import."
+    },
     "modules": {
       "type": "array",
       "items": {

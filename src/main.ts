@@ -89,6 +89,7 @@ import { groupSelection, selectedIds, selectedNodes, selectedWires } from './ui/
 import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
 import { SnippetsView } from './ui/snippetsView';
+import { versionHint, withoutGenerator } from './generator';
 import { askForText } from './ui/textDialog';
 import { SKIPPED_SHOWN, importTerminalLabels } from './project/terminalLabelsImport';
 import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
@@ -634,10 +635,12 @@ async function confirmDiscard(): Promise<boolean> {
   return confirmDialog('Discard the current panel and schematic? Its last state stays under File > Projects, in Earlier states.', 'Discard');
 }
 
-function describeErrors(source: string, errors: ValidationError[]): string[] {
+/** `text` is the file that was refused, if there is one, so that the message can say which version wrote it. */
+function describeErrors(source: string, errors: ValidationError[], text?: string): string[] {
   const shown = errors.slice(0, 5).map((err) => `${source} ${err.path || '(root)'}: ${err.message}`);
   const hidden = errors.length - shown.length;
-  return hidden > 0 ? [...shown, `${source}: ${hidden} more errors`] : shown;
+  const hint = text === undefined ? null : versionHint(text);
+  return [...(hidden > 0 ? [...shown, `${source}: ${hidden} more errors`] : shown), ...(hint ? [hint] : [])];
 }
 
 function applyLoaded(file: ProjectFile, warnings: string[], source: string): void {
@@ -708,7 +711,7 @@ byId<HTMLInputElement>('compare-file').addEventListener('change', async (e) => {
   const text = await file.text();
   input.value = '';
   const result = parseProjectJson(text);
-  if (!result.ok) return showStatus(describeErrors(file.name, result.errors).join('\n'), true);
+  if (!result.ok) return showStatus(describeErrors(file.name, result.errors, text).join('\n'), true);
   showDifferences(result.file, file.name);
 });
 
@@ -749,13 +752,13 @@ let lastSnapshotAt = 0;
 async function keepSnapshot(force: boolean): Promise<void> {
   if (!hasWork(session.project)) return;
   const file = session.toFile();
-  const json = canonicalJson(file);
+  const json = canonicalJson(withoutGenerator(file));
   const now = Date.now();
   if (json === lastSnapshotJson || (!force && now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS)) return;
   try {
     const all = await projectStore.list();
     lastSnapshotJson = json;
-    if (all.some((p) => canonicalJson(p.file) === json)) return;
+    if (all.some((p) => canonicalJson(withoutGenerator(p.file)) === json)) return;
     const snapshot = { id: newSnapshotId(all, now), title: file.project.panel.title ?? '', savedAt: now, file, snapshot: true as const };
     await projectStore.put(snapshot);
     lastSnapshotAt = now;
@@ -789,7 +792,7 @@ async function backupEverything(): Promise<void> {
 
 async function restoreEverything(text: string, name: string): Promise<void> {
   const parsed = parseWorkspace(text);
-  if (!parsed.ok) return showStatus(describeErrors(name, parsed.errors).join('\n'), true);
+  if (!parsed.ok) return showStatus(describeErrors(name, parsed.errors, text).join('\n'), true);
   const { workspace } = parsed;
   try {
     const plan = planProjectImport(await projectStore.list(), savedProjects(workspace.projects));
@@ -1216,7 +1219,7 @@ async function removeLibrary(library: Library): Promise<void> {
 
 async function openProjectFile(text: string, name: string): Promise<string | null> {
   const result = parseProjectJson(text);
-  if (!result.ok) return describeErrors(name, result.errors).join('\n');
+  if (!result.ok) return describeErrors(name, result.errors, text).join('\n');
   if (await confirmDiscard()) applyLoaded(result.file, result.warnings, name);
   return null;
 }
@@ -1255,7 +1258,7 @@ async function importFiles(files: FileList | File[]): Promise<void> {
     });
     if (outcome.kind === 'invalid') {
       failed = true;
-      lines.push(...describeErrors(file.name, outcome.errors));
+      lines.push(...describeErrors(file.name, outcome.errors, libraryText));
     } else if (outcome.kind === 'reserved') {
       failed = true;
       lines.push(`${file.name}: the id "${outcome.library.id}" belongs to the bundled library; give yours another id.`);
@@ -1300,7 +1303,7 @@ byId<HTMLInputElement>('open-project').addEventListener('change', async (e) => {
   const text = await file.text();
   input.value = '';
   const result = parseProjectJson(text);
-  if (!result.ok) showStatus(describeErrors(file.name, result.errors).join('\n'), true);
+  if (!result.ok) showStatus(describeErrors(file.name, result.errors, text).join('\n'), true);
   else if (await confirmDiscard()) applyLoaded(result.file, result.warnings, file.name);
 });
 

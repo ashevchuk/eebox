@@ -182,6 +182,8 @@ export interface Library {
   /** Where the library comes from; only http and https links are accepted. */
   url?: string;
   description?: string;
+  /** The application that wrote the file, as `eebox 0.7.0`; only in a file that was exported. */
+  generator?: string;
   modules: ModuleDef[];
   enclosures: EnclosureDef[];
 }

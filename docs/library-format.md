@@ -19,6 +19,7 @@ Unknown fields are rejected. Errors are reported with their path, for example `m
 | `vendor` | string | optional |
 | `url` | string | optional; `http` or `https` only, at most 300 characters, no spaces |
 | `description` | string | optional, one line, at most 300 characters |
+| `generator` | string | optional; the release that wrote the file, such as `eebox 0.7.0`; written on export, and any earlier mark is replaced. See [file-format.md](file-format.md) |
 | `modules` | array | module definitions |
 | `enclosures` | array | enclosure definitions |
 

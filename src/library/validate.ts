@@ -1,3 +1,4 @@
+import { GENERATOR, generatorCheck } from '../generator';
 import { isStoredLabel } from '../layout/labels';
 import { MAX_LABEL_LENGTH, MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../layout/limits';
 import { MIN_WIDTH_UNITS } from '../layout/units';
@@ -475,6 +476,7 @@ const descriptionCheck: FieldCheck = (v) =>
     : `must be 1 to ${MAX_DESCRIPTION_LENGTH} characters on one line, without surrounding spaces`;
 
 export const LIBRARY_SPEC: FieldSpec = {
+  generator: { required: false, check: generatorCheck },
   $schema: { required: false, check: (v) => (typeof v === 'string' && v.length <= MAX_URL_LENGTH ? null : 'must be a string') },
   version: { required: false, check: versionCheck },
   vendor: { required: false, check: labelCheck },
@@ -575,6 +577,7 @@ export function validateLibrary(raw: unknown): ParseResult {
       ...(root.vendor !== undefined ? { vendor: root.vendor as string } : {}),
       ...(root.url !== undefined ? { url: root.url as string } : {}),
       ...(root.description !== undefined ? { description: root.description as string } : {}),
+      ...(root.generator !== undefined ? { generator: root.generator as string } : {}),
       modules,
       enclosures,
     },
@@ -592,5 +595,6 @@ export function parseLibraryJson(text: string): ParseResult {
 }
 
 export function exportLibraryJson(library: Library): string {
-  return `${JSON.stringify(library, null, 2)}\n`;
+  const { schemaVersion, generator: _earlier, ...rest } = library;
+  return `${JSON.stringify({ schemaVersion, generator: GENERATOR, ...rest }, null, 2)}\n`;
 }

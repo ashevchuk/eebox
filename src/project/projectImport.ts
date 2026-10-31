@@ -1,3 +1,4 @@
+import { withoutGenerator } from '../generator';
 import { canonicalJson } from './canonical';
 import { fileStem } from './names';
 import { parseProjectJson } from './file';
@@ -65,8 +66,8 @@ export function planProjectFiles(existing: readonly StoredProject[], files: read
       continue;
     }
     const title = parsed.file.project.panel.title ?? '';
-    const content = canonicalJson(parsed.file);
-    if (known.some((p) => !p.snapshot && canonicalJson(p.file) === content)) {
+    const content = canonicalJson(withoutGenerator(parsed.file));
+    if (known.some((p) => !p.snapshot && canonicalJson(withoutGenerator(p.file)) === content)) {
       results.push({ name, outcome: 'unchanged', title });
       continue;
     }

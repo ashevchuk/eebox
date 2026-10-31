@@ -56,6 +56,8 @@ import { CONDUCTORS, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import { MAX_LOOP_IMPEDANCE_MOHM, MAX_SHORT_CIRCUIT_KA, routeProblem, findProblems as findSchematicProblems, type SchematicNode, type Wire } from '../schematic/model';
 
+import { GENERATOR, generatorCheck } from '../generator';
+
 export const PROJECT_FORMAT = 'eebox-project';
 export const PROJECT_VERSION = 1;
 const NODE_KINDS = ['source', 'load', 'module'] as const;
@@ -63,6 +65,8 @@ const NODE_KINDS = ['source', 'load', 'module'] as const;
 export interface ProjectFile {
   format: typeof PROJECT_FORMAT;
   version: typeof PROJECT_VERSION;
+  /** The application that wrote the file, as `eebox 0.7.0`; files from before it was written lack it. */
+  generator?: string;
   project: Project;
   /** Definitions of the placed modules at save time, keyed by `libraryId/moduleId`. */
   modules: Record<string, ModuleDef>;
@@ -83,7 +87,7 @@ export function buildProjectFile(
     const def = resolve(module);
     if (def) modules[moduleKey(module)] = def;
   }
-  return { format: PROJECT_FORMAT, version: PROJECT_VERSION, project, modules };
+  return { format: PROJECT_FORMAT, version: PROJECT_VERSION, generator: GENERATOR, project, modules };
 }
 
 const objectCheck = (v: unknown) => (isRecord(v) ? null : 'must be an object');
@@ -152,6 +156,7 @@ const ROOT_SPEC: FieldSpec = {
     required: true,
     check: (v) => (v === PROJECT_VERSION ? null : `unsupported version, this build reads ${PROJECT_VERSION}`),
   },
+  generator: { required: false, check: generatorCheck },
   project: { required: true, check: objectCheck },
   modules: { required: true, check: objectCheck },
 };
@@ -425,7 +430,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   };
   return {
     ok: true,
-    file: { format: PROJECT_FORMAT, version: PROJECT_VERSION, project: parsed, modules },
+    file: { format: PROJECT_FORMAT, version: PROJECT_VERSION, ...(root.generator !== undefined ? { generator: root.generator as string } : {}), project: parsed, modules },
     warnings: projectWarnings(parsed, (ref) => modules[moduleKey(ref)]),
   };
 }

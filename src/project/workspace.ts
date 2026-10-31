@@ -1,3 +1,4 @@
+import { GENERATOR, generatorCheck } from '../generator';
 import type { Snippet } from '../layout/snippets';
 import type { Library } from '../library/types';
 import { validateLibrary, type ValidationError } from '../library/validate';
@@ -32,6 +33,8 @@ export const SETTING_KEYS = [
 export interface WorkspaceFile {
   format: typeof WORKSPACE_FORMAT;
   version: typeof WORKSPACE_VERSION;
+  /** The application that wrote the file, as `eebox 0.7.0`; files from before it was written lack it. */
+  generator?: string;
   savedAt: number;
   /** The project on the screen when the backup was made. */
   current: ProjectFile | null;
@@ -48,8 +51,8 @@ export type WorkspaceParseResult =
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function buildWorkspace(parts: Omit<WorkspaceFile, 'format' | 'version'>): WorkspaceFile {
-  return { format: WORKSPACE_FORMAT, version: WORKSPACE_VERSION, ...parts };
+export function buildWorkspace(parts: Omit<WorkspaceFile, 'format' | 'version' | 'generator'>): WorkspaceFile {
+  return { format: WORKSPACE_FORMAT, version: WORKSPACE_VERSION, generator: GENERATOR, ...parts };
 }
 
 export function workspaceToText(workspace: WorkspaceFile): string {
@@ -72,7 +75,11 @@ export function parseWorkspace(text: string): WorkspaceParseResult {
   if (raw.format !== WORKSPACE_FORMAT) return { ok: false, errors: [{ path: 'format', message: `expected "${WORKSPACE_FORMAT}"` }] };
   if (raw.version !== WORKSPACE_VERSION) return { ok: false, errors: [{ path: 'version', message: `expected ${WORKSPACE_VERSION}` }] };
   for (const key of Object.keys(raw)) {
-    if (!['format', 'version', 'savedAt', 'current', 'projects', 'libraries', 'snippets', 'settings'].includes(key)) fail(key, 'unknown field');
+    if (!['format', 'version', 'generator', 'savedAt', 'current', 'projects', 'libraries', 'snippets', 'settings'].includes(key)) fail(key, 'unknown field');
+  }
+  if (raw.generator !== undefined) {
+    const problem = generatorCheck(raw.generator);
+    if (problem) fail('generator', problem);
   }
   if (typeof raw.savedAt !== 'number' || !Number.isFinite(raw.savedAt)) fail('savedAt', 'must be a number');
 
@@ -128,5 +135,7 @@ export function parseWorkspace(text: string): WorkspaceParseResult {
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, workspace: buildWorkspace({ savedAt: raw.savedAt as number, current, projects, libraries, snippets: snippetList.ok ? snippetList.snippets : [], settings }), warnings };
+  // What was read keeps the mark of the file it came from, not the mark of this build.
+  const { generator: _thisBuild, ...built } = buildWorkspace({ savedAt: raw.savedAt as number, current, projects, libraries, snippets: snippetList.ok ? snippetList.snippets : [], settings });
+  return { ok: true, workspace: { ...built, ...(raw.generator !== undefined ? { generator: raw.generator as string } : {}) }, warnings };
 }
