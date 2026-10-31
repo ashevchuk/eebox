@@ -1,6 +1,7 @@
 import type { Annotation } from '../layout/annotations';
 import { INFO_KEYS, INFO_LABELS } from '../layout/info';
-import type { CombPlacement, ModuleRef, Placement, ShelfItem } from '../layout/placement';
+import type { CombPlacement, ModuleRef, Panel, Placement, ShelfItem } from '../layout/placement';
+import { rowNumber } from '../layout/plates';
 import type { SchematicNode, TerminalRef, Wire } from '../schematic/model';
 import { canonicalJson } from './canonical';
 import { moduleKey, type ProjectFile } from './file';
@@ -67,8 +68,8 @@ function fieldChanges(before: object, after: object, skip: readonly string[], pr
   });
 }
 
-const where = (item: { rail?: number; slot?: number; x?: number; y?: number }): string =>
-  item.rail !== undefined ? `row ${item.rail + 1}, position ${item.slot}` : item.x !== undefined ? `on the plate at ${item.x}, ${item.y} mm` : 'on the shelf';
+const where = (panel: Panel, item: { rail?: number; slot?: number; x?: number; y?: number }): string =>
+  item.rail !== undefined ? `row ${rowNumber(panel, item.rail)}, position ${item.slot}` : item.x !== undefined ? `on the plate at ${item.x}, ${item.y} mm` : 'on the shelf';
 
 function byId<T extends { id: string }>(items: readonly T[]): Map<string, T> {
   return new Map(items.map((item) => [item.id, item]));
@@ -79,7 +80,7 @@ function compareLists<T extends { id: string }>(
   before: readonly T[],
   after: readonly T[],
   area: ChangeArea,
-  describe: (item: T) => string,
+  describe: (item: T, side: 'before' | 'after') => string,
   changes: (a: T, b: T) => string[],
 ): Change[] {
   const old = byId(before);
@@ -87,13 +88,13 @@ function compareLists<T extends { id: string }>(
   const out: Change[] = [];
   for (const item of after) {
     const previous = old.get(item.id);
-    if (!previous) out.push({ area, kind: 'added', text: describe(item) });
+    if (!previous) out.push({ area, kind: 'added', text: describe(item, 'after') });
     else {
       const what = changes(previous, item);
-      if (what.length > 0) out.push({ area, kind: 'changed', text: `${describe(item)}: ${what.join('; ')}` });
+      if (what.length > 0) out.push({ area, kind: 'changed', text: `${describe(item, 'after')}: ${what.join('; ')}` });
     }
   }
-  for (const item of before) if (!next.has(item.id)) out.push({ area, kind: 'removed', text: describe(item) });
+  for (const item of before) if (!next.has(item.id)) out.push({ area, kind: 'removed', text: describe(item, 'before') });
   return out;
 }
 
@@ -124,10 +125,10 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
   for (let i = 0; i < rows; i++) {
     const [railA, railB] = [a.rails[i], b.rails[i]];
     if (!railA || !railB) continue;
-    if (railA.lengthUnits !== railB.lengthUnits) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: length ${railA.lengthUnits} → ${railB.lengthUnits} units` });
-    if (railA.x !== railB.x || railA.y !== railB.y) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: position ${railA.x}, ${railA.y} → ${railB.x}, ${railB.y} mm` });
-    if (railA.plate !== railB.plate) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: plate ${show(railA.plate)} \u2192 ${show(railB.plate)}` });
-    if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${i + 1}: label ${show(railA.label)} → ${show(railB.label)}` });
+    if (railA.lengthUnits !== railB.lengthUnits) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: length ${railA.lengthUnits} → ${railB.lengthUnits} units` });
+    if (railA.x !== railB.x || railA.y !== railB.y) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: position ${railA.x}, ${railA.y} → ${railB.x}, ${railB.y} mm` });
+    if (railA.plate !== railB.plate) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: plate ${show(railA.plate)} \u2192 ${show(railB.plate)}` });
+    if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: label ${show(railA.label)} → ${show(railB.label)}` });
   }
 
   const placed = (file: ProjectFile) => [...file.project.panel.placements, ...file.project.panel.shelf.map((s: ShelfItem) => ({ ...s, rail: undefined, slot: undefined }))] as Array<ShelfItem & { rail?: number; slot?: number; x?: number; y?: number }>;
@@ -136,9 +137,9 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
       placed(before),
       placed(after),
       'modules',
-      (p) => `${p.label ? `"${p.label}" ` : ''}${moduleName(after, p.module)} (${p.id}), ${where(p)}`,
+      (p, side) => `${p.label ? `"${p.label}" ` : ''}${moduleName(after, p.module)} (${p.id}), ${where(side === 'after' ? b : a, p)}`,
       (p, q) => [
-        ...(where(p) !== where(q) ? [`moved from ${where(p)} to ${where(q)}`] : []),
+        ...(where(a, p) !== where(b, q) ? [`moved from ${where(a, p)} to ${where(b, q)}`] : []),
         ...(!same(p.module, q.module) ? [`module ${moduleName(before, p.module)} → ${moduleName(after, q.module)}`] : []),
         ...fieldChanges(p, q, ['id', 'module', 'rail', 'slot', 'x', 'y']),
       ],
@@ -147,9 +148,9 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
       a.combs,
       b.combs,
       'combs',
-      (c: CombPlacement) => `${c.label ? `"${c.label}" ` : ''}${moduleName(after, c.module)} (${c.id}), ${where(c)}`,
+      (c: CombPlacement, side) => `${c.label ? `"${c.label}" ` : ''}${moduleName(after, c.module)} (${c.id}), ${where(side === 'after' ? b : a, c)}`,
       (p, q) => [
-        ...(where(p) !== where(q) ? [`moved from ${where(p)} to ${where(q)}`] : []),
+        ...(where(a, p) !== where(b, q) ? [`moved from ${where(a, p)} to ${where(b, q)}`] : []),
         ...(!same(p.module, q.module) ? [`module ${moduleName(before, p.module)} → ${moduleName(after, q.module)}`] : []),
         ...fieldChanges(p, q, ['id', 'module', 'rail', 'slot']),
       ],

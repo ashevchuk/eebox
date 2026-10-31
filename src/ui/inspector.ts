@@ -2,7 +2,7 @@ import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../layout/ducts';
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
-import { moveRailToPlate, moveToPlate, plateById, removePlate, renamePlate, resizePlate, setRailCountOnPlate } from '../layout/plates';
+import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
 import { lookupsOf } from '../layout/lookups';
 import {
   MAX_CLEARANCE_MM,
@@ -163,6 +163,7 @@ const REPEAT_FIELD: InspectorField = {
 
 const LABEL_MESSAGE = 'Labels are 1 to 60 characters, without line breaks.';
 const NOT_A_NUMBER = 'Enter a whole number.';
+const NO_SUCH_ROW = 'There is no such row.';
 const NOT_A_DECIMAL = 'Enter a number.';
 
 /** What the selection points at, given which view is showing: a module node stands for its placement. */
@@ -353,7 +354,7 @@ function positionFields(
         ...plateField(project.panel, item.plate),
       ]
     : [
-        integer('row', 'Row', item.rail + 1, 1, Math.max(1, rails.length)),
+        integer('row', 'Row', rowNumber(project.panel, item.rail), 1, Math.max(1, rowsOnPlateOf(project.panel, item.rail))),
         decimal('slot', 'Position', lengthIn(unit, item.slot), 0, lengthIn(unit, Math.max(0, (rails[item.rail]?.lengthUnits ?? 0) - width)), `${named} from the start of the rail, ${lengthText(unit, item.slot)}`),
       ];
   return [
@@ -527,11 +528,11 @@ export function inspect(ctx: InspectContext): InspectorView {
       const onRail = panel.placements.filter((p) => p.rail === rail).length;
       const combsOnRail = panel.combs.filter((c) => c.rail === rail).length;
       return {
-        title: `Row ${rail + 1}`,
+        title: `Row ${rowNumber(panel, rail)}`,
         actions: [],
         fields: [
-          text('label', 'Label', panel.rails[rail]?.label ?? '', `Row ${rail + 1}`),
-          integer('position', 'Position', rail + 1, 1, panel.rails.length),
+          text('label', 'Label', panel.rails[rail]?.label ?? '', `Row ${rowNumber(panel, rail)}`),
+          integer('position', 'Position', rowNumber(panel, rail), 1, rowsOnPlateOf(panel, rail)),
           decimal('length', 'Length', panel.rails[rail]?.lengthUnits ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.rails[rail]?.lengthUnits ?? 0)} mm`),
           decimal('x', 'Left end', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge'),
           decimal('y', 'Height', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top to the middle of the rail'),
@@ -784,11 +785,13 @@ export function applyEdit(
       const value = key === 'slot' || key === 'width' ? unitsOf(numberOf(raw), ctx.lengthUnit) : integerOf(raw);
       if ((key === 'row' || key === 'slot') && isOnRail(placement)) {
         if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
+        const rail = key === 'row' ? railOfRowNumber(panel, placement.rail, value) : placement.rail;
+        if (rail === null) return fail(NO_SUCH_ROW);
         const result = movePlacement(
           panel,
           widthOf,
           placement.id,
-          key === 'row' ? value - 1 : placement.rail,
+          rail,
           key === 'slot' ? value : placement.slot,
         );
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
@@ -815,11 +818,13 @@ export function applyEdit(
       const value = key === 'slot' || key === 'width' ? unitsOf(numberOf(raw), ctx.lengthUnit) : integerOf(raw);
       if (key === 'row' || key === 'slot') {
         if (value === null) return fail(key === 'row' ? NOT_A_NUMBER : NOT_A_DECIMAL);
+        const rail = key === 'row' ? railOfRowNumber(panel, comb.rail, value) : comb.rail;
+        if (rail === null) return fail(NO_SUCH_ROW);
         const result = moveComb(
           panel,
           combLookup,
           comb.id,
-          key === 'row' ? value - 1 : comb.rail,
+          rail,
           key === 'slot' ? value : comb.slot,
         );
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
@@ -873,8 +878,10 @@ export function applyEdit(
       const value = key === 'length' || key === 'x' || key === 'y' ? numberOf(raw) : integerOf(raw);
       if (value === null) return fail(NOT_A_NUMBER);
       if (key === 'position') {
-        const result = moveRail(panel, rail, value - 1);
-        return result.ok ? { ok: true, project: { ...project, panel: result.panel }, selection: { rail: value - 1 } } : fail('There is no such row.');
+        const target = railOfRowNumber(panel, rail, value);
+        if (target === null) return fail(NO_SUCH_ROW);
+        const result = moveRail(panel, rail, target);
+        return result.ok ? { ok: true, project: { ...project, panel: result.panel }, selection: { rail: target } } : fail(NO_SUCH_ROW);
       }
       if (key === 'length') {
         const result = setRailLength(panel, widthOf, rail, value);

@@ -33,6 +33,25 @@ export function railOffset(panel: Panel, plateId: string): number {
   return panel.rails.filter((r) => before.includes(r.plate)).length;
 }
 
+/** The number a row is shown by: its place among the rows of its own plate, counted from 1. */
+export function rowNumber(panel: Panel, rail: number): number {
+  const plate = panel.rails[rail]?.plate;
+  return plate === undefined ? rail + 1 : rail - railOffset(panel, plate) + 1;
+}
+
+/** How many rows the plate of a row has. */
+export function rowsOnPlateOf(panel: Panel, rail: number): number {
+  const plate = panel.rails[rail]?.plate;
+  return panel.rails.filter((r) => r.plate === plate).length;
+}
+
+/** The index in the panel of row number `row` (from 1) of the plate that `rail` is on; null when the plate has no such row. */
+export function railOfRowNumber(panel: Panel, rail: number, row: number): number | null {
+  const plate = panel.rails[rail]?.plate;
+  if (plate === undefined || !Number.isInteger(row) || row < 1 || row > rowsOnPlateOf(panel, rail)) return null;
+  return railOffset(panel, plate) + row - 1;
+}
+
 /** Whether the rails stand in blocks, one per plate, in the order of the plates. */
 export function railsAreGrouped(panel: Panel): boolean {
   const order = panel.plates.map((p) => p.id);

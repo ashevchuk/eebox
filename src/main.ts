@@ -79,7 +79,7 @@ import { PaletteView } from './ui/paletteView';
 import { DEFAULT_PRINT_OPTIONS, pageRule, type PrintOptions } from './project/printOptions';
 import { openPrintDialog } from './ui/printDialog';
 import { fillPrintSheet } from './ui/printSheet';
-import { notesOnPlate, withPlateNotes } from './layout/plates';
+import { notesOnPlate, rowNumber, withPlateNotes } from './layout/plates';
 import { MAX_ANNOTATIONS, MAX_NOTE_CHARS, addAnnotation, hitAnnotation, moveAnnotation, removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from './layout/annotations';
 import { centreOf, pinchStep, type Pair } from './view/pinch';
 import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, plateStep, type Arrow } from './ui/keyboardMoves';
@@ -1303,7 +1303,7 @@ byId('duplicate-row').addEventListener('click', () => {
   const result = duplicateRow(project.panel, rail);
   if (!result.ok) return showStatus(result.error === 'invalid-value' ? `A panel has at most ${MAX_RAILS} rows.` : 'That row cannot be copied.', true);
   session.commit({ ...project, panel: result.panel });
-  showStatus(`Row ${rail + 1} copied. Nodes > Sync modules puts the copies on the schematic.`);
+  showStatus(`Row ${rowNumber(project.panel, rail)} copied. Nodes > Sync modules puts the copies on the schematic.`);
 });
 byId('find').addEventListener('click', () => searchView.open());
 byId<HTMLInputElement>('view-minimap').addEventListener('change', (e) => {

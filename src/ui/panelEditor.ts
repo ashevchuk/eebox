@@ -154,7 +154,7 @@ export class PanelEditor {
         this.apply((panel) => moveRail(panel, rail, rail + 1), ''),
       );
       down.disabled = local === count - 1;
-      const line = this.text('div', `Row ${rail + 1} `, 'settings-line');
+      const line = this.text('div', `Row ${local + 1} `, 'settings-line');
       line.addEventListener('focusin', () => this.session.select({ rail }));
       line.append(length, this.text('span', ' units '), up, down);
       const label = this.textInput((value) =>

@@ -1,5 +1,6 @@
 import type { Resolve } from '../electrical/context';
 import { isOnRail } from '../layout/placement';
+import { rowNumber } from '../layout/plates';
 import type { Project } from '../project';
 import type { Objects } from './problems';
 import type { Mode } from './session';
@@ -37,7 +38,7 @@ export function searchProject(project: Project, resolve: Resolve, query: string)
     const def = resolve(placement.module);
     consider([placement.label, def?.name, def?.sku, placement.id], {
       title: placement.label ?? def?.name ?? placement.id,
-      detail: `${def?.name ?? 'module'} · ${isOnRail(placement) ? `row ${placement.rail + 1}${rows[placement.rail] ? ` (${rows[placement.rail]})` : ''}` : 'on the plate'}`,
+      detail: `${def?.name ?? 'module'} · ${isOnRail(placement) ? `row ${rowNumber(project.panel, placement.rail)}${rows[placement.rail] ? ` (${rows[placement.rail]})` : ''}` : 'on the plate'}`,
       prefer: 'panel',
       objects: { ...none, placements: [placement.id] },
     });
@@ -46,7 +47,7 @@ export function searchProject(project: Project, resolve: Resolve, query: string)
     const def = resolve(comb.module);
     consider([comb.label, def?.name, def?.sku, comb.id], {
       title: comb.label ?? def?.name ?? comb.id,
-      detail: `${def?.name ?? 'comb'} · row ${comb.rail + 1}`,
+      detail: `${def?.name ?? 'comb'} · row ${rowNumber(project.panel, comb.rail)}`,
       prefer: 'panel',
       objects: { ...none, combs: [comb.id] },
     });
