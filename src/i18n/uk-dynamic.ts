@@ -41,6 +41,7 @@ export const DYNAMIC: Dictionary = {
   'Saved in this browser as "{t}".': `Збережено в цьому браузері як «{t}».`,
   'Delete "{t}" from this browser?': `Видалити «{t}» з цього браузера?`,
   'Backed up {a}, {b} and the project on the screen.': `Зроблено копію: {a}, {b} і проєкт на екрані.`,
+  'Could not delete everything: {m}': `Не вдалося видалити все: {m}`,
   'Backup failed: {m}': `Не вдалося зробити копію: {m}`,
   'Restore {x}?': `Відновити {x}?`,
   '{a} added ({n} already here)': `{a} додано ({n} уже є)`,

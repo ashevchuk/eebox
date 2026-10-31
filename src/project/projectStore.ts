@@ -111,6 +111,11 @@ export class IndexedDbProjectStore implements ProjectStore {
     await this.request('readwrite', (store) => store.delete(id));
   }
 
+  async close(): Promise<void> {
+    if (this.db) (await this.db).close();
+    this.db = undefined;
+  }
+
   private open(): Promise<IDBDatabase> {
     this.db ??= new Promise((resolve, reject) => {
       const req = indexedDB.open(this.dbName, 1);

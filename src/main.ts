@@ -21,6 +21,7 @@ import { TabGuard } from './project/tabGuard';
 import { bomToCsv, buildBom } from './project/bom';
 import { emptyHint } from './ui/help';
 import { openHelpDialog } from './ui/helpDialog';
+import { clearAllData } from './project/clearData';
 import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
 import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
 import { openProjectsDialog } from './ui/projectsDialog';
@@ -767,6 +768,7 @@ async function openProjectsList(): Promise<void> {
       for (const project of plan.put) await projectStore.put(project);
       return describeImport(plan.results);
     },
+    clearAll: clearEverything,
     remove: async (project) => {
       if (!(await confirmDialog(`Delete "${project.title || 'Untitled panel'}" from this browser?`, 'Delete'))) return false;
       await projectStore.remove(project.id);
@@ -776,12 +778,34 @@ async function openProjectsList(): Promise<void> {
   });
 }
 
+/** Set while everything is being deleted, so that no autosave or snapshot writes it back before the page reloads. */
+let wiping = false;
+
+async function clearEverything(): Promise<void> {
+  if (!(await confirmDialog('Delete everything this application keeps in this browser: the project on the screen, the saved projects and earlier states, your libraries, snippets and settings? Files you exported are not touched.', 'Continue'))) return;
+  if (!(await confirmDialog('This cannot be undone. Delete all of it now?', 'Delete everything'))) return;
+  wiping = true;
+  try {
+    await clearAllData({
+      local: window.localStorage,
+      databases: typeof indexedDB === 'undefined' ? undefined : indexedDB,
+      closeConnections: async () => {
+        for (const store of [storage, projectStore]) if (store instanceof IndexedDbLibraryStorage || store instanceof IndexedDbProjectStore) await store.close();
+      },
+    });
+  } catch (error) {
+    wiping = false;
+    return showStatus(`Could not delete everything: ${(error as Error).message}`, true);
+  }
+  location.reload();
+}
+
 let lastSnapshotJson = '';
 let lastSnapshotAt = 0;
 
 /** Keeps the project on the screen as an earlier state; a failure here must never get in the way of the work. */
 async function keepSnapshot(force: boolean): Promise<void> {
-  if (!hasWork(session.project)) return;
+  if (wiping || !hasWork(session.project)) return;
   const file = session.toFile();
   const json = canonicalJson(withoutGenerator(file));
   const now = Date.now();
@@ -1685,7 +1709,7 @@ function startAutosave(store: KeyValueStore): void {
     if (session.revision === lastSaved) return;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      if (tabGuard.conflict) return;
+      if (tabGuard.conflict || wiping) return;
       save();
     }, AUTOSAVE_DELAY_MS);
   });

@@ -16,6 +16,8 @@ export interface ProjectsHost {
   export(project: StoredProject): void;
   /** Adds the project files to the list; says what became of each. */
   importFiles(files: File[]): Promise<string>;
+  /** Asks twice, then deletes everything the application keeps in this browser and reloads. */
+  clearAll(): Promise<void>;
 }
 
 const countParts = (p: StoredProject): string[] => {
@@ -146,7 +148,15 @@ export async function openProjectsDialog(host: ProjectsHost): Promise<void> {
     await host.saveAsNew();
     await refresh();
   });
-  actions.append(close, importButton, saveNew, save);
+  const clearAll = document.createElement('button');
+  clearAll.className = 'danger';
+  clearAll.textContent = 'Clear all data…';
+  clearAll.title = 'Delete everything this application keeps in this browser: projects, libraries, snippets and settings';
+  clearAll.addEventListener('click', async () => {
+    dialog.close();
+    await host.clearAll();
+  });
+  actions.append(close, importButton, clearAll, saveNew, save);
   dialog.append(title, help, list, result, importInput, actions);
   dialog.addEventListener('close', () => dialog.remove());
   await refresh();

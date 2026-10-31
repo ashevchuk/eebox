@@ -125,6 +125,12 @@ export const UI: Dictionary = {
   'This is about the project as a whole': `Це стосується проєкту загалом`,
   // projects dialog
   'Projects in this browser': `Проєкти в цьому браузері`,
+  'Clear all data…': `Очистити всі дані…`,
+  'Delete everything this application keeps in this browser: projects, libraries, snippets and settings': `Видалити все, що цей застосунок зберігає в цьому браузері: проєкти, бібліотеки, фрагменти й налаштування`,
+  'Delete everything this application keeps in this browser: the project on the screen, the saved projects and earlier states, your libraries, snippets and settings? Files you exported are not touched.':
+    `Видалити все, що цей застосунок зберігає в цьому браузері: проєкт на екрані, збережені проєкти й попередні стани, ваші бібліотеки, фрагменти й налаштування? Експортовані вами файли не зачіпаються.`,
+  'This cannot be undone. Delete all of it now?': `Це неможливо скасувати. Видалити все зараз?`,
+  'Delete everything': `Видалити все`,
   'The project on the screen is also kept by itself, as one, for when the page is opened again; the ones here are kept until you take them away. Export sends one to somebody, and Import (or dropping files here) adds the ones that were sent.':
     `Проєкт на екрані також зберігається сам, як один, на випадок повторного відкриття сторінки; ті, що тут, зберігаються, доки ви їх не приберете. Експорт надсилає один комусь, а Імпорт (або перетягування файлів сюди) додає надіслані.`,
   'Add project files that somebody sent; the project on the screen stays as it is': `Додати файли проєктів, які хтось надіслав; проєкт на екрані лишається як є`,
