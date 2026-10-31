@@ -210,11 +210,12 @@
       .library-title {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 6px;
         margin: 8px 0 4px;
         font-weight: 600;
       }
-      .library-title span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+      .library-title span { flex: 1 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
       .library-title button { padding: 0 6px; font-size: 11px; }
       .module-thumbnail { flex: none; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; }
       .module {
