@@ -1,3 +1,4 @@
+import { withoutGenerator } from '../generator';
 import { MAX_SNIPPETS, type Snippet } from '../layout/snippets';
 import { normalizeLabel } from '../layout/labels';
 import type { ValidationError } from '../library/validate';
@@ -77,7 +78,7 @@ export function planSnippetImport(existing: readonly Snippet[], incoming: readon
   let skipped = 0;
   for (const snippet of incoming) {
     const same = known.find((s) => s.id === snippet.id);
-    if (same && canonicalJson(same.file) === canonicalJson(snippet.file) && same.name === snippet.name) {
+    if (same && canonicalJson(withoutGenerator(same.file)) === canonicalJson(withoutGenerator(snippet.file)) && same.name === snippet.name) {
       unchanged++;
       continue;
     }
