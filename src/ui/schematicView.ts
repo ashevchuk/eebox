@@ -243,7 +243,7 @@ export class SchematicView implements View {
       if (!selectedNodes(this.session.selection).includes(node.id)) this.selectNode(node);
       return;
     }
-    const wire = hitWire(frame.schematic, routeWires(frame.schematic, frame.layout), world, this.reach(WIRE_HIT_TOLERANCE));
+    const wire = hitWire(frame.schematic, routeWires(frame.schematic, frame.layout), world, this.reach(WIRE_HIT_TOLERANCE), selectedWires(this.session.selection));
     if (wire) {
       if (!selectedWires(this.session.selection).includes(wire.id)) this.session.select({ wireId: wire.id });
       return;
@@ -278,7 +278,7 @@ export class SchematicView implements View {
       return true;
     }
     const routes = routeWires(frame.schematic, frame.layout);
-    const wire = hitWire(frame.schematic, routes, world, this.reach(WIRE_HIT_TOLERANCE));
+    const wire = hitWire(frame.schematic, routes, world, this.reach(WIRE_HIT_TOLERANCE), selectedWires(this.session.selection));
     if (e.shiftKey && wire) {
       this.session.select(toggleWire(this.session.selection, wire.id));
       return true;
@@ -416,7 +416,7 @@ export class SchematicView implements View {
     const frame = this.frame();
     const overNode = hitPort(frame.schematic, frame.layout, world) || hitNode(frame.schematic, frame.layout, world);
     const routes = routeWires(frame.schematic, frame.layout);
-    const wire = overNode ? undefined : hitWire(frame.schematic, routes, world, this.reach(WIRE_HIT_TOLERANCE));
+    const wire = overNode ? undefined : hitWire(frame.schematic, routes, world, this.reach(WIRE_HIT_TOLERANCE), selectedWires(this.session.selection));
     const path = wire && routes.get(wire.id);
     const segment = path && hitSegment(path, world, this.reach(WIRE_HIT_TOLERANCE));
     const next = wire && segment ? { wireId: wire.id, segment } : null;

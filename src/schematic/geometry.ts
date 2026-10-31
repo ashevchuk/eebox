@@ -155,11 +155,15 @@ export function hitWire(
   routes: Map<string, Point[]>,
   p: Point,
   tolerance: number,
+  preferred: readonly string[] = [],
 ): Wire | undefined {
-  return [...schematic.wires].reverse().find((wire) => {
+  const under = [...schematic.wires].reverse().filter((wire) => {
     const path = routes.get(wire.id);
     return path !== undefined && distanceToPath(p, path) <= tolerance;
   });
+  // Wires that run on top of each other are all under the point; the ones already chosen win, so a press on the
+  // grip of a chosen wire does not pick another that happens to lie over it.
+  return under.find((wire) => preferred.includes(wire.id)) ?? under[0];
 }
 
 /** First position at or below `start` where a new node of this kind and size overlaps nothing. */
