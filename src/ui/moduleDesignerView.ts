@@ -1,3 +1,4 @@
+import { formatUnits } from '../layout/units';
 import { stableStringify } from '../library/equality';
 import { CONDUCTORS, DIN_MODULE_HEIGHT_MM, TERMINAL_SIDES, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type TerminalSide, type TripCurve } from '../library/types';
 import { validateLibrary } from '../library/validate';
@@ -58,6 +59,8 @@ type Mode = 'terminals' | 'face';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_SHOWN_ERRORS = 6;
+/** The width slider moves by a quarter of a unit, as clicks on the stage snap to a quarter. */
+const PREVIEW_WIDTH_STEP_UNITS = 0.25;
 const DRAG_THRESHOLD_PX = 3;
 const MAX_LABEL_CHARS = 28;
 const MAX_ZOOM = 2.5;
@@ -337,7 +340,7 @@ export class ModuleDesignerView {
     const row = document.createElement('label');
     row.className = 'designer-width';
     this.widthSlider.type = 'range';
-    this.widthSlider.step = 'any';
+    this.widthSlider.step = String(PREVIEW_WIDTH_STEP_UNITS);
     this.widthSlider.addEventListener('input', () => {
       this.previewWidth = Number(this.widthSlider.value);
       this.renderAll();
@@ -430,7 +433,7 @@ export class ModuleDesignerView {
     this.widthSlider.max = String(range?.maxUnits ?? this.module.widthUnits);
     this.widthSlider.value = String(this.shownWidth);
     const note = range ? `${range.minUnits}-${range.maxUnits}` : 'fixed';
-    this.widthLabel.textContent = `Shown at ${this.shownWidth} unit${this.shownWidth === 1 ? '' : 's'} (${note}) `;
+    this.widthLabel.textContent = `Shown at ${formatUnits(this.shownWidth)} unit${this.shownWidth === 1 ? '' : 's'} (${note}) `;
   }
 
   private renderFields(force: boolean): void {
@@ -474,7 +477,7 @@ export class ModuleDesignerView {
         label.length > MAX_LABEL_CHARS ? `${label.slice(0, MAX_LABEL_CHARS - 1)}…` : label,
       ),
     );
-    svg.append(svgElement('text', { x: body.x, y: body.y + body.height + 18, 'font-size': 11, fill: '#9aa1b3' }, `${layout.widthUnits} unit${layout.widthUnits === 1 ? '' : 's'}, ${(layout.widthUnits * 17.5).toFixed(1)} mm`));
+    svg.append(svgElement('text', { x: body.x, y: body.y + body.height + 18, 'font-size': 11, fill: '#9aa1b3' }, `${formatUnits(layout.widthUnits)} unit${layout.widthUnits === 1 ? '' : 's'}, ${(layout.widthUnits * 17.5).toFixed(1)} mm`));
     for (const { net, pins } of netGroups(layout)) {
       const centre = netCentre(pins);
       const group = svgElement('g', { stroke: NET_COLOR, 'stroke-width': 2, opacity: 0.6, fill: NET_COLOR });
@@ -502,6 +505,10 @@ export class ModuleDesignerView {
       const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
       svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, labels[layout.pins.indexOf(pin)]!));
     }
+    // At its own size, so the stage keeps its height while the width is dragged and what is below it does not jump.
+    svg.style.width = `${layout.width}px`;
+    svg.style.height = `${layout.height}px`;
+    svg.style.maxWidth = 'none';
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e, svg));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e, svg));
     svg.addEventListener('pointerup', (e) => this.onPointerUp(e, svg));

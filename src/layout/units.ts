@@ -11,6 +11,9 @@ const DECIMALS = 10_000;
 /** Widths and positions are kept to four decimals, 0.002 mm, which is far below anything a rail resolves. */
 export const roundUnits = (units: number): number => Math.round(units * DECIMALS) / DECIMALS;
 
+/** Units as text for a person: at most two decimals, so 5.52232142857143 reads as 5.52. */
+export const formatUnits = (units: number): string => String(Math.round(units * 100) / 100);
+
 export const unitsFromMm = (mm: number): number => roundUnits(mm / MODULE_UNIT_MM);
 
 export const mmFromUnits = (units: number): number => Math.round(units * MODULE_UNIT_MM * 100) / 100;

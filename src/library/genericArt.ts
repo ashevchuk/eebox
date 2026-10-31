@@ -101,7 +101,6 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
       case 'meter':
         return [
           bandWindow(width, '#bbf7d0'),
-          { kind: 'text', x: mid, y: 7, text: '00000', size: 5.5, fill: '#065f46', align: 'centre', bold: true, anchor: 'centre' },
           { kind: 'ellipse', cx: width - CORNER_MM, cy: LOWER_ROW_MM, rx: 1.6, ry: 1.6, fill: '#ef4444', ...stroked, anchor: 'right' },
         ];
       case 'psu':
