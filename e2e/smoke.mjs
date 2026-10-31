@@ -264,7 +264,7 @@ try {
   await step('the print sheet holds the drawings and tables, and prints on a white ground', async () => {
     await browser.evaluate(`window.print = () => {}; document.getElementById('print').click(); new Promise((r) => setTimeout(r, 200)).then(() => [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Print').click())`);
     await browser.waitFor(`document.querySelectorAll('#print-sheet svg').length === 2`, 'two drawings on the print sheet');
-    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#print-sheet h2')].map((h) => h.textContent)`), ['Parts list', 'Circuits', 'Connections', 'Ferrules'], 'sections');
+    expectEqual(await browser.evaluate(`[...document.querySelectorAll('#print-sheet h2')].map((h) => h.textContent)`), ['Parts list', 'Circuits', 'Connections', 'Cut list', 'Ferrules'], 'sections');
     await browser.media('print');
     const pdf = await browser.pdf();
     await browser.media('screen');
@@ -710,7 +710,7 @@ try {
     await browser.waitFor(`document.querySelector('dialog.tables-dialog[open]')`, 'the tables');
     expectTrue(await browser.evaluate(`document.querySelector('dialog.tables-dialog[open]').getBoundingClientRect().width > 600`), 'the tables dialog is squeezed to the width of a small dialog');
     const tabs = await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].map((b) => b.textContent.replace(/ \\(\\d+\\)$/, ''))`);
-    expectEqual(tabs, ['Parts', 'Circuits', 'Wires', 'Ferrules'], 'the tabs');
+    expectEqual(tabs, ['Parts', 'Circuits', 'Wires', 'Ferrules', 'Cut list'], 'the tabs');
     expectTrue(await browser.evaluate(`document.querySelectorAll('.tables-body tbody tr').length > 3`), 'no parts in the first table');
     await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].find((b) => b.textContent.startsWith('Wires')).click()`);
     const firstWire = () => browser.evaluate(`document.querySelector('.tables-body tbody tr td').textContent`);
