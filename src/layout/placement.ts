@@ -73,6 +73,8 @@ export interface Panel {
   rails: Rail[];
   /** Cable ducts on the mounting plate; only when there are some. */
   ducts?: Duct[];
+  /** How far devices on the plate and ducts are to be kept from other things, in mm; only when it is asked for. */
+  clearanceMm?: number;
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */

@@ -6,7 +6,9 @@ import { computeLayout } from '../schematic/geometry';
 import { routeWires } from '../schematic/router';
 import type { Bounds } from '../view/Camera';
 import { lookupsOf } from '../layout/lookups';
-import { combRect, placementRect } from '../view/geometry';
+import { ductsOf } from '../layout/ducts';
+import { combRect, ductRect, placementRect } from '../view/geometry';
+import { groupSelection } from './selection';
 import type { Mode, Selection } from './session';
 
 export interface ProblemEntry {
@@ -46,23 +48,27 @@ export interface Objects {
   nodes: readonly string[];
   wires: readonly string[];
   combs?: readonly string[];
+  ducts?: readonly string[];
 }
 
 function panelFocus(project: Project, resolve: Resolve, objects: Objects): Focus | undefined {
   const placements = project.panel.placements.filter((p) => objects.placements.includes(p.id));
   const combs = project.panel.combs.filter((c) => objects.combs?.includes(c.id));
-  if (placements.length + combs.length === 0) return undefined;
+  const ducts = ductsOf(project.panel).filter((d) => objects.ducts?.includes(d.id));
+  if (placements.length + combs.length + ducts.length === 0) return undefined;
   const { sizes, widthOf } = lookupsOf(resolve);
   const boxes = [
     ...placements.map((p) => placementRect(project.panel, sizes, p)),
     ...combs.map((c) => combRect(project.panel, c.rail, c.slot, widthOf(c) ?? 1, resolve(c.module)?.comb?.side ?? 'top')),
+    ...ducts.map(ductRect),
   ].map((r) => ({ minX: r.x, minY: r.y, maxX: r.x + r.width, maxY: r.y + r.height }));
   const selection: Selection =
-    placements.length + combs.length === 1
-      ? placements.length === 1 ? { placementId: placements[0]!.id } : { combId: combs[0]!.id }
+    placements.length + combs.length + ducts.length === 1
+      ? groupSelection(placements.map((p) => p.id), combs.map((c) => c.id), ducts.map((d) => d.id))
       : {
           ...(placements.length > 0 ? { placementIds: placements.map((p) => p.id) } : {}),
           ...(combs.length > 0 ? { combIds: combs.map((c) => c.id) } : {}),
+          ...(ducts.length > 0 ? { ductIds: ducts.map((d) => d.id) } : {}),
         };
   return { mode: 'panel', selection, bounds: union(boxes) };
 }
@@ -110,5 +116,6 @@ export function objectsOfSelection(selection: Selection): Objects {
   const combs = selection.combIds ?? (selection.combId ? [selection.combId] : []);
   const nodes = selection.nodeIds ?? (selection.nodeId ? [selection.nodeId] : []);
   const wires = selection.wireIds ?? (selection.wireId ? [selection.wireId] : []);
-  return { placements, combs, nodes, wires };
+  const ducts = selection.ductIds ?? (selection.ductId ? [selection.ductId] : []);
+  return { placements, combs, nodes, wires, ...(ducts.length > 0 ? { ducts } : {}) };
 }

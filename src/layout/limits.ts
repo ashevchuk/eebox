@@ -13,3 +13,5 @@ export const MAX_LABEL_LENGTH = 60;
 export const MAX_DUCTS = 200;
 export const MIN_DUCT_SIZE_MM = 10;
 export const MAX_DUCT_SIZE_MM = 3000;
+/** The clearance kept around devices on the plate and ducts, in mm; none is not checked. */
+export const MAX_CLEARANCE_MM = 200;

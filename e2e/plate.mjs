@@ -149,6 +149,22 @@ try {
     expectTrue(gone.ducts?.length === 1 && gone.placements.length === 1, `delete should take the copies and leave the originals: ${JSON.stringify([gone.ducts, gone.placements])}`);
   });
 
+  await step('two devices on one place are reported by Check, and the report goes when they are moved apart', async () => {
+    const problems = () => browser.evaluate(`document.getElementById('problems').hidden ? '' : document.getElementById('problems').innerText`);
+    const check = () => browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check').click()`);
+    const device = (await saved()).placements.find((p) => p.x !== undefined);
+    await browser.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', ctrlKey: true, bubbles: true }))`);
+    await wait(300);
+    await check();
+    await browser.waitFor(`!document.getElementById('problems').hidden && document.getElementById('problems').innerText.includes('Plate soft starter (p1) stands on Plate soft starter (p2)')`, 'the overlap of the two devices in the list');
+    for (let i = 0; i < 12; i++) await press('ArrowRight', 8);
+    await check();
+    await check();
+    await wait(300);
+    expectTrue(!(await problems()).includes('Plate soft starter (p1) stands on Plate soft starter (p2)'), `the overlap is still reported: ${await problems()}`);
+    expectTrue(device !== undefined, 'no device');
+  });
+
   await step('a device dropped on the plate and a duct survive a reload', async () => {
     const before = await saved();
     await browser.goto(page);

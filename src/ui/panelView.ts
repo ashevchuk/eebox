@@ -23,6 +23,7 @@ import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
 import { FRAME_PADDING, combAtPoint, ductAt, ductRect, frameRect, itemsInRect, placementAt, placementRect, railAtPoint, railRect, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
+import { dimensionsOf, type Dimension } from '../view/dimensions';
 import { snapRect, type Guide } from '../view/snap';
 import { render, type Ghost } from '../view/render';
 import { groupSelection, selectedIds, toggleItem } from './selection';
@@ -101,6 +102,7 @@ export class PanelView implements View {
         moving: drag?.movingId ? { kind: drag.kind, id: drag.movingId } : null,
         ghost: drag?.ghost ?? null,
         guides: drag?.guides ?? plateDrag?.guides ?? [],
+        dimensions: this.session.marksVisible ? this.dimensionsOfSelection() : [],
         draftDuct: this.ductDraft ? this.draftRect(this.ductDraft) : null,
         band: this.band ? rectBetween(this.band.from, this.band.to) : null,
         ruler: this.session.ruler.line,
@@ -108,7 +110,7 @@ export class PanelView implements View {
         texts: this.session.texts,
         selectedAnnotationId: this.session.selection.annotationId ?? null,
         annotations: this.session.notesOf('panel'),
-        marked: this.session.marksVisible ? markedBy(this.session.findings, 'placements') : new Map(),
+        marked: this.session.marksVisible ? new Map([...markedBy(this.session.findings, 'placements'), ...markedBy(this.session.findings, 'ducts')]) : new Map(),
       },
       width,
       height,
@@ -142,6 +144,25 @@ export class PanelView implements View {
     };
     const edges = edgeLines(this.session.project.panel, this.session.sizes, info);
     return snapToEdges(world, edges, RULER_SNAP_PX / this.camera.scale);
+  }
+
+  /**
+   * Distances from the one selected thing, or the one being dragged, to what is beside it. Nothing is
+   * shown for a group, a rail or when nothing is selected.
+   */
+  private dimensionsOfSelection(): Dimension[] {
+    const panel = this.drag?.next ?? this.plateDrag?.next ?? this.session.project.panel;
+    const chosen = selectedIds(this.session.selection);
+    const ids = [...chosen.placements, ...chosen.ducts];
+    if (ids.length !== 1 || chosen.combs.length > 0) return [];
+    const id = ids[0]!;
+    const { sizes } = this.session;
+    const placement = panel.placements.find((p) => p.id === id);
+    const duct = ductsOf(panel).find((d) => d.id === id);
+    const box = placement ? placementRect(panel, sizes, placement) : duct ? ductRect(duct) : undefined;
+    if (!box) return [];
+    const others = [...panel.placements.filter((p) => p.id !== id).map((p) => placementRect(panel, sizes, p)), ...ductsOf(panel).filter((d) => d.id !== id).map(ductRect)];
+    return dimensionsOf(box, others, { x: FRAME_PADDING, y: FRAME_PADDING });
   }
 
   /** The rectangle between two points of a duct being drawn, in world coordinates. */

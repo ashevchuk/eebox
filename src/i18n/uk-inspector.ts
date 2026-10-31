@@ -149,6 +149,8 @@ export const INSPECTOR: Dictionary = {
   'Move what is selected: modules by a unit along the rail and between rails (Alt: a quarter of a unit), devices on the plate and ducts by 1 mm (Shift: 10 mm, Alt: half a millimetre), schematic nodes by 10 mm (Shift: 50 mm)':
     `Пересунути вибране: модулі на один модуль уздовж рейки й між рейками (Alt: чверть модуля), прилади на плиті й канали на 1 мм (Shift: 10 мм, Alt: півміліметра), вузли схеми на 10 мм (Shift: 50 мм)`,
   'Cable duct': `Кабель-канал`,
+  Clearance: `Зазор`,
+  'mm kept clear around devices on the plate and ducts; 0 checks nothing': `мм вільного місця навколо приладів на плиті й каналів; 0 нічого не перевіряє`,
   'Delete the duct': `Видалити канал`,
   'Take off the plate': `Зняти з плити`,
   'Left edge': `Лівий край`,

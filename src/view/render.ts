@@ -17,6 +17,7 @@ import { ALL_TEXT, type TextVisibility } from './textVisibility';
 import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
 import { ductsOf, type Duct } from '../layout/ducts';
 import type { Guide } from './snap';
+import type { Dimension } from './dimensions';
 
 export interface Ghost {
   module: ModuleDef;
@@ -60,6 +61,8 @@ export interface Scene {
   guides?: readonly Guide[];
   /** A cable duct being drawn, before it is made. */
   draftDuct?: Rect | null;
+  /** Distances from the selected thing to its neighbours; shown on the screen only. */
+  dimensions?: readonly Dimension[];
 }
 
 export const LEVER_COLORS: Record<ModuleKind, string> = {
@@ -97,6 +100,7 @@ const COLORS = {
   ductSlot: '#334155',
   ductText: '#e2e8f0',
   guide: '#e879f9',
+  dimension: '#38bdf8',
 };
 
 function fillRect(ctx: CanvasRenderingContext2D, r: Rect, color: string): void {
@@ -268,6 +272,36 @@ function drawDuct(ctx: CanvasRenderingContext2D, duct: Duct, labelled: boolean):
   }
 }
 
+/** A line with a tick at each end and its length beside it; sizes are in screen pixels so it reads at any zoom. */
+function drawDimensions(ctx: CanvasRenderingContext2D, dimensions: readonly Dimension[], scale: number): void {
+  const px = 1 / scale;
+  ctx.save();
+  ctx.strokeStyle = COLORS.dimension;
+  ctx.lineWidth = 1 * px;
+  ctx.font = `${10 * px}px ${FONT_FAMILY}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const { from, to, mm } of dimensions) {
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    const across = from.y === to.y ? { x: 0, y: 4 * px } : { x: 4 * px, y: 0 };
+    for (const end of [from, to]) {
+      ctx.moveTo(end.x - across.x, end.y - across.y);
+      ctx.lineTo(end.x + across.x, end.y + across.y);
+    }
+    ctx.stroke();
+    const text = `${Math.round(mm * 10) / 10}`;
+    const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+    const width = ctx.measureText(text).width + 6 * px;
+    ctx.fillStyle = 'rgba(20, 22, 29, 0.92)';
+    ctx.fillRect(middle.x - width / 2, middle.y - 7 * px, width, 14 * px);
+    ctx.fillStyle = COLORS.dimension;
+    ctx.fillText(text, middle.x, middle.y);
+  }
+  ctx.restore();
+}
+
 function drawGuides(ctx: CanvasRenderingContext2D, guides: readonly Guide[], frame: Rect): void {
   ctx.save();
   ctx.strokeStyle = COLORS.guide;
@@ -426,6 +460,13 @@ export function render(
   for (const duct of ductsOf(panel)) {
     ctx.globalAlpha = duct.id === scene.moving?.id && scene.moving.kind === 'duct' ? 0.35 : 1;
     drawDuct(ctx, duct, texts.moduleLabels);
+    const mark = scene.marked?.get(duct.id);
+    if (mark) {
+      const r = ductRect(duct);
+      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+    }
     if (scene.selectedIds?.has(duct.id)) {
       const r = ductRect(duct);
       ctx.strokeStyle = COLORS.selection;
@@ -482,6 +523,7 @@ export function render(
   }
   if (scene.draftDuct) fillRect(ctx, scene.draftDuct, COLORS.ghostOk);
   if (scene.guides) drawGuides(ctx, scene.guides, frame);
+  if (scene.dimensions) drawDimensions(ctx, scene.dimensions, camera.scale);
 
   if (scene.ruler) drawRuler(ctx, scene.ruler, camera.scale);
 

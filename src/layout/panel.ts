@@ -2,6 +2,7 @@ import {
   DEFAULT_RAIL_LENGTH_UNITS,
   DEFAULT_RAIL_PITCH_MM,
   FIRST_RAIL_Y_MM,
+  MAX_CLEARANCE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
   MAX_RAIL_POSITION_MM,
@@ -87,6 +88,13 @@ export function moveRail(panel: Panel, from: number, to: number): PanelEditResul
   const placements = panel.placements.map((p) => (isOnRail(p) ? { ...p, rail: newIndex(p.rail) } : p));
   const combs = panel.combs.map((c) => ({ ...c, rail: newIndex(c.rail) }));
   return { ok: true, panel: { ...panel, rails, placements, combs } };
+}
+
+/** Sets the clearance to keep, or clears it with 0 so nothing is checked. */
+export function setClearance(panel: Panel, mm: number): PanelEditResult {
+  if (!Number.isFinite(mm) || mm < 0 || mm > MAX_CLEARANCE_MM) return failure('invalid-value');
+  const { clearanceMm: _previous, ...rest } = panel;
+  return { ok: true, panel: mm === 0 ? rest : { ...rest, clearanceMm: mm } };
 }
 
 export function setPanelTitle(panel: Panel, text: string): PanelEditResult {

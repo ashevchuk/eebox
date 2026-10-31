@@ -28,6 +28,8 @@ export interface Finding {
   wires: string[];
   nodes: string[];
   placements: string[];
+  /** Cable ducts the finding is about; only when there are some. */
+  ducts?: string[];
 }
 
 export type ConnectionProblem = Finding;
@@ -132,10 +134,10 @@ export function findFindings(project: Project, resolve: Resolve, settings?: Cabl
 }
 
 /** Which of the wires, nodes or placed modules to mark and how: red for a fault, amber for advice, and a fault wins. */
-export function markedBy(findings: Finding[], what: 'wires' | 'nodes' | 'placements'): Map<string, 'error' | 'advice'> {
+export function markedBy(findings: Finding[], what: 'wires' | 'nodes' | 'placements' | 'ducts'): Map<string, 'error' | 'advice'> {
   const marks = new Map<string, 'error' | 'advice'>();
   for (const finding of findings) {
-    for (const id of finding[what]) if (finding.severity === 'error' || !marks.has(id)) marks.set(id, finding.severity);
+    for (const id of finding[what] ?? []) if (finding.severity === 'error' || !marks.has(id)) marks.set(id, finding.severity);
   }
   return marks;
 }

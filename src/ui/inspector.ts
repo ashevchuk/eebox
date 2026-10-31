@@ -3,6 +3,7 @@ import { changeDuct, ductsOf, removeDuct, setDuctLabel, type Duct } from '../lay
 import { moveFreePlacement } from '../layout/free';
 import { lookupsOf } from '../layout/lookups';
 import {
+  MAX_CLEARANCE_MM,
   MAX_DUCT_SIZE_MM,
   MAX_RAILS,
   MAX_RAIL_LENGTH_UNITS,
@@ -11,6 +12,7 @@ import {
 } from '../layout/limits';
 import {
   moveRail,
+  setClearance,
   setPanelTitle,
   setRailCount,
   setRailLabel,
@@ -379,10 +381,11 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...infoFields(panel),
           integer('rows', 'Rows', panel.rails.length, 1, MAX_RAILS, 'a row must be empty to be removed'),
           readonly('size', 'Size', `longest row ${longest} units`),
+          decimal('clearance', 'Clearance', panel.clearanceMm ?? 0, 0, MAX_CLEARANCE_MM, 'mm kept clear around devices on the plate and ducts; 0 checks nothing'),
           readonly(
             'contents',
             'Contents',
-            `${panel.placements.length} modules, ${panel.combs.length} combs, ${panel.shelf.length} on the shelf`,
+            `${panel.placements.length} modules, ${panel.combs.length} combs, ${ductsOf(panel).length > 0 ? `${ductsOf(panel).length} ducts, ` : ''}${panel.shelf.length} on the shelf`,
           ),
           readonly('libraries', 'Module data', differences.length > 0 ? differences.join(', ') : 'matches the libraries'),
         ],
@@ -667,6 +670,12 @@ export function applyEdit(
         const result = setInfoField(panel, field, text);
         if (result.ok) return withPanel(result.panel);
         return fail(field === 'status' ? `Status: ${STATUSES.join(', ')}.` : field === 'notes' ? `Notes: at most ${MAX_NOTES_CHARS} characters.` : LABEL_MESSAGE);
+      }
+      if (key === 'clearance') {
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = setClearance(panel, mm);
+        return result.ok ? withPanel(result.panel) : fail(`Clearance is 0 to ${MAX_CLEARANCE_MM} mm.`);
       }
       if (key === 'rows') {
         const value = integerOf(raw);

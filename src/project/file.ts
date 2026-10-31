@@ -7,6 +7,7 @@ import { EARTHING_SYSTEM_IDS } from '../electrical/earthing';
 import { CIRCUIT_KINDS, loadSpecProblem, MAX_CABLE_LENGTH_M, MAX_POWER_W, MIN_POWER_FACTOR } from '../electrical/loads';
 import { findRuleWarnings, ownerName } from '../electrical/rules';
 import {
+  MAX_CLEARANCE_MM,
   MAX_DUCTS,
   MAX_DUCT_SIZE_MM,
   MIN_DUCT_SIZE_MM,
@@ -17,6 +18,8 @@ import {
 import type { Duct } from '../layout/ducts';
 import type { Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
+import { lookupsOf } from '../layout/lookups';
+import { findPlacementFindings } from '../layout/placementFindings';
 import {
   findProblems as findPanelProblems,
   type CombPlacement,
@@ -81,6 +84,8 @@ const slotCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_LENGTH_UNITS ? null : `must be a number of units from 0 to ${MAX_RAIL_LENGTH_UNITS}`;
 const unitsCheck = widthCheck;
 const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? null : 'must be a finite number');
+const clearanceCheck = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_CLEARANCE_MM ? null : `must be above 0 and at most ${MAX_CLEARANCE_MM} (mm), or left out`;
 const railPositionCheck = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_POSITION_MM ? null : `must be a number of mm from 0 to ${MAX_RAIL_POSITION_MM}`;
 const railLengthCheck = (v: unknown) =>
@@ -138,6 +143,7 @@ const PANEL_SPEC: FieldSpec = {
   annotations: { required: false, check: annotationsCheck },
   rails: { required: true, check: arrayCheck },
   ducts: { required: false, check: arrayCheck },
+  clearanceMm: { required: false, check: clearanceCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -321,7 +327,8 @@ export function projectWarnings(
       : [];
   });
   const nets = findConnectionProblems(project, resolve).map((p) => p.message);
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message)];
+  const placed = findPlacementFindings(project, lookupsOf(resolve).sizes, resolve).map((f) => f.message);
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {
@@ -365,6 +372,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       ...(panelRaw.annotations !== undefined ? { annotations: panelRaw.annotations as Annotation[] } : {}),
       rails,
       ...(panelRaw.ducts !== undefined ? { ducts } : {}),
+      ...(panelRaw.clearanceMm !== undefined ? { clearanceMm: panelRaw.clearanceMm as number } : {}),
       placements,
       combs,
       shelf,
