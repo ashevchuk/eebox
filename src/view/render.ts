@@ -491,19 +491,6 @@ export function render(
   for (const duct of ductsOf(panel)) {
     ctx.globalAlpha = duct.id === scene.moving?.id && scene.moving.kind === 'duct' ? 0.35 : 1;
     drawDuct(ctx, duct, texts.moduleLabels);
-    const mark = scene.marked?.get(duct.id);
-    if (mark) {
-      const r = ductRect(duct);
-      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
-    }
-    if (scene.selectedIds?.has(duct.id)) {
-      const r = ductRect(duct);
-      ctx.strokeStyle = COLORS.selection;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
-    }
   }
   ctx.globalAlpha = 1;
 
@@ -531,6 +518,22 @@ export function render(
     }
     if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
       const r = placementRect(panel, sizes, placement);
+      ctx.strokeStyle = COLORS.selection;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
+    }
+  }
+  for (const duct of ductsOf(panel)) {
+    ctx.globalAlpha = duct.id === scene.moving?.id && scene.moving.kind === 'duct' ? 0.35 : 1;
+    const mark = scene.marked?.get(duct.id);
+    if (mark) {
+      const r = ductRect(duct);
+      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+    }
+    if (scene.selectedIds?.has(duct.id)) {
+      const r = ductRect(duct);
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 2;
       ctx.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
