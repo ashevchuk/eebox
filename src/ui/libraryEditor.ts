@@ -5,6 +5,9 @@ import {
   MODULE_KINDS,
   TERMINAL_SIDES,
   TRIP_CURVES,
+  SPD_TYPES,
+  FUSE_CLASSES,
+  FUSE_SIZES,
   type Conductor,
   type EnclosureDef,
   type Library,
@@ -154,6 +157,19 @@ function moduleView(module: ModuleDef): InspectorView {
     select('curve', 'Trip curve', module.curve ?? '', ['', ...TRIP_CURVES]),
     number('breakingCapacityKA', 'Breaking capacity', optional(module.breakingCapacityKA), 'kA'),
     number('residualCurrentMa', 'Residual current', optional(module.residualCurrentMa), 'mA'),
+    ...(module.kind === 'spd'
+      ? [
+          select('spdType', 'Surge protector type', module.spdType ?? '', ['', ...SPD_TYPES]),
+          number('impulseCurrentKA', 'Impulse current Iimp', optional(module.impulseCurrentKA), 'kA, 10/350'),
+          number('nominalDischargeKA', 'Nominal discharge In', optional(module.nominalDischargeKA), 'kA, 8/20'),
+          number('maxDischargeKA', 'Maximum discharge Imax', optional(module.maxDischargeKA), 'kA, 8/20'),
+          number('protectionLevelKV', 'Protection level Up', optional(module.protectionLevelKV), 'kV'),
+          number('maxContinuousVoltageV', 'Continuous voltage Uc', optional(module.maxContinuousVoltageV), 'V'),
+        ]
+      : []),
+    ...(module.kind === 'fuse'
+      ? [select('fuseClass', 'Fuse class', module.fuseClass ?? '', ['', ...FUSE_CLASSES]), select('fuseSize', 'Fuse size', module.fuseSize ?? '', ['', ...FUSE_SIZES])]
+      : []),
     number('price', 'Price', optional(module.price), 'what one costs; empty for none'),
     text('currency', 'Currency', module.currency ?? '', 'EUR'),
     number('resizeMin', 'Narrowest copy', optional(module.resizable?.minUnits), 'units; empty both for a fixed width'),
@@ -288,7 +304,7 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
     draft: replaceModule(draft, id, change),
     ...(target ? { target } : {}),
   });
-  const numeric = (field: 'ratedCurrentA' | 'breakingCapacityKA' | 'residualCurrentMa' | 'price'): EditorResult => {
+  const numeric = (field: 'ratedCurrentA' | 'breakingCapacityKA' | 'residualCurrentMa' | 'price' | 'impulseCurrentKA' | 'nominalDischargeKA' | 'maxDischargeKA' | 'protectionLevelKV' | 'maxContinuousVoltageV'): EditorResult => {
     const parsed = optionalNumber(raw, false);
     return parsed.ok ? apply((m) => withOptional(m, field, parsed.value)) : fail(parsed.message);
   };
@@ -323,10 +339,19 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       return apply((m) => withOptional(m, 'sku', optionalText(raw)));
     case 'curve':
       return apply((m) => withOptional(m, 'curve', raw === '' ? undefined : raw));
+    case 'spdType':
+    case 'fuseClass':
+    case 'fuseSize':
+      return apply((m) => withOptional(m, key, raw === '' ? undefined : raw));
     case 'ratedCurrentA':
     case 'breakingCapacityKA':
     case 'residualCurrentMa':
     case 'price':
+    case 'impulseCurrentKA':
+    case 'nominalDischargeKA':
+    case 'maxDischargeKA':
+    case 'protectionLevelKV':
+    case 'maxContinuousVoltageV':
       return numeric(key);
     case 'currency':
       return apply((m) => withOptional(m, 'currency', optionalText(raw)?.toUpperCase()));

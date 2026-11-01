@@ -1,5 +1,5 @@
 import { genericArt } from './genericArt';
-import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type ModuleDef, type TerminalDef } from './types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type ModuleDef, type SpdType, type TerminalDef } from './types';
 
 /**
  * The bundled library, built from standard rating series. Nothing here comes from a manufacturer's
@@ -165,16 +165,17 @@ type LineCode = keyof typeof LINES;
 
 interface SpdFamily {
   idPart: string;
+  spdType: SpdType;
   name: string;
   widths: Partial<Record<LineCode, number>>;
 }
 
 /** The AC families: what the device is made of decides the type, and so how much lightning current it takes. */
 const SPD_FAMILIES: SpdFamily[] = [
-  { idPart: 't1', name: 'SPD type 1 (spark gap)', widths: { '1p': 2, '1pn': 4, '3p': 6, '3pn': 8 } },
-  { idPart: 't12', name: 'SPD type 1+2 (combined)', widths: { '1p': 2, '1pn': 2, '3p': 4, '3pn': 4 } },
-  { idPart: 't2', name: 'SPD type 2 (varistor)', widths: { '1p': 1, '1pn': 2, '3p': 3, '3pn': 4 } },
-  { idPart: 't3', name: 'SPD type 3 (fine protection)', widths: { '1p': 1, '1pn': 1 } },
+  { idPart: 't1', spdType: '1', name: 'SPD type 1 (spark gap)', widths: { '1p': 2, '1pn': 4, '3p': 6, '3pn': 8 } },
+  { idPart: 't12', spdType: '1+2', name: 'SPD type 1+2 (combined)', widths: { '1p': 2, '1pn': 2, '3p': 4, '3pn': 4 } },
+  { idPart: 't2', spdType: '2', name: 'SPD type 2 (varistor)', widths: { '1p': 1, '1pn': 2, '3p': 3, '3pn': 4 } },
+  { idPart: 't3', spdType: '3', name: 'SPD type 3 (fine protection)', widths: { '1p': 1, '1pn': 1 } },
 ];
 
 /** A surge protector shunts the lines to earth: the lines come in on top and the one earth terminal is below, so nothing passes through it. */
@@ -186,17 +187,19 @@ function surgeProtectors(): DinModule[] {
         id: `spd-${family.idPart}-${code}`,
         kind: 'spd',
         name: `${family.name} ${label}`,
+        spdType: family.spdType,
         widthUnits,
         poles,
         terminals: [...spreadTerminals(conductors, 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
       };
     }),
   );
-  const direct = ([['t2', 'SPD type 2 (varistor) for DC, PV', 2], ['t12', 'SPD type 1+2 (combined) for DC, PV', 4]] as const).map(
-    ([idPart, name, widthUnits]): DinModule => ({
+  const direct = ([['t2', '2', 'SPD type 2 (varistor) for DC, PV', 2], ['t12', '1+2', 'SPD type 1+2 (combined) for DC, PV', 4]] as const).map(
+    ([idPart, spdType, name, widthUnits]): DinModule => ({
       id: `spd-pv-${idPart}`,
       kind: 'spd',
       name,
+      spdType,
       widthUnits,
       poles: 2,
       terminals: [...spreadTerminals(['DCP', 'DCN'], 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
@@ -208,16 +211,16 @@ function surgeProtectors(): DinModule[] {
 const FUSE_BREAKING_CAPACITY_KA = 100;
 
 /** Cylindrical fuse sizes of IEC 60269-2 for DIN-rail holders: the width of one pole in mm and the ratings of the links. */
-const FUSE_SIZES = [
-  { size: '10x38', poleMm: 17.5, ratings: [2, 4, 6, 10, 16, 20, 25, 32] },
-  { size: '14x51', poleMm: 22.5, ratings: [10, 16, 20, 25, 32, 40, 50] },
-  { size: '22x58', poleMm: 36, ratings: [32, 40, 50, 63, 80, 100, 125] },
+const FUSE_SERIES = [
+  { size: '10x38' as const, poleMm: 17.5, ratings: [2, 4, 6, 10, 16, 20, 25, 32] },
+  { size: '14x51' as const, poleMm: 22.5, ratings: [10, 16, 20, 25, 32, 40, 50] },
+  { size: '22x58' as const, poleMm: 36, ratings: [32, 40, 50, 63, 80, 100, 125] },
 ];
 
 /** Fuse disconnectors with a gG link; the rating of the link is the rating of the module, so the cable checks can use it. */
 function fuses(): DinModule[] {
   const lines: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
-  return FUSE_SIZES.flatMap(({ size, poleMm, ratings }) =>
+  return FUSE_SERIES.flatMap(({ size, poleMm, ratings }) =>
     POLES.flatMap((poles) =>
       ratings.map((rating): DinModule => {
         const widthUnits = Math.round(((poles * poleMm) / MODULE_UNIT_MM) * 1e4) / 1e4;
@@ -225,6 +228,8 @@ function fuses(): DinModule[] {
           id: `fuse-${size}-${poles}p-${rating}`,
           kind: 'fuse',
           name: `Fuse disconnector ${size} ${poleLabel(poles)} gG ${rating}A`,
+          fuseClass: 'gG',
+          fuseSize: size,
           widthUnits,
           poles,
           ratedCurrentA: rating,
@@ -626,7 +631,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '15';
+export const GENERIC_LIBRARY_VERSION = '16';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

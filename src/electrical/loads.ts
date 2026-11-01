@@ -1,4 +1,4 @@
-import { familyOf } from '../library/types';
+import { familyOf, type ModuleDef } from '../library/types';
 import type { Project } from '../project';
 import {
   ampacityA,
@@ -176,6 +176,8 @@ export interface LoadReport {
   method: InstallMethod;
   /** Rating of the breaker or RCBO the load hangs on, when one is wired directly to it. */
   breakerA?: number;
+  /** The kind of the device that `breakerA` is the rating of: a breaker, an RCBO or a fuse. */
+  breakerKind?: ModuleDef['kind'];
   /** The current a cable has to carry: the load current, or the breaker rating when that is higher. */
   requiredA: number;
   /** Smallest listed cross-section for `requiredA`; undefined when the table has none large enough. */
@@ -203,7 +205,7 @@ export function loadReports(project: Project, resolve: Resolve, settings: CableS
     const breakers = (net?.terminals ?? []).flatMap((t) => {
       const def = t.owner.kind === 'placement' ? context.defs.get(t.owner.id) : undefined;
       return t.terminal.side === 'bottom' && def && PROTECTIVE_KINDS.includes(def.kind) && def.ratedCurrentA
-        ? [{ placementId: t.owner.id, ratedA: def.ratedCurrentA }]
+        ? [{ placementId: t.owner.id, ratedA: def.ratedCurrentA, kind: def.kind }]
         : [];
     });
     const breaker = breakers.reduce<(typeof breakers)[number] | undefined>((lowest, b) => (!lowest || b.ratedA < lowest.ratedA ? b : lowest), undefined);
@@ -225,7 +227,7 @@ export function loadReports(project: Project, resolve: Resolve, settings: CableS
         method,
         requiredA,
         dropLimitPercent: limit,
-        ...(breaker ? { breakerA: breaker.ratedA, breakerPlacementId: breaker.placementId } : {}),
+        ...(breaker ? { breakerA: breaker.ratedA, breakerKind: breaker.kind, breakerPlacementId: breaker.placementId } : {}),
         ...(minimum !== undefined ? { minimumSectionMm2: minimum } : {}),
         ...(minimumByCurrent !== undefined ? { minimumByCurrentMm2: minimumByCurrent } : {}),
         ...(chosenSectionMm2 !== undefined ? { chosenSectionMm2 } : {}),

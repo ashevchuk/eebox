@@ -39,6 +39,8 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | `mounting` | `rail`, `plate` or `both` | required; where the device is fixed: clipped on a DIN rail, screwed to the mounting plate, or either |
 | `poles` | 1, 2, 3 or 4 | decides the derived terminals |
 | `sku`, `ratedCurrentA`, `curve`, `breakingCapacityKA`, `residualCurrentMa` | optional | `curve` is one of `B C D K Z`; searchable in the palette |
+| `spdType`, `impulseCurrentKA`, `nominalDischargeKA`, `maxDischargeKA`, `protectionLevelKV`, `maxContinuousVoltageV` | optional | surge protectors: `spdType` is one of `1`, `1+2`, `2`, `3`; the currents are Iimp (10/350), In and Imax (8/20) in kA, Up is in kV and Uc in V. Check warns when a type 1 or 1+2 protector is fed through an RCD |
+| `fuseClass`, `fuseSize` | optional | fuses: `fuseClass` is one of `gG aM gR`; `fuseSize` is one of `8.5x31.5 10x38 14x51 22x58 NH000 NH00 NH1 NH2 NH3` |
 | `terminals` | array | replaces the terminals derived from `poles` |
 | `comb` | object | required for, and only allowed on, kind `comb` |
 | `resizable` | object | optional, any kind; lets a placed copy have its own width |

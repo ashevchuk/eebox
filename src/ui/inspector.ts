@@ -324,6 +324,17 @@ function moduleDetails(def: ModuleDef | undefined, widthUnits: number): Inspecto
   if (def.curve) details.push(readonly('curve', 'Trip curve', def.curve));
   if (def.breakingCapacityKA !== undefined) details.push(readonly('capacity', 'Breaking capacity', `${def.breakingCapacityKA} kA`));
   if (def.residualCurrentMa !== undefined) details.push(readonly('residual', 'Residual current', `${def.residualCurrentMa} mA`));
+  if (def.spdType) details.push(readonly('spdType', 'Surge protector type', def.spdType));
+  const surge: Array<[string, string, number | undefined, string]> = [
+    ['impulse', 'Impulse current Iimp', def.impulseCurrentKA, 'kA'],
+    ['discharge', 'Nominal discharge In', def.nominalDischargeKA, 'kA'],
+    ['maxDischarge', 'Maximum discharge Imax', def.maxDischargeKA, 'kA'],
+    ['protectionLevel', 'Protection level Up', def.protectionLevelKV, 'kV'],
+    ['continuousVoltage', 'Continuous voltage Uc', def.maxContinuousVoltageV, 'V'],
+  ];
+  for (const [key, label, value, unit] of surge) if (value !== undefined) details.push(readonly(key, label, `${value} ${unit}`));
+  if (def.fuseClass) details.push(readonly('fuseClass', 'Fuse class', def.fuseClass));
+  if (def.fuseSize) details.push(readonly('fuseSize', 'Fuse size', def.fuseSize));
   if (def.sku) details.push(readonly('sku', 'SKU', def.sku));
   const terminals = terminalsOf(def, widthUnits);
   if (terminals.length > 0) {

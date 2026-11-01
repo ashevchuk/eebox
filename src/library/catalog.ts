@@ -39,6 +39,9 @@ function haystackOf(def: ModuleDef): string {
     def.ratedCurrentA === undefined ? undefined : `${def.ratedCurrentA}a`,
     def.residualCurrentMa === undefined ? undefined : `${def.residualCurrentMa}ma`,
     def.breakingCapacityKA === undefined ? undefined : `${def.breakingCapacityKA}ka`,
+    def.spdType === undefined ? undefined : `type ${def.spdType}`,
+    def.fuseClass,
+    def.fuseSize,
   ];
   return parts.filter((p) => p !== undefined).join(' ').toLowerCase();
 }

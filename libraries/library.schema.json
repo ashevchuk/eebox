@@ -197,6 +197,62 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
+        "spdType": {
+          "enum": [
+            "1",
+            "1+2",
+            "2",
+            "3"
+          ],
+          "description": "Surge protectors: the type."
+        },
+        "impulseCurrentKA": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surge protectors: the impulse current Iimp (10/350) in kA."
+        },
+        "nominalDischargeKA": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surge protectors: the nominal discharge current In (8/20) in kA."
+        },
+        "maxDischargeKA": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surge protectors: the maximum discharge current Imax (8/20) in kA."
+        },
+        "protectionLevelKV": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surge protectors: the protection level Up in kV."
+        },
+        "maxContinuousVoltageV": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surge protectors: the maximum continuous operating voltage Uc in V."
+        },
+        "fuseClass": {
+          "enum": [
+            "gG",
+            "aM",
+            "gR"
+          ],
+          "description": "Fuses: the class of the link."
+        },
+        "fuseSize": {
+          "enum": [
+            "8.5x31.5",
+            "10x38",
+            "14x51",
+            "22x58",
+            "NH000",
+            "NH00",
+            "NH1",
+            "NH2",
+            "NH3"
+          ],
+          "description": "Fuses: the size of the link."
+        },
         "terminals": {
           "type": "array",
           "minItems": 1,

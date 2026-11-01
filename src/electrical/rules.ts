@@ -64,6 +64,8 @@ export function findRuleFindings(project: Project, resolve: Resolve, settings: C
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
     ...cablesAgainstBreakers(reports, context.name),
+    ...surgeProtectorsWithoutEarth(context),
+    ...lightningProtectorsBehindResidualCurrentDevices(context),
     ...protectionWarnings(project, resolve, settings, reports, (id) => context.name({ kind: 'node', id })),
   ].map((f) => ({ ...f, nodes: [...new Set([...f.nodes, ...f.placements.flatMap(moduleNodeOf)])] }));
 }
@@ -143,6 +145,41 @@ function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals
   });
 }
 
+/** A surge protector shunts the surge to earth, so one whose lines are connected and whose earth terminal is not protects nothing. */
+function surgeProtectorsWithoutEarth({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
+  return project.panel.placements.flatMap((placement) => {
+    if (defs.get(placement.id)?.kind !== 'spd') return [];
+    const own = terminals.get(placement.id) ?? [];
+    const wired = (t: (typeof own)[number]) => netOf.has(t.key);
+    const linesWired = own.some((t) => t.terminal.conductor !== 'PE' && wired(t));
+    const earthWired = own.some((t) => t.terminal.conductor === 'PE' && wired(t));
+    return linesWired && !earthWired
+      ? [about(`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: its lines are connected but its earth terminal is not, so it protects nothing`, { placements: [placement.id] })]
+      : [];
+  });
+}
+
+/** Lightning current must not go through an RCD: a protector of type 1 or 1+2 belongs ahead of it, so one fed from an RCD output is in the wrong place. */
+function lightningProtectorsBehindResidualCurrentDevices({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
+  return project.panel.placements.flatMap((placement) => {
+    const def = defs.get(placement.id);
+    if (def?.kind !== 'spd' || (def.spdType !== '1' && def.spdType !== '1+2')) return [];
+    const behind = (terminals.get(placement.id) ?? []).some((t) => {
+      if (t.terminal.side !== 'top' || t.terminal.conductor === 'PE') return false;
+      return (netOf.get(t.key)?.terminals ?? []).some((other) => {
+        const otherDef = other.owner.kind === 'placement' ? defs.get(other.owner.id) : undefined;
+        return other.terminal.side === 'bottom' && otherDef !== undefined && RESIDUAL_CURRENT_KINDS.includes(otherDef.kind);
+      });
+    });
+    return behind
+      ? [about(`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: a type ${def.spdType} surge protector is fed from the output of an RCD; it belongs ahead of the RCD`, { placements: [placement.id] })]
+      : [];
+  });
+}
+
+/** What protects the cable behind it: a breaker, or a fuse, which the messages then call by its name. */
+const deviceName = (report: LoadReport): string => (report.breakerKind === 'fuse' ? 'fuse' : 'breaker');
+
 /** A circuit needs load current <= breaker rating <= what the cable carries. */
 function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): RuleFinding[] {
   return reports.flatMap((report) => {
@@ -150,10 +187,10 @@ function cablesAgainstBreakers(reports: LoadReport[], name: Context['name']): Ru
     const warnings: string[] = [];
     const where = { nodes: [report.nodeId], placements: report.breakerPlacementId ? [report.breakerPlacementId] : [] };
     if (report.breakerA !== undefined && report.currentA > report.breakerA) {
-      warnings.push(`${who}: it draws ${formatAmps(report.currentA)} A but its breaker is rated ${report.breakerA} A`);
+      warnings.push(`${who}: it draws ${formatAmps(report.currentA)} A but its ${deviceName(report)} is rated ${report.breakerA} A`);
     }
     if (report.chosenAmpacityA !== undefined && report.chosenAmpacityA < report.requiredA) {
-      const reference = report.breakerA !== undefined && report.breakerA >= report.currentA ? `the breaker rating of ${report.breakerA} A` : `the load current of ${formatAmps(report.currentA)} A`;
+      const reference = report.breakerA !== undefined && report.breakerA >= report.currentA ? `the ${deviceName(report)} rating of ${report.breakerA} A` : `the load current of ${formatAmps(report.currentA)} A`;
       warnings.push(`${who}: a ${report.chosenSectionMm2} mm2 cable carries ${report.chosenAmpacityA} A, below ${reference}`);
     }
     if (report.chosenSectionMm2 !== undefined && report.dropPercent !== undefined && report.dropPercent > report.dropLimitPercent) {

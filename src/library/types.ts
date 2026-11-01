@@ -74,6 +74,18 @@ export type TerminalSide = (typeof TERMINAL_SIDES)[number];
 export const TRIP_CURVES = ['B', 'C', 'D', 'K', 'Z'] as const;
 export type TripCurve = (typeof TRIP_CURVES)[number];
 
+/** The type of a surge protector by what it is tested for: 1 lightning current, 2 switching surges, 3 fine protection; 1+2 is both in one device. */
+export const SPD_TYPES = ['1', '1+2', '2', '3'] as const;
+export type SpdType = (typeof SPD_TYPES)[number];
+
+/** The class of a fuse link: gG for general use, aM for motors (short circuit only), gR for semiconductors. */
+export const FUSE_CLASSES = ['gG', 'aM', 'gR'] as const;
+export type FuseClass = (typeof FUSE_CLASSES)[number];
+
+/** The size of a fuse link: cylindrical by diameter and length in mm, or an NH (blade) size. */
+export const FUSE_SIZES = ['8.5x31.5', '10x38', '14x51', '22x58', 'NH000', 'NH00', 'NH1', 'NH2', 'NH3'] as const;
+export type FuseSize = (typeof FUSE_SIZES)[number];
+
 /**
  * One screw terminal, or `count` identical ones. Terminals that share a `net` are connected
  * inside the module (a terminal bar); without a net a terminal is isolated, like a pole of a breaker.
@@ -146,6 +158,16 @@ export interface ModuleDef {
   curve?: TripCurve;
   breakingCapacityKA?: number;
   residualCurrentMa?: number;
+  /** Surge protectors: the type, the impulse current Iimp (10/350) and the nominal and maximum discharge currents In and Imax (8/20) in kA, the protection level Up in kV and the maximum continuous voltage Uc in V. */
+  spdType?: SpdType;
+  impulseCurrentKA?: number;
+  nominalDischargeKA?: number;
+  maxDischargeKA?: number;
+  protectionLevelKV?: number;
+  maxContinuousVoltageV?: number;
+  /** Fuses: the class and the size of the link that the holder takes. */
+  fuseClass?: FuseClass;
+  fuseSize?: FuseSize;
   /** What one costs, in `currency`; entered by the person who owns the library, so a bill of materials can be priced. */
   price?: number;
   /** Short code of the currency of `price`, for example EUR; totals are kept apart per currency. */
