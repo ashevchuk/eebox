@@ -1,4 +1,5 @@
 import { genericArt } from './genericArt';
+import { blockTerminals, evenPositions } from './terminalLayouts';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type ModuleDef, type SpdType, type TerminalDef } from './types';
 
 /**
@@ -26,6 +27,9 @@ type DinModule = Omit<ModuleDef, 'heightMm' | 'mounting'>;
 
 const poleLabel = (poles: 1 | 2 | 3 | 4) => `${poles}P`;
 const POLES = [1, 2, 3, 4] as const;
+
+/** The conductors of the poles of a device in order: L; L and N; three phases; three phases and N. */
+const POLE_CONDUCTORS: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
 
 function breakers(): DinModule[] {
   return POLES.flatMap((poles) =>
@@ -110,6 +114,55 @@ const TERMINAL_WAYS: Array<{ code: string; conductor: TerminalDef['conductor']; 
   { code: 'pe', conductor: 'PE', name: 'PE', label: 'PE' },
   { code: 'c', conductor: 'C', name: '1', label: 'control' },
 ];
+
+const STRIP_WAYS = [6, 12] as const;
+/** The way of a strip is a 2.5 mm2 terminal, 0.3 unit wide: a width that keeps the outer terminals clear of the edges once they are rounded. */
+const STRIP_WAY_MM = 5.25;
+const STRIP_SECTION_MM2 = 2.5;
+const DISTRIBUTION_UNITS = 2;
+const DISTRIBUTION_IN = 2;
+const DISTRIBUTION_OUT = 6;
+
+const unitsFromMm = (mm: number): number => Math.round((mm / MODULE_UNIT_MM) * 1e4) / 1e4;
+
+/** Strips of feed-through ways in one module, each way a terminal on top and one below joined inside, numbered along the strip. */
+function terminalStrips(): ModuleDef[] {
+  return STRIP_WAYS.flatMap((ways) =>
+    TERMINAL_WAYS.filter(({ code }) => code !== 'l').map(({ code, conductor, name, label }): ModuleDef => {
+      const widthUnits = unitsFromMm(ways * STRIP_WAY_MM);
+      const prefix = conductor === 'C' ? '' : name;
+      const terminals = evenPositions(ways, widthUnits).flatMap((unit, i) =>
+        (['top', 'bottom'] as const).map((side): TerminalDef => ({ name: `${prefix}${i + 1}`, conductor, side, unit, net: `way${i + 1}` })),
+      );
+      return {
+        id: `terminal-strip-${ways}-${code}`,
+        kind: 'terminal',
+        name: `Terminal strip ${ways} ways ${STRIP_SECTION_MM2} mm2 ${label}`,
+        shortName: `${code.toUpperCase()} x${ways}`,
+        widthUnits,
+        heightMm: TERMINAL_HEIGHT_MM,
+        mounting: 'rail',
+        poles: 1,
+        terminals,
+      };
+    }),
+  );
+}
+
+/** Distribution blocks: the inputs on top and the outputs below are one point inside, for one conductor. */
+function distributionBlocks(): ModuleDef[] {
+  return TERMINAL_WAYS.filter(({ code }) => code !== 'c').map(({ code, conductor, label }): ModuleDef => ({
+    id: `distribution-block-${code}`,
+    kind: 'terminal',
+    name: `Distribution block ${DISTRIBUTION_IN} in ${DISTRIBUTION_OUT} out ${label}`,
+    shortName: `${code.toUpperCase()} ${DISTRIBUTION_IN}/${DISTRIBUTION_OUT}`,
+    widthUnits: DISTRIBUTION_UNITS,
+    heightMm: TERMINAL_HEIGHT_MM,
+    mounting: 'rail',
+    poles: 1,
+    terminals: blockTerminals({ top: DISTRIBUTION_IN, bottom: DISTRIBUTION_OUT, conductor, joined: true }, DISTRIBUTION_UNITS, false),
+  }));
+}
 
 /** Single feed-through terminals, a way each: a terminal on top and one below, joined inside. They stand side by side on the rail. */
 function terminalBlocks(): ModuleDef[] {
@@ -219,7 +272,6 @@ const FUSE_SERIES = [
 
 /** Fuse disconnectors with a gG link; the rating of the link is the rating of the module, so the cable checks can use it. */
 function fuses(): DinModule[] {
-  const lines: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
   return FUSE_SERIES.flatMap(({ size, poleMm, ratings }) =>
     POLES.flatMap((poles) =>
       ratings.map((rating): DinModule => {
@@ -234,37 +286,42 @@ function fuses(): DinModule[] {
           poles,
           ratedCurrentA: rating,
           breakingCapacityKA: FUSE_BREAKING_CAPACITY_KA,
-          terminals: [...spreadTerminals(lines[poles], 'top', widthUnits), ...spreadTerminals(lines[poles], 'bottom', widthUnits)],
+          terminals: [...spreadTerminals(POLE_CONDUCTORS[poles], 'top', widthUnits), ...spreadTerminals(POLE_CONDUCTORS[poles], 'bottom', widthUnits)],
         };
       }),
     ),
   );
 }
 
+const CONTACTOR_RATINGS_BY_POLES: Record<1 | 2 | 3 | 4, number[]> = { 1: [20, 25], 2: CONTACTOR_RATINGS, 3: CONTACTOR_RATINGS, 4: CONTACTOR_RATINGS };
+
+/** Modular contactors with a 230 V coil: the poles switch the lines, the coil is on the top. A unit is added above 40 A. */
 function contactors(): DinModule[] {
-  const terminals: TerminalDef[] = [
-    { name: 'L1', conductor: 'L1', side: 'top', unit: 0 },
-    { name: 'L2', conductor: 'L2', side: 'top', unit: 1 },
-    { name: 'L3', conductor: 'L3', side: 'top', unit: 2 },
-    { name: 'A1', conductor: 'L', side: 'top', unit: 0 },
-    { name: 'A2', conductor: 'N', side: 'top', unit: 2 },
-    { name: 'T1', conductor: 'L1', side: 'bottom', unit: 0 },
-    { name: 'T2', conductor: 'L2', side: 'bottom', unit: 1 },
-    { name: 'T3', conductor: 'L3', side: 'bottom', unit: 2 },
-  ];
-  return CONTACTOR_RATINGS.map((rating) => ({
-    id: `contactor-3p-${rating}-230`,
-    kind: 'contactor',
-    name: `Contactor 3P ${rating}A, 230V coil`,
-    widthUnits: rating > 40 ? 4 : 3,
-    poles: 3,
-    ratedCurrentA: rating,
-    terminals,
-    logic: {
-      inputs: { coil: { terminals: ['top:A1', 'top:A2'], when: 'all' } },
-      contacts: [1, 2, 3].map((pole) => ({ between: [`top:L${pole}`, `bottom:T${pole}`], closedWhen: 'coil' })),
-    },
-  }));
+  return POLES.flatMap((poles) =>
+    CONTACTOR_RATINGS_BY_POLES[poles].map((rating): DinModule => {
+      const conductors = POLE_CONDUCTORS[poles];
+      const lineUnits = conductors.map((_, i) => i);
+      const terminals: TerminalDef[] = [
+        ...conductors.map((conductor, i): TerminalDef => ({ name: `L${i + 1}`, conductor, side: 'top', unit: lineUnits[i]! })),
+        { name: 'A1', conductor: 'L', side: 'top', unit: 0 },
+        { name: 'A2', conductor: 'N', side: 'top', unit: poles - 1 },
+        ...conductors.map((conductor, i): TerminalDef => ({ name: `T${i + 1}`, conductor, side: 'bottom', unit: lineUnits[i]! })),
+      ];
+      return {
+        id: `contactor-${poles}p-${rating}-230`,
+        kind: 'contactor',
+        name: `Contactor ${poleLabel(poles)} ${rating}A, 230V coil`,
+        widthUnits: poles + (rating > 40 ? 1 : 0),
+        poles,
+        ratedCurrentA: rating,
+        terminals,
+        logic: {
+          inputs: { coil: { terminals: ['top:A1', 'top:A2'], when: 'all' } },
+          contacts: conductors.map((_, i) => ({ between: [`top:L${i + 1}`, `bottom:T${i + 1}`], closedWhen: 'coil' })),
+        },
+      };
+    }),
+  );
 }
 
 function bars(): DinModule[] {
@@ -618,7 +675,7 @@ export function genericModules(): ModuleDef[] {
     ...bars(),
     ...combs(),
   ].map(onRail);
-  return [...onTheRail, ...terminalBlocks()].map(withWidthRange).map(withArt);
+  return [...onTheRail, ...terminalBlocks(), ...terminalStrips(), ...distributionBlocks()].map(withWidthRange).map(withArt);
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -631,7 +688,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '16';
+export const GENERIC_LIBRARY_VERSION = '17';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

@@ -50,7 +50,7 @@ describe('logic in the library schema', () => {
 describe('bundled devices with logic', () => {
   it('give every contactor, monitoring relay and transfer controller its logic', () => {
     const withLogic = genericModules().filter((m) => m.logic).map((m) => m.kind);
-    expect(withLogic.filter((k) => k === 'contactor')).toHaveLength(4);
+    expect(withLogic.filter((k) => k === 'contactor')).toHaveLength(2 + 4 + 4 + 4);
     expect(genericModules().find((m) => m.id === 'ats-controller-3pn')?.logic?.contacts).toHaveLength(3);
     expect(genericModules().find((m) => m.id === 'vrelay-1p')?.logic).toBeDefined();
   });
