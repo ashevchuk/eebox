@@ -106,12 +106,18 @@ function surgeProtectors(): DinModule[] {
     ['3p', '3P', 3],
     ['3pn', '3P+N', 4],
   ];
+  const lineConductors: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
   return variants.map(([code, label, poles]) => ({
     id: `spd-t2-${code}`,
     kind: 'spd',
     name: `SPD type 2 ${label}`,
     widthUnits: poles,
     poles,
+    // A surge protector shunts the lines to earth: the lines come in on top and the one earth terminal is below, so nothing passes through it.
+    terminals: [
+      ...lineConductors[poles].map((conductor, unit): TerminalDef => ({ name: conductor, conductor, side: 'top', unit })),
+      { name: 'PE', conductor: 'PE', side: 'bottom', unit: (poles - 1) / 2 },
+    ],
   }));
 }
 
@@ -503,7 +509,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '12';
+export const GENERIC_LIBRARY_VERSION = '13';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 
