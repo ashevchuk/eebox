@@ -12,7 +12,7 @@ const BOTTOM_PIN_Y_MM = 84;
 const PIN_SPACING_MM = 5;
 
 /** The bars carry a screw head under every terminal on purpose. */
-const SCREWS_UNDER_TERMINALS = new Set(['busbar', 'terminal']);
+const SCREWS_UNDER_TERMINALS = new Set(['busbar']);
 
 const library = JSON.parse(raw) as Library;
 

@@ -280,6 +280,7 @@ export const DYNAMIC: Dictionary = {
   'Contactors ({a}/{b})': `Контактори ({a}/{b})`,
   'Surge protectors ({a}/{b})': `Обмежувачі перенапруг ({a}/{b})`,
   'Fuses ({a}/{b})': `Запобіжники ({a}/{b})`,
+  'Terminals ({a}/{b})': `Клеми ({a}/{b})`,
   'Meters ({a}/{b})': `Лічильники ({a}/{b})`,
   'Power supplies ({a}/{b})': `Блоки живлення ({a}/{b})`,
   'Bars ({a}/{b})': `Шини ({a}/{b})`,

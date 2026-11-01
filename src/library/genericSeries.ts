@@ -64,23 +64,72 @@ function rcds(): DinModule[] {
   );
 }
 
+const RCBO_VARIANTS = [
+  { code: '1pn', label: '1P+N', poles: 2, widthUnits: 2 },
+  { code: '3pn', label: '3P+N', poles: 4, widthUnits: 4 },
+] as const;
+
 function rcbos(): DinModule[] {
-  return RCBO_CURVES.flatMap((curve) =>
-    RCBO_RATINGS.flatMap((rating) =>
-      RCBO_SENSITIVITIES_MA.map(
-        (ma): DinModule => ({
-          id: `rcbo-1pn-${curve.toLowerCase()}${rating}-${ma}`,
-          kind: 'rcbo',
-          name: `RCBO 1P+N ${curve}${rating} ${ma}mA`,
-          widthUnits: 2,
-          poles: 2,
-          ratedCurrentA: rating,
-          curve,
-          breakingCapacityKA: MCB_BREAKING_CAPACITY_KA,
-          residualCurrentMa: ma,
-        }),
+  return RCBO_VARIANTS.flatMap(({ code, label, poles, widthUnits }) =>
+    RCBO_CURVES.flatMap((curve) =>
+      RCBO_RATINGS.flatMap((rating) =>
+        RCBO_SENSITIVITIES_MA.map(
+          (ma): DinModule => ({
+            id: `rcbo-${code}-${curve.toLowerCase()}${rating}-${ma}`,
+            kind: 'rcbo',
+            name: `RCBO ${label} ${curve}${rating} ${ma}mA`,
+            widthUnits,
+            poles,
+            ratedCurrentA: rating,
+            curve,
+            breakingCapacityKA: MCB_BREAKING_CAPACITY_KA,
+            residualCurrentMa: ma,
+          }),
+        ),
       ),
     ),
+  );
+}
+
+/** Feed-through terminals of IEC 60947-7-1: the width of a block in mm and the rated current by conductor cross-section. */
+const TERMINAL_SIZES = [
+  { sectionMm2: 2.5, widthMm: 5.2, ratedA: 24 },
+  { sectionMm2: 4, widthMm: 6.2, ratedA: 32 },
+  { sectionMm2: 6, widthMm: 8.2, ratedA: 41 },
+  { sectionMm2: 10, widthMm: 10.2, ratedA: 57 },
+  { sectionMm2: 16, widthMm: 12.2, ratedA: 76 },
+] as const;
+
+/** A terminal block is lower than a protective device. */
+const TERMINAL_HEIGHT_MM = 60;
+
+/** The conductor a block carries; `C` is the generic one, for control and signal wiring, which any wire may join. */
+const TERMINAL_WAYS: Array<{ code: string; conductor: TerminalDef['conductor']; name: string; label: string }> = [
+  { code: 'l', conductor: 'L', name: 'L', label: 'L' },
+  { code: 'n', conductor: 'N', name: 'N', label: 'N' },
+  { code: 'pe', conductor: 'PE', name: 'PE', label: 'PE' },
+  { code: 'c', conductor: 'C', name: '1', label: 'control' },
+];
+
+/** Single feed-through terminals, a way each: a terminal on top and one below, joined inside. They stand side by side on the rail. */
+function terminalBlocks(): ModuleDef[] {
+  return TERMINAL_SIZES.flatMap(({ sectionMm2, widthMm, ratedA }) =>
+    TERMINAL_WAYS.map(({ code, conductor, name, label }): ModuleDef => {
+      const widthUnits = Math.round((widthMm / MODULE_UNIT_MM) * 1e4) / 1e4;
+      const unit = Math.round(((widthUnits - 1) / 2) * 1e4) / 1e4;
+      return {
+        id: `terminal-${String(sectionMm2).replace('.', '-')}-${code}`,
+        kind: 'terminal',
+        name: `Feed-through terminal ${sectionMm2} mm2 ${label}`,
+        shortName: `${code.toUpperCase()} ${sectionMm2}`,
+        widthUnits,
+        heightMm: TERMINAL_HEIGHT_MM,
+        mounting: 'rail',
+        poles: 1,
+        ratedCurrentA: ratedA,
+        terminals: (['top', 'bottom'] as const).map((side): TerminalDef => ({ name, conductor, side, unit, net: 'way' })),
+      };
+    }),
   );
 }
 
@@ -547,7 +596,7 @@ function withArt(def: ModuleDef): ModuleDef {
 }
 
 export function genericModules(): ModuleDef[] {
-  return [
+  const onTheRail = [
     ...breakers(),
     ...rcds(),
     ...rcbos(),
@@ -563,7 +612,8 @@ export function genericModules(): ModuleDef[] {
     ...transferController(),
     ...bars(),
     ...combs(),
-  ].map(onRail).map(withWidthRange).map(withArt);
+  ].map(onRail);
+  return [...onTheRail, ...terminalBlocks()].map(withWidthRange).map(withArt);
 }
 
 export function genericEnclosures(): Array<{ id: string; name: string; railLengthsUnits: number[] }> {
@@ -576,7 +626,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '14';
+export const GENERIC_LIBRARY_VERSION = '15';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 

@@ -58,9 +58,11 @@ describe('the height and the mounting of a module in a library', () => {
     expect(pathsOf(libraryWith((m) => (m.mounting = 'wall')))).toEqual(['modules[0].mounting']);
   });
 
-  it('are standard in the bundled library, whose devices all clip on a rail', () => {
+  it('are standard in the bundled library, whose devices all clip on a rail; only the terminal blocks are lower', () => {
     const modules = genericModules();
-    expect(modules.every((m) => m.heightMm === DIN_MODULE_HEIGHT_MM && m.mounting === 'rail')).toBe(true);
+    expect(modules.every((m) => m.mounting === 'rail')).toBe(true);
+    expect(modules.filter((m) => m.kind !== 'terminal').every((m) => m.heightMm === DIN_MODULE_HEIGHT_MM)).toBe(true);
+    expect(modules.filter((m) => m.kind === 'terminal').every((m) => m.heightMm < DIN_MODULE_HEIGHT_MM)).toBe(true);
   });
 });
 

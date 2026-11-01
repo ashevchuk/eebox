@@ -116,7 +116,7 @@ A transfer controller and two contactors switch a workshop to the generator when
 
 Open the page, drag modules from the palette onto a rail, switch to *Schematic* and wire them. To see a finished design, open [`examples/house-panel.json`](examples/house-panel.json) with *Open...* or pick one under *File > Examples*; [`examples/automation-panel.json`](examples/automation-panel.json) is the pump station with two plates.
 
-The bundled *Generic IEC modules* library is generated from standard rating series and covers breakers, RCDs, RCBOs, switches, fuse disconnectors, surge protectors (spark gap, combined, varistor and fine protection, and for DC), contactors, voltage and phase monitoring relays, lighting relays, changeover switches for a backup input, a transfer controller, meters and small devices. Its widths are typical values and do not come from any manufacturer, so import your own library for real parts.
+The bundled *Generic IEC modules* library is generated from standard rating series and covers breakers, RCDs, RCBOs (also with three phases and a neutral), switches, fuse disconnectors, feed-through terminals (L, N, PE and control, 2.5 to 16 mm2), surge protectors (spark gap, combined, varistor and fine protection, and for DC), contactors, voltage and phase monitoring relays, lighting relays, changeover switches for a backup input, a transfer controller, meters and small devices. Its widths are typical values and do not come from any manufacturer, so import your own library for real parts.
 
 ## Development
 

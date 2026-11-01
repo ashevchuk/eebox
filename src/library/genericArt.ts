@@ -124,8 +124,9 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
           ...knob(CORNER_MM + 1, 'left'),
         ];
       case 'busbar':
-      case 'terminal':
         return barArt(def, width);
+      case 'terminal':
+        return terminalArt(def, width);
       case 'relay':
         return relayArt(def, width);
       case 'other':
@@ -135,6 +136,18 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
     }
   })();
   return shapes.length > 0 ? shapes : undefined;
+}
+
+/** A band across the foot of the body of a feed-through terminal in the colour of its conductor, under the rating and the name and above the lower terminal. */
+const TERMINAL_BAND_TOP_MM = 43;
+const TERMINAL_BAND_HEIGHT_MM = 6;
+
+function terminalArt(def: ModuleDef, width: number): ArtShape[] {
+  const conductor = def.terminals?.[0]?.conductor;
+  const colour = conductor === 'N' ? '#2f7de1' : conductor === 'PE' ? '#2f9e44' : '#a8a29e';
+  const body: ArtShape[] = [stripe(width, TERMINAL_BAND_TOP_MM, TERMINAL_BAND_HEIGHT_MM, colour)];
+  if (conductor === 'PE') body.push(stripe(width, TERMINAL_BAND_TOP_MM + 2, 2, '#f2d21b'));
+  return body;
 }
 
 function relayArt(def: ModuleDef, width: number): ArtShape[] {
