@@ -39,8 +39,8 @@ export const MAX_POWER_W = 10_000_000;
 export const MIN_POWER_FACTOR = 0.1;
 export const MAX_CABLE_LENGTH_M = 1000;
 
-/** Breakers and RCBOs are the modules whose rating protects the cable behind them. */
-export const PROTECTIVE_KINDS = ['breaker', 'rcbo'];
+/** Breakers, RCBOs and fuses are the modules whose rating protects the cable behind them. */
+export const PROTECTIVE_KINDS = ['breaker', 'rcbo', 'fuse'];
 
 export function loadSpecProblem(spec: LoadSpec): string | null {
   if (!Number.isFinite(spec.powerW) || spec.powerW <= 0 || spec.powerW > MAX_POWER_W) {

@@ -12,6 +12,7 @@ export const MODULE_KINDS = [
   'rcbo',
   'contactor',
   'spd',
+  'fuse',
   'meter',
   'psu',
   'terminal',

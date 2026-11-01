@@ -220,6 +220,7 @@ export const UI: Dictionary = {
   'Take this module out of the library': `Прибрати цей модуль із бібліотеки`,
   'Circuit breakers': `Автоматичні вимикачі`,
   'Surge protectors': `Обмежувачі перенапруг`,
+  Fuses: `Запобіжники`,
   'Power supplies': `Блоки живлення`,
   // panel editor / view
   'That row does not exist.': `Такого ряду немає.`,

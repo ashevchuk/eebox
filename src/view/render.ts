@@ -98,6 +98,7 @@ export const LEVER_COLORS: Record<ModuleKind, string> = {
   rcbo: '#0d9488',
   contactor: '#9333ea',
   spd: '#dc2626',
+  fuse: '#b45309',
   meter: '#475569',
   psu: '#ca8a04',
   terminal: '#78716c',

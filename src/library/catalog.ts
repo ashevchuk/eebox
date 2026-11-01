@@ -6,6 +6,7 @@ export const KIND_LABELS: Record<ModuleKind, string> = {
   rcbo: 'RCBOs',
   contactor: 'Contactors',
   spd: 'Surge protectors',
+  fuse: 'Fuses',
   meter: 'Meters',
   psu: 'Power supplies',
   terminal: 'Terminals',

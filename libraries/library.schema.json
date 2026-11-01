@@ -118,6 +118,7 @@
             "rcbo",
             "contactor",
             "spd",
+            "fuse",
             "meter",
             "psu",
             "terminal",

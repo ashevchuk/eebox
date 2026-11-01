@@ -19,6 +19,12 @@ const CORNER_MM = 5;
 
 const stroked = { stroke: INK, strokeWidth: 0.3 };
 
+const FUSE_BAND = '#b45309';
+
+/** The window of a surge protector tells its type apart: type 1 red, 1+2 orange, 2 green, 3 blue, and amber for the DC ones. */
+const spdBand = (id: string): string =>
+  id.startsWith('spd-pv-') ? '#a16207' : id.startsWith('spd-t12-') ? '#ea580c' : id.startsWith('spd-t1-') ? '#b91c1c' : id.startsWith('spd-t3-') ? '#0369a1' : '#16a34a';
+
 /** Screw head with a slot over each unit of a terminal bar, under the terminals. */
 const screws = (): ArtShape[] =>
   [7, 84].flatMap((y): ArtShape[] => [
@@ -94,9 +100,15 @@ export function genericArt(def: ModuleDef): ArtShape[] | undefined {
           bandWindow(width, INK),
           ...[74, 77.5].map((y): ArtShape => ({ kind: 'line', x1: 3, y1: y, x2: width - 3, y2: y, stroke: STEEL, strokeWidth: 0.6, anchor: 'stretch' })),
         ];
+      case 'fuse':
+        return [
+          bandWindow(width, FUSE_BAND),
+          { kind: 'rect', x: 3, y: LOWER_ROW_MM - 3.5, width: width - 6, height: 7, fill: PALE, ...stroked, anchor: 'stretch' },
+          { kind: 'line', x1: 6, y1: LOWER_ROW_MM, x2: width - 6, y2: LOWER_ROW_MM, stroke: INK, strokeWidth: 0.5, anchor: 'stretch' },
+        ];
       case 'spd':
         return [
-          bandWindow(width, '#16a34a'),
+          bandWindow(width, spdBand(def.id)),
           { kind: 'polyline', points: [[mid - 3, 72], [mid + 1, 75], [mid - 1, 76], [mid + 3, 79]], stroke: '#dc2626', strokeWidth: 0.9, anchor: 'centre' },
         ];
       case 'meter':

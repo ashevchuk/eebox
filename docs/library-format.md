@@ -31,7 +31,7 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | identifier | required, unique in the library |
-| `kind` | enum | `breaker`, `rcd`, `rcbo`, `contactor`, `spd`, `meter`, `psu`, `terminal`, `busbar`, `comb`, `switch`, `relay`, `softstarter`, `vfd`, `plc`, `transformer`, `other` |
+| `kind` | enum | `breaker`, `rcd`, `rcbo`, `contactor`, `spd`, `fuse`, `meter`, `psu`, `terminal`, `busbar`, `comb`, `switch`, `relay`, `softstarter`, `vfd`, `plc`, `transformer`, `other` |
 | `name` | string | required; the name in the palette, the search and the parts list |
 | `shortName` | string | optional, 1 to 16 characters on one line; what the face of the module shows in place of `name`, which is too long there |
 | `widthUnits` | number | width in 17.5 mm units, from 0.1; a fraction is fine, so a relay of 22.5 mm is `1.2857` and a block of 29 mm `1.6571`. The designer takes the width in millimetres |

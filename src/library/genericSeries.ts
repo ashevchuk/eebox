@@ -1,5 +1,5 @@
 import { genericArt } from './genericArt';
-import { DIN_MODULE_HEIGHT_MM, type ModuleDef, type TerminalDef } from './types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type ModuleDef, type TerminalDef } from './types';
 
 /**
  * The bundled library, built from standard rating series. Nothing here comes from a manufacturer's
@@ -99,26 +99,92 @@ function switches(): DinModule[] {
   );
 }
 
+/** Terminals of one side spread evenly over the width: the centre of the i-th of n cells. */
+const spreadTerminals = (conductors: TerminalDef['conductor'][], side: 'top' | 'bottom', widthUnits: number): TerminalDef[] => {
+  const step = widthUnits / conductors.length;
+  return conductors.map((conductor, i): TerminalDef => ({ name: conductor, conductor, side, unit: Math.round((i * step + (step - 1) / 2) * 1e4) / 1e4 }));
+};
+
+const LINES: Record<'1p' | '1pn' | '3p' | '3pn', { label: string; poles: 1 | 2 | 3 | 4; conductors: TerminalDef['conductor'][] }> = {
+  '1p': { label: '1P', poles: 1, conductors: ['L'] },
+  '1pn': { label: '1P+N', poles: 2, conductors: ['L', 'N'] },
+  '3p': { label: '3P', poles: 3, conductors: ['L1', 'L2', 'L3'] },
+  '3pn': { label: '3P+N', poles: 4, conductors: ['L1', 'L2', 'L3', 'N'] },
+};
+
+type LineCode = keyof typeof LINES;
+
+interface SpdFamily {
+  idPart: string;
+  name: string;
+  widths: Partial<Record<LineCode, number>>;
+}
+
+/** The AC families: what the device is made of decides the type, and so how much lightning current it takes. */
+const SPD_FAMILIES: SpdFamily[] = [
+  { idPart: 't1', name: 'SPD type 1 (spark gap)', widths: { '1p': 2, '1pn': 4, '3p': 6, '3pn': 8 } },
+  { idPart: 't12', name: 'SPD type 1+2 (combined)', widths: { '1p': 2, '1pn': 2, '3p': 4, '3pn': 4 } },
+  { idPart: 't2', name: 'SPD type 2 (varistor)', widths: { '1p': 1, '1pn': 2, '3p': 3, '3pn': 4 } },
+  { idPart: 't3', name: 'SPD type 3 (fine protection)', widths: { '1p': 1, '1pn': 1 } },
+];
+
+/** A surge protector shunts the lines to earth: the lines come in on top and the one earth terminal is below, so nothing passes through it. */
 function surgeProtectors(): DinModule[] {
-  const variants: Array<[string, string, 1 | 2 | 3 | 4]> = [
-    ['1p', '1P', 1],
-    ['1pn', '1P+N', 2],
-    ['3p', '3P', 3],
-    ['3pn', '3P+N', 4],
-  ];
-  const lineConductors: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
-  return variants.map(([code, label, poles]) => ({
-    id: `spd-t2-${code}`,
-    kind: 'spd',
-    name: `SPD type 2 ${label}`,
-    widthUnits: poles,
-    poles,
-    // A surge protector shunts the lines to earth: the lines come in on top and the one earth terminal is below, so nothing passes through it.
-    terminals: [
-      ...lineConductors[poles].map((conductor, unit): TerminalDef => ({ name: conductor, conductor, side: 'top', unit })),
-      { name: 'PE', conductor: 'PE', side: 'bottom', unit: (poles - 1) / 2 },
-    ],
-  }));
+  const alternating = SPD_FAMILIES.flatMap((family) =>
+    (Object.entries(family.widths) as Array<[LineCode, number]>).map(([code, widthUnits]): DinModule => {
+      const { label, poles, conductors } = LINES[code];
+      return {
+        id: `spd-${family.idPart}-${code}`,
+        kind: 'spd',
+        name: `${family.name} ${label}`,
+        widthUnits,
+        poles,
+        terminals: [...spreadTerminals(conductors, 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
+      };
+    }),
+  );
+  const direct = ([['t2', 'SPD type 2 (varistor) for DC, PV', 2], ['t12', 'SPD type 1+2 (combined) for DC, PV', 4]] as const).map(
+    ([idPart, name, widthUnits]): DinModule => ({
+      id: `spd-pv-${idPart}`,
+      kind: 'spd',
+      name,
+      widthUnits,
+      poles: 2,
+      terminals: [...spreadTerminals(['DCP', 'DCN'], 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
+    }),
+  );
+  return [...alternating, ...direct];
+}
+
+const FUSE_BREAKING_CAPACITY_KA = 100;
+
+/** Cylindrical fuse sizes of IEC 60269-2 for DIN-rail holders: the width of one pole in mm and the ratings of the links. */
+const FUSE_SIZES = [
+  { size: '10x38', poleMm: 17.5, ratings: [2, 4, 6, 10, 16, 20, 25, 32] },
+  { size: '14x51', poleMm: 22.5, ratings: [10, 16, 20, 25, 32, 40, 50] },
+  { size: '22x58', poleMm: 36, ratings: [32, 40, 50, 63, 80, 100, 125] },
+];
+
+/** Fuse disconnectors with a gG link; the rating of the link is the rating of the module, so the cable checks can use it. */
+function fuses(): DinModule[] {
+  const lines: Record<1 | 2 | 3 | 4, TerminalDef['conductor'][]> = { 1: ['L'], 2: ['L', 'N'], 3: ['L1', 'L2', 'L3'], 4: ['L1', 'L2', 'L3', 'N'] };
+  return FUSE_SIZES.flatMap(({ size, poleMm, ratings }) =>
+    POLES.flatMap((poles) =>
+      ratings.map((rating): DinModule => {
+        const widthUnits = Math.round(((poles * poleMm) / MODULE_UNIT_MM) * 1e4) / 1e4;
+        return {
+          id: `fuse-${size}-${poles}p-${rating}`,
+          kind: 'fuse',
+          name: `Fuse disconnector ${size} ${poleLabel(poles)} gG ${rating}A`,
+          widthUnits,
+          poles,
+          ratedCurrentA: rating,
+          breakingCapacityKA: FUSE_BREAKING_CAPACITY_KA,
+          terminals: [...spreadTerminals(lines[poles], 'top', widthUnits), ...spreadTerminals(lines[poles], 'bottom', widthUnits)],
+        };
+      }),
+    ),
+  );
 }
 
 function contactors(): DinModule[] {
@@ -487,6 +553,7 @@ export function genericModules(): ModuleDef[] {
     ...rcbos(),
     ...switches(),
     ...surgeProtectors(),
+    ...fuses(),
     ...contactors(),
     ...monitoringRelays(),
     ...lightingRelays(),
@@ -509,7 +576,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '13';
+export const GENERIC_LIBRARY_VERSION = '14';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
 
