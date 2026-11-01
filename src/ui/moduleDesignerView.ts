@@ -30,6 +30,7 @@ import {
   pinLabels,
   railPreviewScene,
   repairPositions,
+  fitTerminalsToWidth,
   setAllConductors,
   slotAt,
   spreadSide,
@@ -658,6 +659,7 @@ export class ModuleDesignerView {
   }
 
   private edit(key: string, raw: string): void {
+    const previousWidth = this.module.widthUnits;
     const result = applyEditorEdit(this.state, key, raw);
     if (!result.ok) {
       this.say(result.message, true);
@@ -665,8 +667,10 @@ export class ModuleDesignerView {
     }
     if (result.target?.kind === 'module') this.moduleId = result.target.id;
     this.pristine = false;
-    if (key === 'widthUnits') this.previewWidth = null;
-    const repaired = ['widthUnits', 'resizeMin', 'resizeMax'].includes(key) ? repairPositions(result.draft, this.moduleId) : result.draft;
+    const widthKey = key === 'widthUnits' || key === 'widthMm';
+    if (widthKey) this.previewWidth = null;
+    const resized = ['widthUnits', 'widthMm', 'resizeMin', 'resizeMax'].includes(key) ? repairPositions(result.draft, this.moduleId) : result.draft;
+    const repaired = widthKey ? fitTerminalsToWidth(resized, this.moduleId, previousWidth) : resized;
     this.commit(repaired, this.selected);
   }
 

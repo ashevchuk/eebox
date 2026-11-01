@@ -133,6 +133,25 @@ export function repairPositions(draft: Library, moduleId: string): Library {
   return replaceTerminals(draft, moduleId, terminals);
 }
 
+/**
+ * A module of a fixed width that is made narrower loses the room that terminals near its far edge stood in, and a
+ * list of errors that blocks saving is no answer to that: the layout is scaled to the new width, so rows of
+ * terminals stay spread over the module. Nothing changes when the terminals still fit, or when the module grows.
+ */
+export function fitTerminalsToWidth(draft: Library, moduleId: string, previousWidth: number): Library {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def?.terminals || def.resizable) return draft;
+  const width = def.widthUnits;
+  if (width >= previousWidth || def.terminals.every((t) => t.unit === undefined || isValidPosition(t.unit, undefined, width))) return draft;
+  const { min, max } = fixedRange(width);
+  const scaled = def.terminals.map((t) => {
+    if (t.unit === undefined) return t;
+    const unit = Math.round(((t.unit + 0.5) * (width / previousWidth) - 0.5) * 1000) / 1000;
+    return { ...t, unit: Math.min(max, Math.max(min, unit)) };
+  });
+  return replaceTerminals(draft, moduleId, scaled);
+}
+
 /** The entries of `terminals`, or the ones the poles give when the module has none of its own. */
 function listedTerminals(def: ModuleDef): TerminalDef[] {
   return def.terminals ?? terminalsOf(def).map((t) => ({ name: t.name, conductor: t.conductor, side: t.side }));
