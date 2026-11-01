@@ -12,7 +12,7 @@
     "test": "vitest run",
     "gen:library": "vite-node scripts/generate-generic-library.ts",
     "test:watch": "vitest",
-    "e2e": "node e2e/smoke.mjs && node e2e/persistence.mjs && node e2e/plate.mjs && node e2e/signals.mjs && node e2e/tiles.mjs && node e2e/contextmenu.mjs && node e2e/designerwidth.mjs && node e2e/problems.mjs && node e2e/features.mjs && node e2e/fileversion.mjs && node e2e/toolbar.mjs && node e2e/touch.mjs && node e2e/wirepick.mjs && node e2e/cleardata.mjs && node e2e/facedelete.mjs && node e2e/designerselect.mjs"
+    "e2e": "node e2e/smoke.mjs && node e2e/persistence.mjs && node e2e/plate.mjs && node e2e/signals.mjs && node e2e/tiles.mjs && node e2e/contextmenu.mjs && node e2e/designerwidth.mjs && node e2e/problems.mjs && node e2e/features.mjs && node e2e/fileversion.mjs && node e2e/toolbar.mjs && node e2e/touch.mjs && node e2e/wirepick.mjs && node e2e/cleardata.mjs && node e2e/facedelete.mjs && node e2e/designerselect.mjs && node e2e/designerlogic.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

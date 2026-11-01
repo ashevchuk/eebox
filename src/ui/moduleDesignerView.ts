@@ -37,6 +37,7 @@ import {
   UNIT_PX,
   type DesignerLayout,
   type DesignerPin,
+  dropBrokenLogic,
 } from './moduleDesigner';
 import { MODULE_TEMPLATES } from './moduleTemplates';
 
@@ -387,13 +388,14 @@ export class ModuleDesignerView {
   }
 
   /** Records a new draft in the history; `reset` also forgets what was selected and the width that was tried. */
-  private commit(draft: Library, selected: number | null, reset = false): void {
-    if (stableStringify(draft) === stableStringify(this.draft)) return;
+  private commit(edited: Library, selected: number | null, reset = false): void {
+    if (stableStringify(edited) === stableStringify(this.draft)) return;
+    const { draft, dropped } = dropBrokenLogic(edited, this.moduleId);
     this.history.commit(draft);
     this.selected = selected;
     this.connectFrom = null;
     if (reset) this.previewWidth = null;
-    this.say('');
+    this.say(dropped ? 'The logic of this module named terminals that are gone, so it was taken off. Undo brings it back.' : '');
     this.renderAll(true);
   }
 

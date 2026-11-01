@@ -69,6 +69,7 @@ export const DESIGNER: Dictionary = {
     `Клацніть фігуру, щоб вибрати; Shift+клац додає; перетягування по порожньому місцю вибирає все всередині; тягніть вибране, щоб пересунути, маркер — щоб змінити розмір. Delete видаляє, стрілки підсувають, Ctrl+C і Ctrl+V копіюють на інший модуль. Редагується для ширини {n} мод., на яку створено модуль; рейка нижче показує інші ширини.`,
   // module designer
   'Module designer': `Конструктор модулів`,
+  'The logic of this module named terminals that are gone, so it was taken off. Undo brings it back.': `Логіка цього модуля називала клеми, яких уже немає, тому її прибрано. Скасування повертає її.`,
   'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ':
     `Розміщення: клацніть верхню чи нижню половину, щоб додати; клацніть клему, щоб вибрати; тягніть, щоб пересунути; Delete видаляє. Клацніть «Розмістити» ще раз, щоб вимкнути його, і тоді клацання лише вибирає. `,
   'Click again to switch placing off and only select and move terminals': `Клацніть ще раз, щоб вимкнути розміщення й лише вибирати та переміщувати клеми`,

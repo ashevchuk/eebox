@@ -468,6 +468,30 @@ export function makeBlock(draft: Library, moduleId: string, spec: BlockSpec, wid
   return { ok: true, draft: replaceTerminals(draft, moduleId, terminals), index: 0 };
 }
 
+/** The ids the validator accepts for the stored terminals: a group of `count` is `name1`, `name2`, ... */
+function declaredIds(terminals: readonly TerminalDef[]): Set<string> {
+  const ids = new Set<string>();
+  for (const t of terminals) {
+    const count = t.count ?? 1;
+    for (let i = 0; i < count; i++) ids.add(`${t.side}:${count > 1 ? `${t.name}${i + 1}` : t.name}`);
+  }
+  return ids;
+}
+
+/**
+ * Takes the logic off a module when it names a terminal the module no longer has, because the validator refuses
+ * such a module and it could not be saved. The designer says so and its Undo brings the logic back.
+ */
+export function dropBrokenLogic(draft: Library, moduleId: string): { draft: Library; dropped: boolean } {
+  const def = draft.modules.find((m) => m.id === moduleId);
+  if (!def?.logic || !def.terminals) return { draft, dropped: false };
+  const ids = declaredIds(def.terminals);
+  const named = [...Object.values(def.logic.inputs).flatMap((input) => input.terminals), ...def.logic.contacts.flatMap((c) => c.between)];
+  if (named.every((id) => ids.has(id))) return { draft, dropped: false };
+  const { logic: _removed, ...rest } = def;
+  return { draft: { ...draft, modules: draft.modules.map((m) => (m.id === moduleId ? rest : m)) }, dropped: true };
+}
+
 export const PREVIEW_LIBRARY_ID = 'preview';
 
 /** A one-rail panel with the module on it, one unit from the start, to draw it as it looks in a panel. */
