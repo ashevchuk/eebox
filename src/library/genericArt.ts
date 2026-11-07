@@ -25,12 +25,18 @@ const FUSE_BAND = '#b45309';
 const spdBand = (id: string): string =>
   id.startsWith('spd-pv-') ? '#a16207' : id.startsWith('spd-t12-') ? '#ea580c' : id.startsWith('spd-t1-') ? '#b91c1c' : id.startsWith('spd-t3-') ? '#0369a1' : '#16a34a';
 
-/** Screw head with a slot over each unit of a terminal bar, under the terminals. */
-const screws = (): ArtShape[] =>
-  [7, 84].flatMap((y): ArtShape[] => [
-    { kind: 'ellipse', cx: MODULE_UNIT_MM / 2, cy: y, rx: 3.6, ry: 3.6, fill: PALE, stroke: STEEL, strokeWidth: 0.4, anchor: 'tile', period: 1 },
-    { kind: 'line', x1: MODULE_UNIT_MM / 2 - 2.4, y1: y - 1.2, x2: MODULE_UNIT_MM / 2 + 2.4, y2: y + 1.2, stroke: STEEL, strokeWidth: 0.5, anchor: 'tile', period: 1 },
+/** The height of the top and bottom rows of terminals of a bar, where its screws are drawn. */
+const TOP_SCREW_MM = 7;
+const BOTTOM_SCREW_MM = 84;
+
+/** Screw head with a slot over each terminal of a terminal bar, `period` units apart, under the terminals. */
+const screws = (rows: readonly number[] = [TOP_SCREW_MM, BOTTOM_SCREW_MM], period = 1): ArtShape[] => {
+  const half = (MODULE_UNIT_MM * period) / 2;
+  return rows.flatMap((y): ArtShape[] => [
+    { kind: 'ellipse', cx: half, cy: y, rx: 3.6, ry: 3.6, fill: PALE, stroke: STEEL, strokeWidth: 0.4, anchor: 'tile', period },
+    { kind: 'line', x1: half - 2.4, y1: y - 1.2, x2: half + 2.4, y2: y + 1.2, stroke: STEEL, strokeWidth: 0.5, anchor: 'tile', period },
   ]);
+};
 
 /** A window across the band, where a handle sits, a relay shows its state or a meter its reading. */
 const bandWindow = (width: number, fill: string): ArtShape => ({
@@ -77,7 +83,10 @@ function barArt(def: ModuleDef, width: number): ArtShape[] {
   const body: ArtShape[] = [stripe(width, 40, 8, conductor === 'PE' ? '#2f9e44' : '#2f7de1')];
   if (conductor === 'PE') body.push(stripe(width, 42.5, 3, '#f2d21b'));
   if (conductor === 'PEN') body.push(stripe(width, 42.5, 3, '#2f9e44'));
-  return [...body, ...screws()];
+  const sides = [...new Set(def.terminals?.map((t) => t.side))];
+  if (sides.length !== 1) return [...body, ...screws()];
+  // A bar with one row of terminals has screws on that side only, one for each terminal.
+  return [...body, ...screws([sides[0] === 'top' ? TOP_SCREW_MM : BOTTOM_SCREW_MM], def.widthUnits / (def.terminals?.length ?? 1))];
 }
 
 /** What is drawn on the face of a bundled device, or nothing for a kind that has no face worth drawing. */

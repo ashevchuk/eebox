@@ -306,10 +306,13 @@ describe('resizable validation', () => {
     expect([1, 2, 4].map((w) => unitOf(w, 'top:A1'))).toEqual([0, 0, 0]);
   });
 
-  it('marks the bundled bars and combs as resizable', () => {
+  /** Bars of one evenly spread row of terminals, whose terminals stand at fractions of a unit and so cannot follow a width. */
+  const FIXED_WIDTH_BARS = ['n-bar-16', 'n-bar-16-bottom'];
+
+  it('marks the bundled bars and combs as resizable, except the bars of fixed width', () => {
     const parsed = parseLibraryJson(genericIecText);
     if (!parsed.ok) throw new Error('bundled library must be valid');
-    const resizable = parsed.library.modules.filter((m) => m.kind === 'busbar' || m.kind === 'comb');
+    const resizable = parsed.library.modules.filter((m) => (m.kind === 'busbar' || m.kind === 'comb') && !FIXED_WIDTH_BARS.includes(m.id));
     expect(resizable.length).toBeGreaterThan(0);
     expect(resizable.every((m) => m.resizable !== undefined)).toBe(true);
   });

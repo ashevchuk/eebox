@@ -22,7 +22,7 @@ describe('the bundled library', () => {
   });
 
   it('is valid and has metadata that says where the numbers come from', () => {
-    expect(library.version).toBe('18');
+    expect(library.version).toBe('19');
     expect(library.description).toMatch(/not taken from any manufacturer/);
   });
 
@@ -86,9 +86,14 @@ describe('the bundled library', () => {
     expect(conductors('rcbo-1pn-c16-30')).toEqual(['L', 'N']);
   });
 
-  it('lets bars and combs be resized and gives combs the patterns of the devices they serve', () => {
-    for (const m of library.modules.filter((x) => x.kind === 'busbar' || x.kind === 'comb')) {
+  it('lets bars and combs be resized, except the bars of fixed width, and gives combs the patterns of the devices they serve', () => {
+    const fixedWidthBars = ['n-bar-16', 'n-bar-16-bottom'];
+    for (const m of library.modules.filter((x) => (x.kind === 'busbar' || x.kind === 'comb') && !fixedWidthBars.includes(x.id))) {
       expect(m.resizable).toBeDefined();
+    }
+    for (const id of fixedWidthBars) {
+      expect(byId.get(id)?.resizable).toBeUndefined();
+      expect(byId.get(id)?.terminals).toHaveLength(16);
     }
     expect(byId.get('comb-3phn-12')?.comb?.pattern).toEqual(['L1', 'L2', 'L3', 'N']);
   });
@@ -161,5 +166,28 @@ describe('devices with control circuits', () => {
   it('gives the transfer controller sensing inputs for both supplies and dry contacts for the contactors and a generator', () => {
     expect(contactsOf('ats-controller-3pn').map((t) => t.name)).toEqual(['CA1', 'CA2', 'CB1', 'CB2', 'GS1', 'GS2']);
     expect(terminals('ats-controller-3pn').filter((t) => t.side === 'top')).toHaveLength(8);
+  });
+});
+
+describe('the bars of one row of terminals', () => {
+  const SIDES = { 'n-bar-16': 'top', 'n-bar-16-bottom': 'bottom' } as const;
+
+  it.each(Object.entries(SIDES))('%s has 16 terminals of neutral on its %s side, evenly spread and joined into one net', (id, side) => {
+    const def = byId.get(id)!;
+    const terminals = terminalsOf(def);
+    expect(terminals).toHaveLength(16);
+    expect(terminals.every((t) => t.side === side && t.conductor === 'N' && t.net === 'N')).toBe(true);
+    const spacing = terminals.slice(1).map((t, i) => Math.round((t.unit - terminals[i]!.unit) * 1000) / 1000);
+    expect(new Set(spacing)).toEqual(new Set([0.5]));
+    expect(new Set(terminals.map((t) => t.id)).size).toBe(16);
+  });
+
+  it('draw a screw for each terminal on the side of the terminals only', () => {
+    const rows = (id: string) => {
+      const screws = byId.get(id)!.art!.filter((s) => s.kind === 'ellipse');
+      return { ys: [...new Set(screws.map((s) => (s.kind === 'ellipse' ? s.cy : 0)))], period: screws.map((s) => s.period)[0] };
+    };
+    expect(rows('n-bar-16')).toEqual({ ys: [7], period: 0.5 });
+    expect(rows('n-bar-16-bottom')).toEqual({ ys: [84], period: 0.5 });
   });
 });

@@ -326,6 +326,9 @@ function contactors(): DinModule[] {
   );
 }
 
+const ONE_ROW_BAR_UNITS = 8;
+const ONE_ROW_BAR_TERMINALS = 16;
+
 function bars(): DinModule[] {
   const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): DinModule => ({
     id,
@@ -339,8 +342,22 @@ function bars(): DinModule[] {
       { name: bottom, conductor, side: 'bottom', net: conductor, count: 6 },
     ],
   });
+  /**
+   * A bar of fixed width with all its terminals in one evenly spread row on one side: on a vertical rail the top side
+   * is the right and the bottom side the left. It is not resizable, because its terminals stand at fractions of a unit.
+   */
+  const oneRowBar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', terminal: string, side: 'top' | 'bottom'): DinModule => ({
+    id,
+    kind: 'busbar',
+    name,
+    widthUnits: ONE_ROW_BAR_UNITS,
+    poles: 1,
+    terminals: evenPositions(ONE_ROW_BAR_TERMINALS, ONE_ROW_BAR_UNITS).map((unit, i): TerminalDef => ({ name: `${terminal}${i + 1}`, conductor, side, net: conductor, unit })),
+  });
   return [
     bar('n-bar-12', 'Neutral bar 12 terminals', 'N', 'N', 'Nb'),
+    oneRowBar('n-bar-16', 'Neutral bar 16 terminals, one row', 'N', 'N', 'top'),
+    oneRowBar('n-bar-16-bottom', 'Neutral bar 16 terminals, one row, bottom', 'N', 'Nb', 'bottom'),
     bar('pe-bar-12', 'Earth bar 12 terminals', 'PE', 'PE', 'PEb'),
     bar('pen-bar-12', 'PEN bar 12 terminals', 'PEN', 'PEN', 'PENb'),
     {
@@ -692,7 +709,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '18';
+export const GENERIC_LIBRARY_VERSION = '19';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths and the marked inputs of RCDs, surge protectors and power supplies are typical, not taken from any manufacturer; check the datasheet before ordering.';
 
