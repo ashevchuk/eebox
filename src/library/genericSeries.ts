@@ -326,6 +326,19 @@ function contactors(): DinModule[] {
   );
 }
 
+type BarConductor = 'N' | 'PE' | 'PEN' | 'L' | 'L1' | 'L2' | 'L3';
+
+/** The bars of one row of terminals: the conductor each carries, and the prefixes of the names of the terminals on the top and the bottom side. */
+const ONE_ROW_BARS: ReadonlyArray<{ id: string; name: string; conductor: BarConductor; top: string; bottom: string }> = [
+  { id: 'n', name: 'Neutral', conductor: 'N', top: 'N', bottom: 'Nb' },
+  { id: 'pe', name: 'Earth', conductor: 'PE', top: 'PE', bottom: 'PEb' },
+  { id: 'pen', name: 'PEN', conductor: 'PEN', top: 'PEN', bottom: 'PENb' },
+  { id: 'l', name: 'Phase', conductor: 'L', top: 'L.', bottom: 'Lb.' },
+  { id: 'l1', name: 'Phase L1', conductor: 'L1', top: 'L1.', bottom: 'L1b.' },
+  { id: 'l2', name: 'Phase L2', conductor: 'L2', top: 'L2.', bottom: 'L2b.' },
+  { id: 'l3', name: 'Phase L3', conductor: 'L3', top: 'L3.', bottom: 'L3b.' },
+];
+
 const ONE_ROW_BAR_UNITS = 8;
 const ONE_ROW_BAR_TERMINALS = 16;
 
@@ -346,7 +359,7 @@ function bars(): DinModule[] {
    * A bar of fixed width with all its terminals in one evenly spread row on one side: on a vertical rail the top side
    * is the right and the bottom side the left. It is not resizable, because its terminals stand at fractions of a unit.
    */
-  const oneRowBar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', terminal: string, side: 'top' | 'bottom'): DinModule => ({
+  const oneRowBar = (id: string, name: string, conductor: BarConductor, terminal: string, side: 'top' | 'bottom'): DinModule => ({
     id,
     kind: 'busbar',
     name,
@@ -356,8 +369,10 @@ function bars(): DinModule[] {
   });
   return [
     bar('n-bar-12', 'Neutral bar 12 terminals', 'N', 'N', 'Nb'),
-    oneRowBar('n-bar-16', 'Neutral bar 16 terminals, one row', 'N', 'N', 'top'),
-    oneRowBar('n-bar-16-bottom', 'Neutral bar 16 terminals, one row, bottom', 'N', 'Nb', 'bottom'),
+    ...ONE_ROW_BARS.flatMap(({ id, name, conductor, top, bottom }) => [
+      oneRowBar(`${id}-bar-16`, `${name} bar 16 terminals, one row`, conductor, top, 'top'),
+      oneRowBar(`${id}-bar-16-bottom`, `${name} bar 16 terminals, one row, bottom`, conductor, bottom, 'bottom'),
+    ]),
     bar('pe-bar-12', 'Earth bar 12 terminals', 'PE', 'PE', 'PEb'),
     bar('pen-bar-12', 'PEN bar 12 terminals', 'PEN', 'PEN', 'PENb'),
     {

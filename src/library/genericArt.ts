@@ -77,10 +77,17 @@ const pushButtons = (cx: number): ArtShape[] =>
 
 const stripe = (width: number, y: number, height: number, fill: string): ArtShape => ({ kind: 'rect', x: 0, y, width, height, fill, anchor: 'stretch' });
 
+/**
+ * The colour of a phase depends on the colour scheme of the person, which colours the terminals, so the stripe of a bar
+ * that carries a phase is neutral, as the band of a feed-through terminal is.
+ */
+const PHASE_CONDUCTORS: ReadonlySet<string> = new Set(['L', 'L1', 'L2', 'L3']);
+const NEUTRAL_STEEL = '#a8a29e';
+
 /** The colour of the conductor a bar carries, across its middle, so a neutral bar is not taken for an earth bar. */
 function barArt(def: ModuleDef, width: number): ArtShape[] {
   const conductor = def.id === 'pen-split-12' ? 'PEN' : (def.terminals?.[0]?.conductor ?? 'N');
-  const body: ArtShape[] = [stripe(width, 40, 8, conductor === 'PE' ? '#2f9e44' : '#2f7de1')];
+  const body: ArtShape[] = [stripe(width, 40, 8, conductor === 'PE' ? '#2f9e44' : PHASE_CONDUCTORS.has(conductor) ? NEUTRAL_STEEL : '#2f7de1')];
   if (conductor === 'PE') body.push(stripe(width, 42.5, 3, '#f2d21b'));
   if (conductor === 'PEN') body.push(stripe(width, 42.5, 3, '#2f9e44'));
   const sides = [...new Set(def.terminals?.map((t) => t.side))];

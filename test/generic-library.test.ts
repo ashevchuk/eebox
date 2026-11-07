@@ -87,7 +87,7 @@ describe('the bundled library', () => {
   });
 
   it('lets bars and combs be resized, except the bars of fixed width, and gives combs the patterns of the devices they serve', () => {
-    const fixedWidthBars = ['n-bar-16', 'n-bar-16-bottom'];
+    const fixedWidthBars = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [`${id}-bar-16`, `${id}-bar-16-bottom`]);
     for (const m of library.modules.filter((x) => (x.kind === 'busbar' || x.kind === 'comb') && !fixedWidthBars.includes(x.id))) {
       expect(m.resizable).toBeDefined();
     }
@@ -170,13 +170,17 @@ describe('devices with control circuits', () => {
 });
 
 describe('the bars of one row of terminals', () => {
-  const SIDES = { 'n-bar-16': 'top', 'n-bar-16-bottom': 'bottom' } as const;
+  const CONDUCTORS = { n: 'N', pe: 'PE', pen: 'PEN', l: 'L', l1: 'L1', l2: 'L2', l3: 'L3' } as const;
+  const BARS = Object.entries(CONDUCTORS).flatMap(([id, conductor]) => [
+    [`${id}-bar-16`, conductor, 'top'],
+    [`${id}-bar-16-bottom`, conductor, 'bottom'],
+  ] as const);
 
-  it.each(Object.entries(SIDES))('%s has 16 terminals of neutral on its %s side, evenly spread and joined into one net', (id, side) => {
+  it.each(BARS)('%s has 16 terminals of %s on its %s side, evenly spread and joined into one net', (id, conductor, side) => {
     const def = byId.get(id)!;
     const terminals = terminalsOf(def);
     expect(terminals).toHaveLength(16);
-    expect(terminals.every((t) => t.side === side && t.conductor === 'N' && t.net === 'N')).toBe(true);
+    expect(terminals.every((t) => t.side === side && t.conductor === conductor && t.net === conductor)).toBe(true);
     const spacing = terminals.slice(1).map((t, i) => Math.round((t.unit - terminals[i]!.unit) * 1000) / 1000);
     expect(new Set(spacing)).toEqual(new Set([0.5]));
     expect(new Set(terminals.map((t) => t.id)).size).toBe(16);
@@ -187,7 +191,12 @@ describe('the bars of one row of terminals', () => {
       const screws = byId.get(id)!.art!.filter((s) => s.kind === 'ellipse');
       return { ys: [...new Set(screws.map((s) => (s.kind === 'ellipse' ? s.cy : 0)))], period: screws.map((s) => s.period)[0] };
     };
-    expect(rows('n-bar-16')).toEqual({ ys: [7], period: 0.5 });
-    expect(rows('n-bar-16-bottom')).toEqual({ ys: [84], period: 0.5 });
+    for (const [id, , side] of BARS) expect(rows(id), id).toEqual({ ys: [side === 'top' ? 7 : 84], period: 0.5 });
+  });
+
+  it('have a blue stripe for the neutral and a neutral one for every phase, whose colour comes from the colour scheme of the terminals', () => {
+    const stripe = (id: string) => byId.get(id)!.art!.find((s) => s.kind === 'rect' && s.anchor === 'stretch')!;
+    expect(stripe('n-bar-16')).toMatchObject({ fill: '#2f7de1' });
+    for (const id of ['l-bar-16', 'l1-bar-16', 'l2-bar-16', 'l3-bar-16-bottom']) expect(stripe(id), id).toMatchObject({ fill: '#a8a29e' });
   });
 });
