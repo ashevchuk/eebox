@@ -125,7 +125,7 @@ try {
         document.getElementById('export-svg').click(); await new Promise((r) => setTimeout(r, 700));
         HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create;
         const text = blob ? await blob.text() : '';
-        return [...text.matchAll(/<path d="([^"]+)"[^>]*?stroke="(#(?:ffd700|008000|ff0000))"/g)].map((m) => m[2] + ' ' + m[1]);
+        return [...text.matchAll(/<path d="([^"]+)"[^>]*?stroke="(#(?:ffd700|008000|ff0000))" stroke-width="2.5"/g)].map((m) => m[2] + ' ' + m[1]);
       })()`);
     const before = await paths();
     expectTrue(before.length === 9, `${before.length} wires are drawn, not nine`);
