@@ -27,14 +27,17 @@ const spdBand = (id: string): string =>
 
 /** The height of the top and bottom rows of terminals of a bar, where its screws are drawn. */
 const TOP_SCREW_MM = 7;
+const SCREW_RADIUS_MM = 3.6;
 const BOTTOM_SCREW_MM = 84;
 
 /** Screw head with a slot over each terminal of a terminal bar, `period` units apart, under the terminals. */
 const screws = (rows: readonly number[] = [TOP_SCREW_MM, BOTTOM_SCREW_MM], period = 1): ArtShape[] => {
   const half = (MODULE_UNIT_MM * period) / 2;
+  const radius = Math.min(SCREW_RADIUS_MM, half - 0.2);
+  const scale = radius / SCREW_RADIUS_MM;
   return rows.flatMap((y): ArtShape[] => [
-    { kind: 'ellipse', cx: half, cy: y, rx: 3.6, ry: 3.6, fill: PALE, stroke: STEEL, strokeWidth: 0.4, anchor: 'tile', period },
-    { kind: 'line', x1: half - 2.4, y1: y - 1.2, x2: half + 2.4, y2: y + 1.2, stroke: STEEL, strokeWidth: 0.5, anchor: 'tile', period },
+    { kind: 'ellipse', cx: half, cy: y, rx: radius, ry: radius, fill: PALE, stroke: STEEL, strokeWidth: 0.4, anchor: 'tile', period },
+    { kind: 'line', x1: half - 2.4 * scale, y1: y - 1.2 * scale, x2: half + 2.4 * scale, y2: y + 1.2 * scale, stroke: STEEL, strokeWidth: 0.5, anchor: 'tile', period },
   ]);
 };
 

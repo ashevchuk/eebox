@@ -339,8 +339,10 @@ const ONE_ROW_BARS: ReadonlyArray<{ id: string; name: string; conductor: BarCond
   { id: 'l3', name: 'Phase L3', conductor: 'L3', top: 'L3.', bottom: 'L3b.' },
 ];
 
-const ONE_ROW_BAR_UNITS = 8;
-const ONE_ROW_BAR_TERMINALS = 16;
+/** The distance between the terminals of a bar of one row, as drawn on the picture of real bars it follows: about 5 mm. */
+const ONE_ROW_PITCH_UNITS = 0.3;
+const ONE_ROW_COUNTS = [10, 12, 16];
+const roundUnits = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function bars(): DinModule[] {
   const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): DinModule => ({
@@ -359,20 +361,25 @@ function bars(): DinModule[] {
    * A bar of fixed width with all its terminals in one evenly spread row on one side: on a vertical rail the top side
    * is the right and the bottom side the left. It is not resizable, because its terminals stand at fractions of a unit.
    */
-  const oneRowBar = (id: string, name: string, conductor: BarConductor, terminal: string, side: 'top' | 'bottom'): DinModule => ({
-    id,
-    kind: 'busbar',
-    name,
-    widthUnits: ONE_ROW_BAR_UNITS,
-    poles: 1,
-    terminals: evenPositions(ONE_ROW_BAR_TERMINALS, ONE_ROW_BAR_UNITS).map((unit, i): TerminalDef => ({ name: `${terminal}${i + 1}`, conductor, side, net: conductor, unit })),
-  });
+  const oneRowBar = (id: string, name: string, conductor: BarConductor, terminal: string, side: 'top' | 'bottom', count: number): DinModule => {
+    const widthUnits = roundUnits(count * ONE_ROW_PITCH_UNITS);
+    return {
+      id,
+      kind: 'busbar',
+      name,
+      widthUnits,
+      poles: 1,
+      terminals: evenPositions(count, widthUnits).map((unit, i): TerminalDef => ({ name: `${terminal}${i + 1}`, conductor, side, net: conductor, unit })),
+    };
+  };
   return [
     bar('n-bar-12', 'Neutral bar 12 terminals', 'N', 'N', 'Nb'),
-    ...ONE_ROW_BARS.flatMap(({ id, name, conductor, top, bottom }) => [
-      oneRowBar(`${id}-bar-16`, `${name} bar 16 terminals, one row`, conductor, top, 'top'),
-      oneRowBar(`${id}-bar-16-bottom`, `${name} bar 16 terminals, one row, bottom`, conductor, bottom, 'bottom'),
-    ]),
+    ...ONE_ROW_BARS.flatMap(({ id, name, conductor, top, bottom }) =>
+      ONE_ROW_COUNTS.flatMap((count) => [
+        oneRowBar(`${id}-row-${count}`, `${name} bar ${count} terminals, one row`, conductor, top, 'top', count),
+        oneRowBar(`${id}-row-${count}-bottom`, `${name} bar ${count} terminals, one row, bottom`, conductor, bottom, 'bottom', count),
+      ]),
+    ),
     bar('pe-bar-12', 'Earth bar 12 terminals', 'PE', 'PE', 'PEb'),
     bar('pen-bar-12', 'PEN bar 12 terminals', 'PEN', 'PEN', 'PENb'),
     {

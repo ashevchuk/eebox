@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import libraryText from '../libraries/generic-iec.json?raw';
 import { genericEnclosures, genericLibraryText, genericModules } from '../src/library/genericSeries';
 import { terminalsOf } from '../src/electrical/terminals';
+import { placeArt } from '../src/library/art';
 import { parseLibraryJson } from '../src/library/validate';
 
 const parsed = parseLibraryJson(libraryText);
@@ -87,13 +88,13 @@ describe('the bundled library', () => {
   });
 
   it('lets bars and combs be resized, except the bars of fixed width, and gives combs the patterns of the devices they serve', () => {
-    const fixedWidthBars = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [`${id}-bar-16`, `${id}-bar-16-bottom`]);
+    const fixedWidthBars = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [10, 12, 16].flatMap((count) => [`${id}-row-${count}`, `${id}-row-${count}-bottom`]));
     for (const m of library.modules.filter((x) => (x.kind === 'busbar' || x.kind === 'comb') && !fixedWidthBars.includes(x.id))) {
       expect(m.resizable).toBeDefined();
     }
     for (const id of fixedWidthBars) {
       expect(byId.get(id)?.resizable).toBeUndefined();
-      expect(byId.get(id)?.terminals).toHaveLength(16);
+      expect(byId.get(id)?.terminals).toHaveLength(Number(/-row-(\d+)/.exec(id)![1]));
     }
     expect(byId.get('comb-3phn-12')?.comb?.pattern).toEqual(['L1', 'L2', 'L3', 'N']);
   });
@@ -171,32 +172,34 @@ describe('devices with control circuits', () => {
 
 describe('the bars of one row of terminals', () => {
   const CONDUCTORS = { n: 'N', pe: 'PE', pen: 'PEN', l: 'L', l1: 'L1', l2: 'L2', l3: 'L3' } as const;
-  const BARS = Object.entries(CONDUCTORS).flatMap(([id, conductor]) => [
-    [`${id}-bar-16`, conductor, 'top'],
-    [`${id}-bar-16-bottom`, conductor, 'bottom'],
-  ] as const);
+  const BARS = Object.entries(CONDUCTORS).flatMap(([id, conductor]) =>
+    [10, 12, 16].flatMap((count) => [
+      [`${id}-row-${count}`, conductor, 'top', count],
+      [`${id}-row-${count}-bottom`, conductor, 'bottom', count],
+    ] as const),
+  );
 
-  it.each(BARS)('%s has 16 terminals of %s on its %s side, evenly spread and joined into one net', (id, conductor, side) => {
+  it.each(BARS)('%s has its terminals of %s on its %s side, evenly spread at 0.3 unit and joined into one net', (id, conductor, side, count) => {
     const def = byId.get(id)!;
     const terminals = terminalsOf(def);
-    expect(terminals).toHaveLength(16);
+    expect(terminals).toHaveLength(count);
+    expect(def.widthUnits).toBeCloseTo(count * 0.3, 6);
     expect(terminals.every((t) => t.side === side && t.conductor === conductor && t.net === conductor)).toBe(true);
     const spacing = terminals.slice(1).map((t, i) => Math.round((t.unit - terminals[i]!.unit) * 1000) / 1000);
-    expect(new Set(spacing)).toEqual(new Set([0.5]));
-    expect(new Set(terminals.map((t) => t.id)).size).toBe(16);
+    expect(new Set(spacing)).toEqual(new Set([0.3]));
+    expect(new Set(terminals.map((t) => t.id)).size).toBe(count);
   });
 
-  it('draw a screw for each terminal on the side of the terminals only', () => {
-    const rows = (id: string) => {
-      const screws = byId.get(id)!.art!.filter((s) => s.kind === 'ellipse');
-      return { ys: [...new Set(screws.map((s) => (s.kind === 'ellipse' ? s.cy : 0)))], period: screws.map((s) => s.period)[0] };
-    };
-    for (const [id, , side] of BARS) expect(rows(id), id).toEqual({ ys: [side === 'top' ? 7 : 84], period: 0.5 });
+  it.each(BARS)('%s draws one screw for each terminal on the side of the terminals only', (id, _conductor, side, count) => {
+    const def = byId.get(id)!;
+    const screws = placeArt(def.art!, def.widthUnits, def.widthUnits).filter((s) => s.kind === 'ellipse');
+    expect(new Set(screws.map((s) => (s.kind === 'ellipse' ? s.cy : 0)))).toEqual(new Set([side === 'top' ? 7 : 84]));
+    expect(screws).toHaveLength(count);
   });
 
   it('have a blue stripe for the neutral and a neutral one for every phase, whose colour comes from the colour scheme of the terminals', () => {
     const stripe = (id: string) => byId.get(id)!.art!.find((s) => s.kind === 'rect' && s.anchor === 'stretch')!;
-    expect(stripe('n-bar-16')).toMatchObject({ fill: '#2f7de1' });
-    for (const id of ['l-bar-16', 'l1-bar-16', 'l2-bar-16', 'l3-bar-16-bottom']) expect(stripe(id), id).toMatchObject({ fill: '#a8a29e' });
+    expect(stripe('n-row-16')).toMatchObject({ fill: '#2f7de1' });
+    for (const id of ['l-row-10', 'l1-row-12', 'l2-row-16', 'l3-row-16-bottom']) expect(stripe(id), id).toMatchObject({ fill: '#a8a29e' });
   });
 });

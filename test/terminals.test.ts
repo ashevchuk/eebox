@@ -307,7 +307,7 @@ describe('resizable validation', () => {
   });
 
   /** Bars of one evenly spread row of terminals, whose terminals stand at fractions of a unit and so cannot follow a width. */
-  const FIXED_WIDTH_BARS = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [`${id}-bar-16`, `${id}-bar-16-bottom`]);
+  const FIXED_WIDTH_BARS = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [10, 12, 16].flatMap((count) => [`${id}-row-${count}`, `${id}-row-${count}-bottom`]));
 
   it('marks the bundled bars and combs as resizable, except the bars of fixed width', () => {
     const parsed = parseLibraryJson(genericIecText);
