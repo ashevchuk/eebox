@@ -22,6 +22,8 @@ interface Pattern {
 /** How deep a phrase may stand inside a phrase; a pattern that is only a place would otherwise never end. */
 const MAX_DEPTH = 3;
 const PLACEHOLDER = /\{([A-Za-z0-9_]+)\}/g;
+/** A phrase with forms for a count takes only a number in its place `n`, so a word such as "one" in a sentence is not taken for a count; elsewhere `n` may stand for a name. */
+const NUMBER_PATTERN = '(\\d+(?:[.,]\\d+)?)';
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The phrases of a dictionary, ready to be matched against text. */
@@ -39,7 +41,7 @@ export class Catalogue {
       let source = '';
       let last = 0;
       for (const m of phrase.matchAll(PLACEHOLDER)) {
-        source += escape(phrase.slice(last, m.index)) + '([\\s\\S]+?)';
+        source += escape(phrase.slice(last, m.index)) + (m[1] === 'n' && typeof entry !== 'string' ? NUMBER_PATTERN : '([\\s\\S]+?)');
         last = m.index! + m[0].length;
       }
       source += escape(phrase.slice(last));

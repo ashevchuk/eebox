@@ -31,8 +31,8 @@ describe('the Ukrainian dictionary', () => {
   });
 
   it('is in Ukrainian: every translation has a Cyrillic letter, but for the few that are the same in both languages', () => {
-    // Phrases that are the same in both languages: a pencil or an arrow after a heading that is translated where it stands.
-    const same = new Set(['OK', 'Ctrl+C, Ctrl+V', 'Tab, Shift+Tab', '{h} \u270e', '{h} \u25b4', '{h} \u25be', '{h} \u270e \u25b4', '{h} \u270e \u25be']);
+    // Phrases that are the same in both languages: a pencil or an arrow after a heading that is translated where it stands, and the name and id in front of a finding.
+    const same = new Set(['OK', 'Ctrl+C, Ctrl+V', 'Tab, Shift+Tab', '{h} \u270e', '{h} \u25b4', '{h} \u25be', '{h} \u270e \u25b4', '{h} \u270e \u25be', '{a} [{b}]: {c}']);
     for (const [phrase, entry] of entries) {
       if (same.has(phrase)) continue;
       for (const form of forms(entry)) expect(HAS_CYRILLIC.test(form), `${phrase} => ${form}`).toBe(true);
