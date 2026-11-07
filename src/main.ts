@@ -87,7 +87,7 @@ import { fillPrintSheet } from './ui/printSheet';
 import { notesOnPlate, rowNumber, withPlateNotes } from './layout/plates';
 import { MAX_ANNOTATIONS, MAX_NOTE_CHARS, addAnnotation, hitAnnotation, moveAnnotation, removeAnnotation, setAnnotationTarget, setAnnotationText, withNotes, type Annotation } from './layout/annotations';
 import { centreOf, pinchStep, type Pair } from './view/pinch';
-import { ARROWS, nextModuleId, nextNodeId, nodeStep, panelStep, plateStep, type Arrow } from './ui/keyboardMoves';
+import { ARROWS, nextModuleId, nextNodeId, nodeStep, onVerticalRails, panelStep, plateStep, type Arrow } from './ui/keyboardMoves';
 import { groupSelection, selectedIds, selectedNodes, selectedWires } from './ui/selection';
 import { insertSnippet, makeSnippet, MAX_SNIPPETS, type Snippet } from './layout/snippets';
 import { loadSnippets, planSnippetImport, saveSnippets } from './project/snippetStorage';
@@ -571,7 +571,8 @@ window.addEventListener('keydown', (e) => {
   } else if (!mod && ARROWS.includes(e.code) && hasSelection() && !modalOpen()) {
     e.preventDefault();
     if (session.mode === 'panel') {
-      const step = panelStep(e.code as Arrow, e.altKey);
+      const chosen = selectedIds(session.selection);
+      const step = panelStep(e.code as Arrow, e.altKey, onVerticalRails(session.project.panel, chosen.placements, chosen.combs));
       panelView.nudgeSelection(step, plateStep(e.code as Arrow, e.shiftKey, e.altKey));
     } else {
       const step = nodeStep(e.code as Arrow, e.shiftKey);
