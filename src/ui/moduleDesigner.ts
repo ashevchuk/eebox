@@ -154,14 +154,19 @@ export function fitTerminalsToWidth(draft: Library, moduleId: string, previousWi
 
 /** The entries of `terminals`, or the ones the poles give when the module has none of its own. */
 function listedTerminals(def: ModuleDef): TerminalDef[] {
-  return def.terminals ?? terminalsOf(def).map((t) => ({ name: t.name, conductor: t.conductor, side: t.side }));
+  return def.terminals ?? terminalsOf(def).map((t) => ({ name: t.name, conductor: t.conductor, side: t.side, ...(t.role ? { role: t.role } : {}) }));
 }
 
 type Change = { ok: true; draft: Library; index: number } | { ok: false; message: string };
 
+/** A device with listed terminals carries a role on each, so the side its maker names as the input goes with them. */
 const replaceTerminals = (draft: Library, moduleId: string, terminals: TerminalDef[]): Library => ({
   ...draft,
-  modules: draft.modules.map((m) => (m.id === moduleId ? { ...m, terminals } : m)),
+  modules: draft.modules.map((m) => {
+    if (m.id !== moduleId) return m;
+    const { feed: _feed, ...rest } = m;
+    return { ...rest, terminals };
+  }),
 });
 
 const freeName = (taken: readonly string[], count: number): string => {
@@ -356,7 +361,8 @@ export type VariantResult = { ok: true; draft: Library; ids: string[] } | { ok: 
 /** The listed terminals of a module with every conductor replaced; the poles' terminals are listed first. */
 function withConductor(def: ModuleDef, conductor: Conductor): ModuleDef {
   if (def.kind === 'comb') return def;
-  return { ...def, terminals: listedTerminals(def).map((t) => ({ ...t, conductor })) };
+  const { feed: _feed, ...rest } = def;
+  return { ...rest, terminals: listedTerminals(def).map((t) => ({ ...t, conductor })) };
 }
 
 /**
@@ -540,6 +546,25 @@ export function pinLabels(layout: DesignerLayout): string[] {
     const shared = common !== undefined && sameSide.length >= MIN_PINS_TO_ABBREVIATE && sameSide.every((p) => p === common);
     return shared ? pin.terminal.name.slice(common.length) : pin.terminal.name;
   });
+}
+
+const ROLE_MARKER_GAP_PX = 5;
+const ROLE_MARKER_HALF_BASE_PX = 3.5;
+const ROLE_MARKER_HALF_HEIGHT_PX = 3;
+
+/**
+ * A small arrow on the edge side of a pin whose maker fixes the way it is fed: it points into the module
+ * for an input and out of it for an output. A pin with no role has none.
+ */
+export function roleMarker(pin: DesignerPin, pinRadius: number): { points: string } | null {
+  const role = pin.terminal.role;
+  if (role === undefined) return null;
+  const towardEdge = pin.terminal.side === 'top' ? -1 : 1;
+  const pointing = role === 'input' ? -towardEdge : towardEdge;
+  const centreY = pin.y + towardEdge * (pinRadius + ROLE_MARKER_GAP_PX);
+  const tip = `${pin.x},${centreY + pointing * ROLE_MARKER_HALF_HEIGHT_PX}`;
+  const baseY = centreY - pointing * ROLE_MARKER_HALF_HEIGHT_PX;
+  return { points: `${tip} ${pin.x - ROLE_MARKER_HALF_BASE_PX},${baseY} ${pin.x + ROLE_MARKER_HALF_BASE_PX},${baseY}` };
 }
 
 /** The point a net is drawn to from each of its pins: the middle of them. */

@@ -62,6 +62,7 @@ function rcds(): DinModule[] {
           poles,
           ratedCurrentA: rating,
           residualCurrentMa: ma,
+          feed: 'top',
         }),
       ),
     ),
@@ -88,6 +89,7 @@ function rcbos(): DinModule[] {
             curve,
             breakingCapacityKA: MCB_BREAKING_CAPACITY_KA,
             residualCurrentMa: ma,
+            feed: 'top',
           }),
         ),
       ),
@@ -243,7 +245,7 @@ function surgeProtectors(): DinModule[] {
         spdType: family.spdType,
         widthUnits,
         poles,
-        terminals: [...spreadTerminals(conductors, 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
+        terminals: [...spreadTerminals(conductors, 'top', widthUnits).map(asInput), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
       };
     }),
   );
@@ -255,7 +257,7 @@ function surgeProtectors(): DinModule[] {
       spdType,
       widthUnits,
       poles: 2,
-      terminals: [...spreadTerminals(['DCP', 'DCN'], 'top', widthUnits), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
+      terminals: [...spreadTerminals(['DCP', 'DCN'], 'top', widthUnits).map(asInput), { name: 'PE', conductor: 'PE', side: 'bottom', unit: (widthUnits - 1) / 2 }],
     }),
   );
   return [...alternating, ...direct];
@@ -380,6 +382,8 @@ function combs(): DinModule[] {
   ];
 }
 
+const asInput = (terminal: TerminalDef): TerminalDef => ({ ...terminal, role: 'input' });
+const asOutput = (terminal: TerminalDef): TerminalDef => ({ ...terminal, role: 'output' });
 const top = (name: string, conductor: TerminalDef['conductor']): TerminalDef => ({ name, conductor, side: 'top' });
 const bottom = (name: string, conductor: TerminalDef['conductor']): TerminalDef => ({ name, conductor, side: 'bottom' });
 
@@ -545,7 +549,7 @@ function metersAndSmallDevices(): DinModule[] {
       name: 'Power supply 24 V DC, 1 A',
       widthUnits: 2,
       poles: 2,
-      terminals: [top('L', 'L'), top('N', 'N'), bottom('24V', 'DCP'), bottom('0V', 'DCN')],
+      terminals: [asInput(top('L', 'L')), asInput(top('N', 'N')), asOutput(bottom('24V', 'DCP')), asOutput(bottom('0V', 'DCN'))],
     },
     {
       id: 'psu-24v-2a5',
@@ -553,7 +557,7 @@ function metersAndSmallDevices(): DinModule[] {
       name: 'Power supply 24 V DC, 2.5 A',
       widthUnits: 4,
       poles: 2,
-      terminals: [top('L', 'L'), top('N', 'N'), bottom('24V', 'DCP'), bottom('0V', 'DCN')],
+      terminals: [asInput(top('L', 'L')), asInput(top('N', 'N')), asOutput(bottom('24V', 'DCP')), asOutput(bottom('0V', 'DCN'))],
     },
     {
       id: 'din-socket-16',
@@ -688,9 +692,9 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '17';
+export const GENERIC_LIBRARY_VERSION = '18';
 export const GENERIC_LIBRARY_DESCRIPTION =
-  'Generic IEC devices from standard rating series. Widths are typical (about one 17.5 mm unit per pole for protective devices) and not taken from any manufacturer; check the datasheet before ordering.';
+  'Generic IEC devices from standard rating series. Widths and the marked inputs of RCDs, surge protectors and power supplies are typical, not taken from any manufacturer; check the datasheet before ordering.';
 
 /** The text of `libraries/generic-iec.json`: one module per line, so diffs stay readable. */
 export function genericLibraryText(): string {

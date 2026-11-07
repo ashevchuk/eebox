@@ -71,6 +71,10 @@ export const canJoin = (a: Conductor, b: Conductor): boolean => a === 'C' || b =
 export const TERMINAL_SIDES = ['top', 'bottom'] as const;
 export type TerminalSide = (typeof TERMINAL_SIDES)[number];
 
+/** Which way a device is meant to be fed: current comes in at an input and leaves at an output. */
+export const TERMINAL_ROLES = ['input', 'output'] as const;
+export type TerminalRole = (typeof TERMINAL_ROLES)[number];
+
 export const TRIP_CURVES = ['B', 'C', 'D', 'K', 'Z'] as const;
 export type TripCurve = (typeof TRIP_CURVES)[number];
 
@@ -95,6 +99,8 @@ export interface TerminalDef {
   conductor: Conductor;
   side: TerminalSide;
   net?: string;
+  /** Set where the maker fixes the way the device is fed; left out, the terminal works either way. */
+  role?: TerminalRole;
   /** Horizontal position in module units; spread evenly over the width when omitted. */
   unit?: number;
   count?: number;
@@ -174,6 +180,8 @@ export interface ModuleDef {
   currency?: string;
   /** Replaces the terminals derived from `poles`. */
   terminals?: TerminalDef[];
+  /** Where the maker puts the input of a device whose terminals are derived from `poles`; with explicit `terminals` each one carries its own `role`. */
+  feed?: TerminalSide;
   /** Required for, and only allowed on, kind "comb". */
   comb?: CombSpec;
   /**

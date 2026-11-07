@@ -29,6 +29,7 @@ import {
   MIN_MODULE_HEIGHT_MM,
   MAX_MODULE_HEIGHT_MM,
   SCHEMA_VERSION,
+  TERMINAL_ROLES,
   TERMINAL_SIDES,
   TRIP_CURVES,
   SPD_TYPES,
@@ -137,6 +138,7 @@ export const MODULE_SPEC: FieldSpec = {
   price: { required: false, check: priceCheck },
   currency: { required: false, check: currencyCheck },
   terminals: { required: false, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
+  feed: { required: false, check: oneOf(TERMINAL_SIDES) },
   comb: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   resizable: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   logic: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
@@ -186,6 +188,7 @@ export const TERMINAL_SPEC: FieldSpec = {
   conductor: { required: true, check: oneOf(CONDUCTORS) },
   side: { required: true, check: oneOf(TERMINAL_SIDES) },
   net: { required: false, check: identifier },
+  role: { required: false, check: oneOf(TERMINAL_ROLES) },
   unit: { required: false, check: finiteNumber },
   count: {
     required: false,
@@ -253,6 +256,9 @@ export function validateModuleDeep(
   if (def.comb !== undefined) validateObject(def.comb, COMB_SPEC, `${path}.comb`, errors);
   const narrowest = checkResizable(def, path, errors);
   if (def.art !== undefined) validateArt(def.art, `${path}.art`, errors);
+  if (def.feed !== undefined && (def.terminals !== undefined || def.kind === 'comb')) {
+    errors.push({ path: `${path}.feed`, message: 'only applies to terminals derived from poles; with explicit terminals give each one a role' });
+  }
   if (def.logic !== undefined && !Array.isArray(def.terminals)) {
     errors.push({ path: `${path}.logic`, message: 'needs explicit terminals to refer to' });
   }

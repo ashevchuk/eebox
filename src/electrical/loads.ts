@@ -11,6 +11,7 @@ import {
   type LoadedConductors,
 } from './cables';
 import { Components, netContextOf, PASSIVE_KINDS, type Resolve } from './context';
+import { directionOf } from './direction';
 import { buildNets, terminalKey } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
 import type { Terminal } from './terminals';
@@ -196,6 +197,7 @@ export interface LoadReport {
 
 export function loadReports(project: Project, resolve: Resolve, settings: CableSettings = DEFAULT_CABLE_SETTINGS): LoadReport[] {
   const context = netContextOf(project, resolve);
+  const direction = directionOf(context);
   return project.schematic.nodes.flatMap((node): LoadReport[] => {
     const currentA = loadCurrentA(node);
     const loaded = loadedConductorsOf(node);
@@ -204,7 +206,7 @@ export function loadReports(project: Project, resolve: Resolve, settings: CableS
     const net = firstPhase && context.netOf.get(`n:${node.id}/${firstPhase.id}`);
     const breakers = (net?.terminals ?? []).flatMap((t) => {
       const def = t.owner.kind === 'placement' ? context.defs.get(t.owner.id) : undefined;
-      return t.terminal.side === 'bottom' && def && PROTECTIVE_KINDS.includes(def.kind) && def.ratedCurrentA
+      return direction.isOutput(t.key) && def && PROTECTIVE_KINDS.includes(def.kind) && def.ratedCurrentA
         ? [{ placementId: t.owner.id, ratedA: def.ratedCurrentA, kind: def.kind }]
         : [];
     });

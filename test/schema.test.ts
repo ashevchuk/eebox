@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import libraryText from '../libraries/generic-iec.json?raw';
 import schemaText from '../libraries/library.schema.json?raw';
 import { MAX_RAILS, MAX_RAIL_LENGTH_UNITS } from '../src/layout/limits';
-import { CONDUCTORS, MODULE_KINDS, TERMINAL_SIDES, TRIP_CURVES } from '../src/library/types';
+import { CONDUCTORS, MODULE_KINDS, TERMINAL_ROLES, TERMINAL_SIDES, TRIP_CURVES } from '../src/library/types';
 import {
   COMB_SPEC,
   ENCLOSURE_SPEC,
@@ -50,6 +50,7 @@ describe('library schema matches the validator', () => {
     expect(defs.module.properties.curve.enum).toEqual([...TRIP_CURVES]);
     expect(defs.conductor.enum).toEqual([...CONDUCTORS]);
     expect(defs.side.enum).toEqual([...TERMINAL_SIDES]);
+    expect(defs.terminal.properties.role.enum).toEqual([...TERMINAL_ROLES]);
     expect(defs.module.properties.poles.enum).toEqual([1, 2, 3, 4]);
   });
 

@@ -5,6 +5,7 @@ import { formatAmps, loadReports, type LoadReport } from './loads';
 import { netContextOf, PASSIVE_KINDS, type NetContext, type Resolve } from './context';
 import type { Net, NetTerminal } from './nets';
 import { freeNodeTerminals } from './nodeTerminals';
+import { directionOf, type Direction } from './direction';
 import { earthingFindings } from './earthingRules';
 import { protectionWarnings } from './protection';
 import type { Terminal } from './terminals';
@@ -22,10 +23,11 @@ export function ownerName(project: Project, resolve: Resolve, owner: Owner): str
 
 const isPhase = (terminal: Terminal): boolean => familyOf(terminal.conductor) === 'phase';
 
-type Context = NetContext & { name: (owner: Owner) => string };
+type Context = NetContext & { name: (owner: Owner) => string; direction: Direction };
 
 function contextOf(project: Project, resolve: Resolve): Context {
-  return { ...netContextOf(project, resolve), name: (owner) => ownerName(project, resolve, owner) };
+  const net = netContextOf(project, resolve);
+  return { ...net, name: (owner) => ownerName(project, resolve, owner), direction: directionOf(net) };
 }
 
 /** A piece of advice with what to mark on the drawings: the nodes and the placed modules it is about. */
@@ -61,6 +63,7 @@ export function findRuleFindings(project: Project, resolve: Resolve, settings: C
     ...openEarth(context),
     ...earthingFindings(project, resolve, (id) => context.name({ kind: 'node', id })),
     ...unfedModules(context),
+    ...modulesFedTheWrongWay(context),
     ...overloadedModules(context),
     ...loadsWithoutResidualCurrentProtection(context),
     ...cablesAgainstBreakers(reports, context.name),
@@ -80,33 +83,42 @@ function openEarth({ project, netOf, name }: Context): RuleFinding[] {
   });
 }
 
-function unfedModules({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
+function unfedModules({ project, netOf, defs, terminals, name, direction }: Context): RuleFinding[] {
   return project.panel.placements.flatMap((placement) => {
     const def = defs.get(placement.id);
     if (!def || PASSIVE_KINDS.includes(def.kind)) return [];
-    const used = (side: Terminal['side']) =>
-      terminals.get(placement.id)!.some((t) => t.terminal.side === side && netOf.has(t.key));
-    return used('bottom') && !used('top')
+    const used = (isSide: (key: string) => boolean) => terminals.get(placement.id)!.some((t) => isSide(t.key) && netOf.has(t.key));
+    return used(direction.isOutput) && !used(direction.isInput)
       ? [about(`${name({ kind: 'placement', id: placement.id })} [${placement.id}]: its outputs are connected but its input is not fed`, { placements: [placement.id] })]
       : [];
   });
 }
 
+/** A device that a source reaches through its output, or from both sides at once, is wired against its design or has something going round it. */
+function modulesFedTheWrongWay({ project, name, direction }: Context): RuleFinding[] {
+  const finding = (placementId: string, text: string) =>
+    about(`${name({ kind: 'placement', id: placementId })} [${placementId}]: ${text}`, { placements: [placementId] });
+  return project.panel.placements.flatMap((placement) => [
+    ...(direction.fedThroughOutput.has(placement.id) ? [finding(placement.id, 'it is fed through a terminal that its maker marks as an output')] : []),
+    ...(direction.fedFromBothSides.has(placement.id) ? [finding(placement.id, 'it is fed from both of its sides, so something goes round it')] : []),
+  ]);
+}
+
 /** Per phase, the modules fed through a module's outputs must not draw more than the module is rated for. */
-function overloadedModules({ project, nets, defs, name }: Context): RuleFinding[] {
+function overloadedModules({ project, nets, defs, name, direction }: Context): RuleFinding[] {
   return project.panel.placements.flatMap((placement) => {
     const rating = defs.get(placement.id)?.ratedCurrentA;
-    if (!rating) return [];
+    if (!rating || direction.fedFromBothSides.has(placement.id)) return [];
     let worst = 0;
     for (const net of nets) {
       const suppliesPhase = net.terminals.some(
-        (t) => t.owner.id === placement.id && t.terminal.side === 'bottom' && isPhase(t.terminal),
+        (t) => t.owner.id === placement.id && direction.isOutput(t.key) && isPhase(t.terminal),
       );
       if (!suppliesPhase) continue;
       const drawn = new Map<string, number>();
       for (const t of net.terminals) {
         const consumer = t.owner.kind === 'placement' && t.owner.id !== placement.id ? defs.get(t.owner.id) : undefined;
-        if (consumer?.ratedCurrentA && !PASSIVE_KINDS.includes(consumer.kind) && t.terminal.side === 'top' && isPhase(t.terminal)) {
+        if (consumer?.ratedCurrentA && !PASSIVE_KINDS.includes(consumer.kind) && direction.isInput(t.key) && isPhase(t.terminal)) {
           drawn.set(t.owner.id, consumer.ratedCurrentA);
         }
       }
@@ -118,17 +130,17 @@ function overloadedModules({ project, nets, defs, name }: Context): RuleFinding[
   });
 }
 
-function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
+function loadsWithoutResidualCurrentProtection({ project, netOf, defs, terminals, name, direction }: Context): RuleFinding[] {
   const reachesSource = (net: Net, seen: Set<Net>): boolean => {
     if (seen.has(net)) return false;
     seen.add(net);
     return net.terminals.some((t) => {
-      if (t.terminal.side !== 'bottom') return false;
+      if (t.owner.kind === 'placement' ? !direction.isOutput(t.key) : t.terminal.side !== 'bottom') return false;
       if (t.owner.kind === 'node') return project.schematic.nodes.find((n) => n.id === t.owner.id)?.kind === 'source';
       const def = defs.get(t.owner.id);
       if (!def || RESIDUAL_CURRENT_KINDS.includes(def.kind)) return false;
       return (terminals.get(t.owner.id) ?? []).some((input) => {
-        const upstream = input.terminal.side === 'top' && isPhase(input.terminal) ? netOf.get(input.key) : undefined;
+        const upstream = direction.isInput(input.key) && isPhase(input.terminal) ? netOf.get(input.key) : undefined;
         return upstream !== undefined && reachesSource(upstream, seen);
       });
     });
@@ -160,15 +172,15 @@ function surgeProtectorsWithoutEarth({ project, netOf, defs, terminals, name }: 
 }
 
 /** Lightning current must not go through an RCD: a protector of type 1 or 1+2 belongs ahead of it, so one fed from an RCD output is in the wrong place. */
-function lightningProtectorsBehindResidualCurrentDevices({ project, netOf, defs, terminals, name }: Context): RuleFinding[] {
+function lightningProtectorsBehindResidualCurrentDevices({ project, netOf, defs, terminals, name, direction }: Context): RuleFinding[] {
   return project.panel.placements.flatMap((placement) => {
     const def = defs.get(placement.id);
     if (def?.kind !== 'spd' || (def.spdType !== '1' && def.spdType !== '1+2')) return [];
     const behind = (terminals.get(placement.id) ?? []).some((t) => {
-      if (t.terminal.side !== 'top' || t.terminal.conductor === 'PE') return false;
+      if (!direction.isInput(t.key) || t.terminal.conductor === 'PE') return false;
       return (netOf.get(t.key)?.terminals ?? []).some((other) => {
         const otherDef = other.owner.kind === 'placement' ? defs.get(other.owner.id) : undefined;
-        return other.terminal.side === 'bottom' && otherDef !== undefined && RESIDUAL_CURRENT_KINDS.includes(otherDef.kind);
+        return direction.isOutput(other.key) && otherDef !== undefined && RESIDUAL_CURRENT_KINDS.includes(otherDef.kind);
       });
     });
     return behind

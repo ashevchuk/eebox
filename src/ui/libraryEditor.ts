@@ -3,6 +3,7 @@ import { MAX_RAIL_LENGTH_UNITS, MAX_RAILS } from '../layout/limits';
 import {
   CONDUCTORS,
   MODULE_KINDS,
+  TERMINAL_ROLES,
   TERMINAL_SIDES,
   TRIP_CURVES,
   SPD_TYPES,
@@ -14,6 +15,8 @@ import {
   type ModuleDef,
   type ModuleKind,
   type TerminalDef,
+  type TerminalRole,
+  type TerminalSide,
 } from '../library/types';
 import { DIN_MODULE_HEIGHT_MM, MOUNTINGS, SCHEMA_VERSION, type Mounting } from '../library/types';
 import { mmFromUnits, roundUnits, unitsFromMm } from '../layout/units';
@@ -152,6 +155,7 @@ function moduleView(module: ModuleDef): InspectorView {
     number('heightMm', 'Height, mm', module.heightMm, `the real height of the device; a standard DIN module is ${DIN_MODULE_HEIGHT_MM}`),
     select('mounting', 'Mounting', module.mounting, MOUNTINGS),
     select('poles', 'Poles', String(module.poles), ['1', '2', '3', '4']),
+    ...(module.terminals || module.kind === 'comb' ? [] : [select('feed', 'Input side', module.feed ?? '', ['', ...TERMINAL_SIDES])]),
     text('sku', 'Part number', module.sku ?? ''),
     number('ratedCurrentA', 'Rated current', optional(module.ratedCurrentA), 'A'),
     select('curve', 'Trip curve', module.curve ?? '', ['', ...TRIP_CURVES]),
@@ -194,6 +198,7 @@ function moduleView(module: ModuleDef): InspectorView {
         select(`t.${i}.conductor`, `T${n} conductor`, t.conductor, CONDUCTORS),
         select(`t.${i}.side`, `T${n} side`, t.side, TERMINAL_SIDES),
         text(`t.${i}.net`, `T${n} net`, t.net ?? ''),
+        select(`t.${i}.role`, `T${n} role`, t.role ?? '', ['', ...TERMINAL_ROLES]),
         { key: `t.${i}.unit`, label: `T${n} position`, kind: 'number', value: optional(t.unit), hint: 'units from the left, decimals allowed, negative from the right; empty spreads evenly' },
         integer(`t.${i}.count`, `T${n} copies`, optional(t.count), 'repeats with numbered names'),
       );
@@ -273,7 +278,7 @@ function parseRails(raw: string): number[] | string {
 function withKind(module: ModuleDef, kind: ModuleKind): ModuleDef {
   let next: ModuleDef = { ...module, kind };
   if (kind === 'comb') {
-    next = withOptional(withOptional(next, 'terminals', undefined), 'comb', next.comb ?? { ...DEFAULT_COMB, pattern: [...DEFAULT_COMB.pattern] });
+    next = withOptional(withOptional(withOptional(next, 'terminals', undefined), 'feed', undefined), 'comb', next.comb ?? { ...DEFAULT_COMB, pattern: [...DEFAULT_COMB.pattern] });
   } else {
     next = withOptional(next, 'comb', undefined);
   }
@@ -289,6 +294,7 @@ function editTerminal(module: ModuleDef, index: number, field: string, raw: stri
   else if (field === 'conductor') next = { ...current, conductor: raw as Conductor };
   else if (field === 'side') next = { ...current, side: raw as TerminalDef['side'] };
   else if (field === 'net') next = withOptional(current, 'net', optionalText(raw));
+  else if (field === 'role') next = withOptional(current, 'role', raw === '' ? undefined : (raw as TerminalRole));
   else if (field === 'unit' || field === 'count') {
     const parsed = optionalNumber(raw, field === 'count');
     if (!parsed.ok) return fail(parsed.message);
@@ -337,6 +343,8 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       return apply((m) => ({ ...m, poles: Number(raw) as ModuleDef['poles'] }));
     case 'sku':
       return apply((m) => withOptional(m, 'sku', optionalText(raw)));
+    case 'feed':
+      return apply((m) => withOptional(m, 'feed', raw === '' ? undefined : (raw as TerminalSide)));
     case 'curve':
       return apply((m) => withOptional(m, 'curve', raw === '' ? undefined : raw));
     case 'spdType':
@@ -433,14 +441,14 @@ export function applyEditorAction(state: EditorState, key: string): EditorResult
     return copy ? { ok: true, draft: copy.draft, target: { kind: 'module', id: copy.id } } : fail('That module does not exist.');
   }
   if (module.kind === 'comb') return fail('A comb has no terminals.');
-  const setTerminals = (terminals: TerminalDef[] | undefined): EditorResult => ({
-    ok: true,
-    draft: replaceModule(draft, module.id, (m) => withOptional(m, 'terminals', terminals && terminals.length > 0 ? terminals : undefined)),
-  });
+  const setTerminals = (terminals: TerminalDef[] | undefined): EditorResult => {
+    const listed = terminals && terminals.length > 0 ? terminals : undefined;
+    return { ok: true, draft: replaceModule(draft, module.id, (m) => withOptional(withOptional(m, 'feed', listed ? undefined : m.feed), 'terminals', listed)) };
+  };
   if (key === 'defaultTerminals') return setTerminals(undefined);
   if (key === 'addTerminal') {
     const listed: TerminalDef[] =
-      module.terminals ?? terminalsOf(module).map((t) => ({ name: t.name, conductor: t.conductor, side: t.side }));
+      module.terminals ?? terminalsOf(module).map((t) => ({ name: t.name, conductor: t.conductor, side: t.side, ...(t.role ? { role: t.role } : {}) }));
     const taken = listed.map((t) => `${t.side}:${t.name}`);
     let n = listed.length + 1;
     while (taken.includes(`top:T${n}`)) n++;

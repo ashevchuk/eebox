@@ -262,6 +262,10 @@
           },
           "description": "Replaces the terminals derived from the pole count."
         },
+        "feed": {
+          "$ref": "#/definitions/side",
+          "description": "The side that the maker makes the input of a device whose terminals are derived from the pole count; the other side is the output. Not allowed with terminals (give each terminal a role) or on a comb."
+        },
         "comb": {
           "$ref": "#/definitions/comb"
         },
@@ -339,6 +343,13 @@
         "net": {
           "$ref": "#/definitions/identifier",
           "description": "Terminals sharing a net are joined inside the module."
+        },
+        "role": {
+          "enum": [
+            "input",
+            "output"
+          ],
+          "description": "Set where the maker fixes the way the device is fed. Left out, the terminal works either way."
         },
         "unit": {
           "type": "number",

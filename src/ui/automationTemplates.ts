@@ -1,6 +1,6 @@
 import { unitsFromMm } from '../layout/units';
 import { evenPositions } from '../library/terminalLayouts';
-import type { Conductor, ModuleDef, Mounting, TerminalDef, TerminalSide } from '../library/types';
+import type { Conductor, ModuleDef, Mounting, TerminalDef, TerminalRole, TerminalSide } from '../library/types';
 import type { ModuleTemplate } from './moduleTemplates';
 
 type Pin = readonly [name: string, conductor: Conductor];
@@ -18,9 +18,12 @@ interface DeviceSpec {
 }
 
 /** One side of terminals, evenly spread over the width. */
-function row(side: TerminalSide, pins: readonly Pin[], widthUnits: number): TerminalDef[] {
-  return evenPositions(pins.length, widthUnits).map((unit, i) => ({ name: pins[i]![0], conductor: pins[i]![1], side, unit }));
+function row(side: TerminalSide, pins: readonly Pin[], widthUnits: number, role?: TerminalRole): TerminalDef[] {
+  return evenPositions(pins.length, widthUnits).map((unit, i) => ({ name: pins[i]![0], conductor: pins[i]![1], side, unit, ...(role ? { role } : {}) }));
 }
+
+/** Devices that change what they are fed with have an input and an output by design, not by the side of their terminals. */
+const DIRECTED_KINDS: readonly ModuleDef['kind'][] = ['softstarter', 'vfd', 'transformer', 'psu'];
 
 /**
  * A device of a size and terminal layout that is typical for its kind, not taken from any maker's
@@ -32,7 +35,8 @@ function device(spec: DeviceSpec): ModuleTemplate {
     label: spec.label,
     build: (id) => {
       const widthUnits = unitsFromMm(spec.widthMm);
-      const terminals = [...row('top', spec.top ?? [], widthUnits), ...row('bottom', spec.bottom ?? [], widthUnits)];
+      const directed = DIRECTED_KINDS.includes(spec.kind);
+      const terminals = [...row('top', spec.top ?? [], widthUnits, directed ? 'input' : undefined), ...row('bottom', spec.bottom ?? [], widthUnits, directed ? 'output' : undefined)];
       return {
         id,
         kind: spec.kind,

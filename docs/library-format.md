@@ -42,6 +42,7 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | `spdType`, `impulseCurrentKA`, `nominalDischargeKA`, `maxDischargeKA`, `protectionLevelKV`, `maxContinuousVoltageV` | optional | surge protectors: `spdType` is one of `1`, `1+2`, `2`, `3`; the currents are Iimp (10/350), In and Imax (8/20) in kA, Up is in kV and Uc in V. Check warns when a type 1 or 1+2 protector is fed through an RCD |
 | `fuseClass`, `fuseSize` | optional | fuses: `fuseClass` is one of `gG aM gR`; `fuseSize` is one of `8.5x31.5 10x38 14x51 22x58 NH000 NH00 NH1 NH2 NH3` |
 | `terminals` | array | replaces the terminals derived from `poles` |
+| `feed` | `top` or `bottom` | optional; the side that the maker makes the input of a device whose terminals are derived from `poles`, the other side being the output. Not allowed with `terminals` (give each terminal a `role`) or on a comb |
 | `comb` | object | required for, and only allowed on, kind `comb` |
 | `resizable` | object | optional, any kind; lets a placed copy have its own width |
 | `logic` | object | optional; what a relay or contactor does with the voltages it senses, see below. Needs explicit `terminals` |
@@ -52,6 +53,14 @@ another library under it is refused. Edit a copy of the bundled library instead.
 Without `terminals`, each pole yields a terminal on the top and the bottom side: 1P has `L`; 2P has
 `L` and `N`; 3P has `L1 L2 L3`; 4P has `L1 L2 L3 N`.
 
+### Direction of feed
+
+Most devices can be fed from either side, so a module without `feed` and without roles has no fixed
+input: the application takes the side that a source reaches as the input, and the top when no source
+reaches it. A device whose maker fixes the way it is fed names it with `feed` (derived terminals) or
+with a `role` on each terminal (explicit terminals); Check then warns when a source reaches it through
+an output. Only the phase conductors decide the direction; neutral, earth and control terminals do not.
+
 ### Explicit terminals
 
 | Field | Notes |
@@ -59,6 +68,7 @@ Without `terminals`, each pole yields a terminal on the top and the bottom side:
 | `name` | identifier; unique per side |
 | `conductor` | `L`, `L1`, `L2`, `L3`, `N`, `PE`, `PEN`, `C`, `DCP`, `DCN`, `SP`, `SN`, `SH`, `RA` or `RB`; `L` is a phase decided by what feeds it, `PEN` is a neutral and a protective earth in one conductor |
 | `side` | `top` or `bottom` |
+| `role` | optional, `input` or `output`; set only where the maker fixes the way the device is fed. Left out, the terminal works either way |
 | `net` | terminals of one module that share a net are connected inside it (a terminal bar); without a net a terminal is isolated |
 | `unit` | position of the terminal's centre along the module, in module units from the left edge; decimals are allowed. `0` is the centre of the first unit and `0.5` the border between the first and the second. It has to lie inside the module and `0.15` of a unit from either edge (a quarter of the width on a module narrower than 0.6 units, so a 5.2 mm clamp can hold terminals), so `-0.35` to `width - 0.65`; not combined with `count`. On a resizable module a negative value counts from the right edge (`-1` is the centre of the last unit), and any position must exist at the narrowest width |
 | `count` | 1 to 48 identical terminals named `name1`, `name2`, ... |

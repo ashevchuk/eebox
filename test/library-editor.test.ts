@@ -141,9 +141,9 @@ describe('describing what is being edited', () => {
     expect(field(s, 'resizeMin')?.value).toBe('');
   });
 
-  it('lists six fields and a remove button for every listed terminal', () => {
+  it('lists seven fields and a remove button for every listed terminal', () => {
     const s = state(sample(), { kind: 'module', id: 'bar' });
-    expect(fieldKeys(s).filter((k) => k.startsWith('t.0.'))).toEqual(['t.0.name', 't.0.conductor', 't.0.side', 't.0.net', 't.0.unit', 't.0.count']);
+    expect(fieldKeys(s).filter((k) => k.startsWith('t.0.'))).toEqual(['t.0.name', 't.0.conductor', 't.0.side', 't.0.net', 't.0.role', 't.0.unit', 't.0.count']);
     const actions = describeEditor(s).actions.map((a) => a.key);
     expect(actions).toEqual(expect.arrayContaining(['duplicate', 'remove', 'removeTerminal:0', 'addTerminal', 'defaultTerminals']));
   });

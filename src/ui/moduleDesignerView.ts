@@ -28,6 +28,7 @@ import {
   netGroups,
   pinAt,
   pinLabels,
+  roleMarker,
   railPreviewScene,
   repairPositions,
   fitTerminalsToWidth,
@@ -520,6 +521,8 @@ export class ModuleDesignerView {
         const r = layout.pinRadius;
         svg.append(svgElement('path', { d: `M${pin.x} ${pin.y - r}A${r} ${r} 0 0 1 ${pin.x} ${pin.y + r}Z`, fill: style.stripe, 'pointer-events': 'none' }));
       }
+      const marker = roleMarker(pin, layout.pinRadius);
+      if (marker) svg.append(svgElement('polygon', { points: marker.points, fill: '#14161d', 'pointer-events': 'none' }));
       const stagger = layout.crowded ? (layout.pins.indexOf(pin) % 2) * LABEL_STAGGER_PX : 0;
       const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
       svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, labels[layout.pins.indexOf(pin)]!));

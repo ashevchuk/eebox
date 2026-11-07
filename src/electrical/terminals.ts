@@ -1,5 +1,5 @@
 import { leftPosition } from '../library/positions';
-import type { Conductor, ModuleDef, TerminalDef, TerminalSide } from '../library/types';
+import type { Conductor, ModuleDef, TerminalDef, TerminalRole, TerminalSide } from '../library/types';
 
 export interface Terminal {
   /** Unique within a module: `<side>:<name>`. */
@@ -11,6 +11,8 @@ export interface Terminal {
   unit: number;
   /** Terminals with the same net are connected inside the module. */
   net?: string;
+  /** Only when the maker fixes the way the device is fed. */
+  role?: TerminalRole;
 }
 
 export const terminalId = (side: TerminalSide, name: string): string => `${side}:${name}`;
@@ -61,6 +63,7 @@ function draftsOf(def: ModuleDef, widthUnits: number): Draft[] {
           conductor: t.conductor,
           side: t.side,
           ...(t.net ? { net: t.net } : {}),
+          ...(t.role ? { role: t.role } : {}),
           ...(t.unit !== undefined ? { unit: t.unit } : {}),
         };
       });
@@ -69,7 +72,13 @@ function draftsOf(def: ModuleDef, widthUnits: number): Draft[] {
   const conductors = defaultPoleConductors(def.poles);
   return (['top', 'bottom'] as const).flatMap((side) =>
     conductors.map(
-      (conductor): Draft => ({ id: terminalId(side, conductor), name: conductor, conductor, side }),
+      (conductor): Draft => ({
+        id: terminalId(side, conductor),
+        name: conductor,
+        conductor,
+        side,
+        ...(def.feed ? { role: side === def.feed ? 'input' : 'output' } : {}),
+      }),
     ),
   );
 }
