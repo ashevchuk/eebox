@@ -23,7 +23,7 @@ import { deleteDuct, deletePlacement } from '../project/delete';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import type { Bounds, Point } from '../view/Camera';
 import { Camera } from '../view/Camera';
-import { FRAME_PADDING, combAtPoint, ductAt, ductRect, frameRect, itemsInRect, placementAt, placementRect, railAtPoint, railRect, rectBetween, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
+import { FRAME_PADDING, combAtPoint, ductAt, ductRect, frameRect, itemsInRect, placementAt, placementRect, railAtPoint, railRect, rectBetween, rowRect, snapToSlot, type Neighbour, type Rect } from '../view/geometry';
 import { dimensionsOf, type Dimension } from '../view/dimensions';
 import { scopeToPlate } from '../layout/plates';
 import { snapRect, snapToGrid, type Guide } from '../view/snap';
@@ -157,13 +157,16 @@ export class PanelView implements View {
   }
 
   /**
-   * Distances from the one selected thing, or the one being dragged, to what is beside it. Nothing is
-   * shown for a group, a rail or when nothing is selected.
+   * Distances from the one selected thing, or the one being dragged, to what is beside it; for a
+   * selected row, the clear space to the rows and things around its body. Nothing is shown for a
+   * group or when nothing is selected.
    */
   private dimensionsOfSelection(): Dimension[] {
     const panel = this.viewed(this.drag?.next ?? this.plateDrag?.next ?? null);
     const chosen = selectedIds(this.session.selection);
     const ids = [...chosen.placements, ...chosen.ducts];
+    const row = this.session.selection.rail === undefined ? -1 : this.session.selection.rail - this.session.scope.offset;
+    if (ids.length === 0 && chosen.combs.length === 0 && row >= 0 && row < panel.rails.length) return this.dimensionsOfRow(panel, row);
     if (ids.length !== 1 || chosen.combs.length > 0) return [];
     const id = ids[0]!;
     const { sizes } = this.session;
@@ -173,6 +176,16 @@ export class PanelView implements View {
     if (!box) return [];
     const others = [...panel.placements.filter((p) => p.id !== id).map((p) => placementRect(panel, sizes, p)), ...ductsOf(panel).filter((d) => d.id !== id).map(ductRect)];
     return dimensionsOf(box, others, { x: FRAME_PADDING, y: FRAME_PADDING });
+  }
+
+  private dimensionsOfRow(panel: Panel, row: number): Dimension[] {
+    const { sizes } = this.session;
+    const others = [
+      ...panel.rails.map((_r, i) => i).filter((i) => i !== row).map((i) => rowRect(panel, sizes, i)),
+      ...panel.placements.filter((p) => !isOnRail(p)).map((p) => placementRect(panel, sizes, p)),
+      ...ductsOf(panel).map(ductRect),
+    ];
+    return dimensionsOf(rowRect(panel, sizes, row), others, { x: FRAME_PADDING, y: FRAME_PADDING });
   }
 
   /** The rectangle between two points of a duct being drawn, in world coordinates. */

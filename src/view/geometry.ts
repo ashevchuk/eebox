@@ -51,6 +51,14 @@ export function placementRect(panel: Panel, sizes: Sizes, placement: Placement):
   return moduleRect(panel, placement.rail, placement.slot, width, height);
 }
 
+/** The body of a row: the length of its rail and the height of the tallest module standing on it (a standard module when it is empty). */
+export function rowRect(panel: Panel, sizes: Sizes, rail: number): Rect {
+  const heights = panel.placements.filter(isOnRail).filter((p) => p.rail === rail).map((p) => sizes.heightOf(p) ?? DIN_MODULE_HEIGHT_MM);
+  const height = Math.max(DIN_MODULE_HEIGHT_MM, ...heights);
+  const { x, width } = railRect(panel, rail);
+  return { x, y: railCenterY(panel, rail) - height / 2, width, height };
+}
+
 export function ductRect(duct: Duct): Rect {
   return { x: FRAME_PADDING + duct.x, y: FRAME_PADDING + duct.y, width: duct.widthMm, height: duct.heightMm };
 }
