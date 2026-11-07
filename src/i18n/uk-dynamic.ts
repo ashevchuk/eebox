@@ -77,6 +77,7 @@ export const DYNAMIC: Dictionary = {
   'Enclosures ({n})': `Корпуси ({n})`,
   // panel, schematic, inspector
   'Row {n}': `Ряд {n}`,
+  'Rows: at most {n}.': `Рядів: не більше {n}.`,
   'Shelf ({n})': `Полиця ({n})`,
   'Snippets ({n})': `Фрагменти ({n})`,
   'longest row {n} units': ['найдовший ряд {n} модуль', 'найдовший ряд {n} модулі', 'найдовший ряд {n} модулів'],

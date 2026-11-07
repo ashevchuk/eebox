@@ -11,7 +11,8 @@ import {
   setRailPosition,
   type PanelEditResult,
 } from '../layout/panel';
-import { setRailCountOnPlate, type PlateResult } from '../layout/plates';
+import { addVerticalRail, setRailCountOnPlate, type PlateResult } from '../layout/plates';
+import { isVertical } from '../layout/rail';
 import type { Panel } from '../layout/placement';
 import type { Session } from './session';
 
@@ -20,6 +21,9 @@ interface RailRow {
   length: HTMLInputElement;
   x: HTMLInputElement;
   y: HTMLInputElement;
+  /** The words before the two position fields: x and y, or the centre line and the top end of a vertical row. */
+  xName: HTMLElement;
+  yName: HTMLElement;
   up: HTMLButtonElement;
   down: HTMLButtonElement;
 }
@@ -75,6 +79,9 @@ export class PanelEditor {
       set(row.length, rail?.lengthUnits ?? 0);
       set(row.x, rail?.x ?? 0);
       set(row.y, rail?.y ?? 0);
+      const vertical = isVertical(rail);
+      row.xName.textContent = vertical ? 'centre ' : 'x ';
+      row.yName.textContent = vertical ? ' top ' : ' y ';
       row.up.disabled = i === 0;
       row.down.disabled = i === this.rows.length - 1;
     });
@@ -135,7 +142,18 @@ export class PanelEditor {
     );
     const countLine = this.text('div', 'Rows ', 'settings-line');
     countLine.append(this.countInput);
-    this.container.append(countLine);
+    const addVertical = this.button('Add vertical row', 'A row that runs down the plate by its right edge, for bars, terminal blocks and combs', () => {
+      const result = addVerticalRail(this.panel, plate);
+      if (!result.ok) {
+        this.session.notify(result.error === 'too-many-rails' ? `Rows: at most ${MAX_RAILS}.` : ERROR_TEXT['unknown-rail'], true);
+        return;
+      }
+      this.session.commit({ ...this.session.project, panel: result.panel });
+      this.session.select({ rail: result.panel.rails.map((r) => r.plate).lastIndexOf(plate) });
+    });
+    const addLine = this.text('div', '', 'settings-line');
+    addLine.append(addVertical);
+    this.container.append(countLine, addLine);
 
     this.rows = [];
     for (let local = 0; local < count; local++) {
@@ -179,9 +197,11 @@ export class PanelEditor {
       const y = place('y');
       const positionLine = this.text('div', '', 'settings-line settings-gap');
       positionLine.addEventListener('focusin', () => this.session.select({ rail }));
-      positionLine.append(this.text('span', 'x '), x, this.text('span', ' y '), y, this.text('span', ' mm'));
+      const xName = this.text('span', 'x ');
+      const yName = this.text('span', ' y ');
+      positionLine.append(xName, x, yName, y, this.text('span', ' mm'));
       this.container.append(positionLine);
-      this.rows.push({ label, length, x, y, up, down });
+      this.rows.push({ label, length, x, y, xName, yName, up, down });
     }
   }
 }

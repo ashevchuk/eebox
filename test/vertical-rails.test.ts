@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_RAILS } from '../src/layout/limits';
 import { createPanel } from '../src/layout/panel';
+import { addPlate, addVerticalRail, DEFAULT_PLATE_ID } from '../src/layout/plates';
 import type { Panel, Sizes } from '../src/layout/placement';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM } from '../src/library/types';
 import { COMB_HEIGHT, COMB_OVERHANG, FRAME_PADDING, RAIL_HEIGHT, combRect, levelLabelEdge, levelLabelSide, moduleRect, placementRect, printArea, railAtPoint, railRect, rowRect, snapToSlot } from '../src/view/geometry';
@@ -178,5 +180,47 @@ describe('the side of the label of a module on a vertical rail', () => {
     expect(levelLabelEdge(panel, sizes, info('top'), body, 1, 'left')).toBe(body.x);
     expect(levelLabelEdge(panel, sizes, info('bottom'), body, 1, 'left')).toBe(strip.x);
     expect(strip.x).toBeLessThan(body.x);
+  });
+});
+
+describe('adding a vertical row', () => {
+  const big = (): Panel => ({ ...createPanel([24]), plates: [{ id: DEFAULT_PLATE_ID, name: 'Back plate', widthMm: 600, heightMm: 800 }] });
+  const added = (panel: Panel, plate = DEFAULT_PLATE_ID): Panel => {
+    const result = addVerticalRail(panel, plate);
+    if (!result.ok) throw new Error(result.error);
+    return result.panel;
+  };
+
+  it('stands it to the right of the horizontal rows when the plate has room there, from the top, as long as a default row', () => {
+    const rail = added(big()).rails.at(-1)!;
+    expect(rail).toEqual({ plate: DEFAULT_PLATE_ID, orientation: 'vertical', x: 24 * MODULE_UNIT_MM + 60, y: 40, lengthUnits: 12 });
+  });
+
+  it('stands it by the right edge of the plate when the rows run all the way and there is no room beside them', () => {
+    const full: Panel = { ...big(), plates: [{ id: DEFAULT_PLATE_ID, name: 'Back plate', widthMm: 24 * MODULE_UNIT_MM, heightMm: 800 }] };
+    expect(added(full).rails.at(-1)!.x).toBe(24 * MODULE_UNIT_MM - 60);
+  });
+
+  it('keeps it on a small plate: the modules turned on it fit across, and it is no longer than the plate is tall', () => {
+    const small: Panel = { ...big(), plates: [{ id: DEFAULT_PLATE_ID, name: 'Back plate', widthMm: 100, heightMm: 100 }] };
+    const rail = added(small).rails.at(-1)!;
+    expect(rail.x).toBe(DIN_MODULE_HEIGHT_MM / 2);
+    expect(rail.lengthUnits).toBe(Math.floor(60 / MODULE_UNIT_MM));
+  });
+
+  it('puts it among the rows of its own plate, so the rows of a plate stay together', () => {
+    const base = big();
+    const second = addPlate(base, 'Door', 300, 400);
+    if (!second.ok) throw new Error(second.error);
+    const twoPlates = added(second.panel, DEFAULT_PLATE_ID);
+    expect(twoPlates.rails.map((r) => r.plate)).toEqual([DEFAULT_PLATE_ID, DEFAULT_PLATE_ID]);
+    const onDoor = added(twoPlates, second.panel.plates[1]!.id);
+    expect(onDoor.rails.map((r) => r.plate)).toEqual([DEFAULT_PLATE_ID, DEFAULT_PLATE_ID, second.panel.plates[1]!.id]);
+  });
+
+  it('refuses an unknown plate and a panel that has all the rows it may have', () => {
+    expect(addVerticalRail(big(), 'nowhere')).toEqual({ ok: false, error: 'unknown-plate' });
+    const full = { ...big(), rails: Array.from({ length: MAX_RAILS }, () => big().rails[0]!) };
+    expect(addVerticalRail(full, DEFAULT_PLATE_ID)).toEqual({ ok: false, error: 'too-many-rails' });
   });
 });
