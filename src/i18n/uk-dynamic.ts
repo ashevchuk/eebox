@@ -80,6 +80,7 @@ export const DYNAMIC: Dictionary = {
   'Shelf ({n})': `Полиця ({n})`,
   'Snippets ({n})': `Фрагменти ({n})`,
   'longest row {n} units': ['найдовший ряд {n} модуль', 'найдовший ряд {n} модулі', 'найдовший ряд {n} модулів'],
+  'units, {a} mm': `модулів, {a} мм`,
   '{a} module, {b} comb': `модулів: {a}, гребінок: {b}`,
   '{a} module, {b} combs': `модулів: {a}, гребінок: {b}`,
   '{a} modules, {b} comb': `модулів: {a}, гребінок: {b}`,

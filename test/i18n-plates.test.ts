@@ -25,6 +25,8 @@ describe('the Ukrainian text of the plate and the terminal features', () => {
 
   it('turns the length label and the contents line of a row into Ukrainian, whichever of them is one', () => {
     expect(t('Length')).toBe('\u0414\u043e\u0432\u0436\u0438\u043d\u0430');
+    expect(t('units, 420 mm')).toBe('\u043c\u043e\u0434\u0443\u043b\u0456\u0432, 420 \u043c\u043c');
+    expect(t('units, 22.5 mm')).toBe('\u043c\u043e\u0434\u0443\u043b\u0456\u0432, 22.5 \u043c\u043c');
     const row = (a: number, b: number) => `${a} module${a === 1 ? '' : 's'}, ${b} comb${b === 1 ? '' : 's'}`;
     for (const [a, b] of [[1, 1], [1, 0], [3, 1], [4, 0], [0, 2]] as const) {
       expect(t(row(a, b)), row(a, b)).toBe(`\u043c\u043e\u0434\u0443\u043b\u0456\u0432: ${a}, \u0433\u0440\u0435\u0431\u0456\u043d\u043e\u043a: ${b}`);
