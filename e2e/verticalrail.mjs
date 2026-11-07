@@ -171,7 +171,7 @@ try {
       [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Discard')?.click();
     })()`);
     await browser.waitFor(`document.getElementById('status').textContent.includes('loaded')`, 'the project to load');
-    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Add vertical row').click()`);
+    await browser.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent === '+ Vertical row').click()`);
     await wait(400);
     const rails = await saved().then((p) => p.rails);
     const added = rails.at(-1);

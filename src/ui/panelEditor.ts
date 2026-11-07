@@ -142,7 +142,7 @@ export class PanelEditor {
     );
     const countLine = this.text('div', 'Rows ', 'settings-line');
     countLine.append(this.countInput);
-    const addVertical = this.button('Add vertical row', 'A row that runs down the plate by its right edge, for bars, terminal blocks and combs', () => {
+    const addVertical = this.button('+ Vertical row', 'Add a row that runs down the plate, for bars, terminal blocks and combs', () => {
       const result = addVerticalRail(this.panel, plate);
       if (!result.ok) {
         this.session.notify(result.error === 'too-many-rails' ? `Rows: at most ${MAX_RAILS}.` : ERROR_TEXT['unknown-rail'], true);
@@ -151,9 +151,10 @@ export class PanelEditor {
       this.session.commit({ ...this.session.project, panel: result.panel });
       this.session.select({ rail: result.panel.rails.map((r) => r.plate).lastIndexOf(plate) });
     });
-    const addLine = this.text('div', '', 'settings-line');
-    addLine.append(addVertical);
-    this.container.append(countLine, addLine);
+    // On the line of the rows, so that the library below does not move down; a longer text wraps instead of running out.
+    countLine.style.flexWrap = 'wrap';
+    countLine.append(addVertical);
+    this.container.append(countLine);
 
     this.rows = [];
     for (let local = 0; local < count; local++) {
