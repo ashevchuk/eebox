@@ -66,6 +66,7 @@ export const INSPECTOR: Dictionary = {
   'Module node': `Вузол модуля`,
   'Left end': `Лівий край`,
   Orientation: `Розташування`,
+  Length: `Довжина`,
   horizontal: `горизонтально`,
   vertical: `вертикально`,
   'Centre line': `Вісь`,
