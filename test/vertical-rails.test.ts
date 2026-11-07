@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPanel } from '../src/layout/panel';
 import type { Panel, Sizes } from '../src/layout/placement';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM } from '../src/library/types';
-import { COMB_HEIGHT, COMB_OVERHANG, FRAME_PADDING, RAIL_HEIGHT, combRect, moduleRect, placementRect, railAtPoint, railRect, rowRect, snapToSlot } from '../src/view/geometry';
+import { COMB_HEIGHT, COMB_OVERHANG, FRAME_PADDING, RAIL_HEIGHT, combRect, levelLabelStart, moduleRect, placementRect, railAtPoint, railRect, rowRect, snapToSlot } from '../src/view/geometry';
 
 const AXIS_X_MM = 300;
 const TOP_Y_MM = 60;
@@ -83,5 +83,26 @@ describe('dropping on a vertical rail', () => {
     const panel = panelWithVerticalRail();
     const bar = railRect(panel, 0);
     expect(snapToSlot(panel, { x: bar.x + 3.5 * MODULE_UNIT_MM, y: bar.y + RAIL_HEIGHT / 2 }, 1, 0.5)).toEqual({ rail: 0, slot: 3 });
+  });
+});
+
+describe('the label of a module on a vertical rail', () => {
+  const combOf = (side: 'top' | 'bottom') => () => ({ widthUnits: 6, side });
+  const withComb = (): Panel => ({ ...panelWithVerticalRail(), combs: [{ id: 'c1', module: { libraryId: 'l', moduleId: 'comb' }, rail: 1, slot: 0 }] });
+
+  it('starts at the right edge of the module when no comb is over it', () => {
+    const panel = panelWithVerticalRail();
+    const body = moduleRect(panel, 1, 0, 2, DIN_MODULE_HEIGHT_MM);
+    expect(levelLabelStart(panel, sizes, combOf('top'), body, 1)).toBe(body.x + body.width);
+  });
+
+  it('starts after a comb of top terminals that lies over the module, and ignores one of bottom terminals or on other modules', () => {
+    const panel = withComb();
+    const body = moduleRect(panel, 1, 0, 2, DIN_MODULE_HEIGHT_MM);
+    const comb = combRect(panel, sizes, 1, 0, 6, 'top');
+    expect(levelLabelStart(panel, sizes, combOf('top'), body, 1)).toBe(comb.x + comb.width);
+    expect(levelLabelStart(panel, sizes, combOf('bottom'), body, 1)).toBe(body.x + body.width);
+    const farBody = moduleRect(panel, 1, 8, 2, DIN_MODULE_HEIGHT_MM);
+    expect(levelLabelStart(panel, sizes, combOf('top'), farBody, 1)).toBe(farBody.x + farBody.width);
   });
 });

@@ -130,6 +130,23 @@ export function placementLabelRoom(panel: Panel, placement: Placement, body: Rec
   return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : Math.max(0, frameRect(panel).height - (body.y + body.height) - LABEL_GAP);
 }
 
+type CombInfoOf = (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined;
+
+/**
+ * Where the label of a module on a vertical rail may start: right of the module, and right of a comb of
+ * top terminals that lies over it, which sticks out on the same side.
+ */
+export function levelLabelStart(panel: Panel, sizes: Sizes, combInfoOf: CombInfoOf, body: Rect, rail: number): number {
+  let edge = body.x + body.width;
+  for (const comb of panel.combs) {
+    const info = comb.rail === rail ? combInfoOf(comb) : undefined;
+    if (info?.side !== 'top') continue;
+    const r = combRect(panel, sizes, comb.rail, comb.slot, info.widthUnits, info.side);
+    if (r.y < body.y + body.height && body.y < r.y + r.height) edge = Math.max(edge, r.x + r.width);
+  }
+  return edge;
+}
+
 export function combAtPoint(
   panel: Panel,
   sizes: Sizes,
@@ -289,9 +306,14 @@ export function printArea(
     const r = placementRect(panel, sizes, p);
     rects.push(r);
     if (p.label) {
-      const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
-      if (isOnRail(p) && isVertical(panel.rails[p.rail])) rects.push({ x: r.x + r.width, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
-      else rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
+      if (isOnRail(p) && isVertical(panel.rails[p.rail])) {
+        const start = levelLabelStart(panel, sizes, combInfoOf, r, p.rail);
+        const length = Math.min(measure(p.label), placementLabelRoom(panel, p, { ...r, width: start - r.x }));
+        rects.push({ x: start, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
+      } else {
+        const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
+        rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
+      }
     }
   }
   for (const c of panel.combs) {

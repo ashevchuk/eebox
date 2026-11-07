@@ -5,9 +5,9 @@ import { terminalLabels, terminalX } from './terminalLabels';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
-import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind, type TerminalSide } from '../library/types';
 import { lookupsOf } from '../layout/lookups';
-import { isOnRail, type ModuleRef, type Panel, type Sizes } from '../layout/placement';
+import { isOnRail, type CombPlacement, type ModuleRef, type Panel, type Sizes } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
 import type { Annotation } from '../layout/annotations';
@@ -15,7 +15,7 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, levelLabelStart, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
 import { ductsOf, type Duct } from '../layout/ducts';
 import { isVertical } from '../layout/rail';
 import type { Guide } from './snap';
@@ -211,6 +211,12 @@ function drawUpwardsLabel(
 
 const LEVEL_LABEL_GAP = 4;
 
+/** The width and side of a comb as the geometry wants them; nothing for a comb whose module is missing. */
+function combInfoOf(scene: Scene, comb: CombPlacement): { widthUnits: number; side: TerminalSide } | undefined {
+  const def = scene.resolve(comb.module);
+  return def?.comb ? { widthUnits: itemWidth(scene, comb), side: def.comb.side } : undefined;
+}
+
 /** Text that reads from left to right, for what stands on a vertical rail, where nothing is below it to print under. */
 function drawLevelLabel(
   ctx: CanvasRenderingContext2D,
@@ -242,9 +248,13 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
   for (const placement of panel.placements) {
     if (!placement.label || !texts.moduleLabels) continue;
     const r = placementRect(panel, sizesOf(scene), placement);
-    const room = placementLabelRoom(panel, placement, r);
-    if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) drawLevelLabel(ctx, placement.label, r.x + r.width + LEVEL_LABEL_GAP, r.y + r.height / 2, room, 'left', 'middle', theme().label);
-    else drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, room, 'right', theme().label);
+    if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) {
+      const start = levelLabelStart(panel, sizesOf(scene), (c) => combInfoOf(scene, c), r, placement.rail);
+      const room = placementLabelRoom(panel, placement, { ...r, width: start - r.x });
+      drawLevelLabel(ctx, placement.label, start + LEVEL_LABEL_GAP, r.y + r.height / 2, room, 'left', 'middle', theme().label);
+    } else {
+      drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
+    }
   }
   if (texts.terminalLabels) {
     for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
