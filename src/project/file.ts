@@ -22,7 +22,7 @@ import {
 } from '../layout/limits';
 import type { Duct } from '../layout/ducts';
 import { railsAreGrouped } from '../layout/plates';
-import type { Rail } from '../layout/rail';
+import { RAIL_ORIENTATIONS, type Rail } from '../layout/rail';
 import { findCombProblems } from '../layout/combs';
 import { lookupsOf } from '../layout/lookups';
 import { findDuctFillFindings } from '../electrical/ductFill';
@@ -129,6 +129,7 @@ const PLATE_SPEC: FieldSpec = {
 };
 const RAIL_SPEC: FieldSpec = {
   plate: { required: true, check: identifier },
+  orientation: { required: true, check: oneOf(RAIL_ORIENTATIONS) },
   x: { required: true, check: railPositionCheck },
   y: { required: true, check: railPositionCheck },
   lengthUnits: { required: true, check: railLengthCheck },

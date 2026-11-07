@@ -31,7 +31,7 @@ When the number is raised, add a line below saying what changed and in which rel
 
 ### Project and backup: version 1
 
-The format of eebox 0.7.0. The number has not been raised since the first release, although the format changed between releases before 0.7.0 (for example the module height and mounting, the position of a rail, plates, the duct of a wire, the depth of a duct). A file written by a release before 0.7.0 may therefore be refused for what it holds, not for its number; it carries no `generator` to say so.
+The format of eebox 0.7.0. The number has not been raised since the first release, although the format changed between releases before 0.7.0 (for example the module height and mounting, the position and orientation of a rail, plates, the duct of a wire, the depth of a duct). A file written by a release before 0.7.0 may therefore be refused for what it holds, not for its number; it carries no `generator` to say so.
 
 ### Library: schemaVersion 1
 
