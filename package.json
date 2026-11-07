@@ -1,6 +1,6 @@
 {
   "name": "eebox",
-  "version": "0.8.7",
+  "version": "0.9.0",
   "private": true,
   "description": "Browser-based modular electrical panel designer with user-supplied module libraries.",
   "type": "module",
