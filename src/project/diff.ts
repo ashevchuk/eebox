@@ -126,6 +126,7 @@ export function diffProjects(before: ProjectFile, after: ProjectFile): Change[] 
     const [railA, railB] = [a.rails[i], b.rails[i]];
     if (!railA || !railB) continue;
     if (railA.lengthUnits !== railB.lengthUnits) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: length ${railA.lengthUnits} → ${railB.lengthUnits} units` });
+    if (railA.orientation !== railB.orientation) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: orientation ${railA.orientation} → ${railB.orientation}` });
     if (railA.x !== railB.x || railA.y !== railB.y) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: position ${railA.x}, ${railA.y} → ${railB.x}, ${railB.y} mm` });
     if (railA.plate !== railB.plate) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: plate ${show(railA.plate)} \u2192 ${show(railB.plate)}` });
     if (railA.label !== railB.label) out.push({ area: 'rows', kind: 'changed', text: `row ${rowNumber(a, i)}: label ${show(railA.label)} → ${show(railB.label)}` });

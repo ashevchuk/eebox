@@ -400,6 +400,7 @@ export const DYNAMIC: Dictionary = {
   'row {n}, position {s}': `ряд {n}, положення {s}`,
   'moved from {a} to {b}': `переміщено з {a} на {b}`,
   'row {n}: length {a} → {b} units': `ряд {n}: довжина {a} → {b} модулів`,
+  'row {n}: orientation {a} → {b}': `ряд {n}: розташування {a} → {b}`,
   'row {n}: label {a} → {b}': `ряд {n}: назва {a} → {b}`,
   'title {a} → {b}': `заголовок {a} → {b}`,
   'revision {a} → {b}': `редакція {a} → {b}`,

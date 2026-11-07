@@ -43,6 +43,12 @@ describe('comparing two projects', () => {
     expect(lines).toContain('rows/changed: row 1: label "Incoming" → "Mains"');
   });
 
+  it('reports a row that was turned', () => {
+    const a = project();
+    const rails = a.panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r));
+    expect(texts(a, { ...a, panel: { ...a.panel, rails } })).toContain('rows/changed: row 2: orientation horizontal → vertical');
+  });
+
   it('reports a module that was added, removed and moved, with its row and position', () => {
     const a = project();
     const panel = { ...a.panel, placements: [{ ...(a.panel.placements[0] as RailPlacement), slot: 5 }, place('p9', 'mcb1', 1, 3)] };

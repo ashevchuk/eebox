@@ -14,7 +14,7 @@ import { normalizeLabel } from './labels';
 import { DEFAULT_PLATE_ID, DEFAULT_PLATE_NAME } from './plates';
 import { isOnRail, type Panel, type WidthOf } from './placement';
 import { MODULE_UNIT_MM } from '../library/types';
-import { isVertical, type Rail } from './rail';
+import { isVertical, type Rail, type RailOrientation } from './rail';
 import { LAYOUT_EPSILON_UNITS } from './units';
 
 /** The height of the plate of a panel that has no rail yet. */
@@ -87,6 +87,12 @@ export function setRailPosition(panel: Panel, rail: number, x: number, y: number
   const valid = (v: number) => Number.isFinite(v) && v >= 0 && v <= MAX_RAIL_POSITION_MM;
   if (!valid(x) || !valid(y)) return failure('invalid-value');
   return { ok: true, panel: { ...panel, rails: panel.rails.map((r, i) => (i === rail ? { ...r, x, y } : r)) } };
+}
+
+/** Turns a row; its x and y keep their numbers, which then mean the other pair (see `Rail`). */
+export function setRailOrientation(panel: Panel, rail: number, orientation: RailOrientation): PanelEditResult {
+  if (!inRange(rail, 0, panel.rails.length - 1)) return failure('unknown-rail');
+  return { ok: true, panel: { ...panel, rails: panel.rails.map((r, i) => (i === rail ? { ...r, orientation } : r)) } };
 }
 
 /**
