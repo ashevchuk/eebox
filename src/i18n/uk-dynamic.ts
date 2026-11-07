@@ -107,6 +107,8 @@ export const DYNAMIC: Dictionary = {
   '{a}-{b} mm, {c} units': `{a}–{b} мм, {c} модулів`,
   '{w} units ({m} mm)': `{w} модулів ({m} мм)`,
   'top {a} · bottom {b}': `верх {a} · низ {b}`,
+  'top {a} · no bottom': `верх {a} · без низу`,
+  'no top · bottom {a}': `без верху · низ {a}`,
   '{t} (top)': `{t} (верх)`,
   '{t} (bottom)': `{t} (низ)`,
   'Input {n}': `Вхід {n}`,

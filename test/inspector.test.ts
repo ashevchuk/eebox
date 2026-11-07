@@ -104,6 +104,13 @@ describe('inspect: what is shown', () => {
     expect(field(ctx({ placementId: 'p3' }, 'panel', wide), 'slot')?.max).toBe(14);
   });
 
+  it('names the side that has no terminals instead of leaving it empty', () => {
+    const base = build();
+    const project = { ...base, panel: { ...base.panel, placements: [...base.panel.placements, place('p8', 'rowTop', 0, 14), place('p9', 'rowBottom', 0, 17)] } };
+    expect(field(ctx({ placementId: 'p8' }, 'panel', project), 'terminals')?.value).toBe('top A B · no bottom');
+    expect(field(ctx({ placementId: 'p9' }, 'panel', project), 'terminals')?.value).toBe('no top · bottom A B');
+  });
+
   it('summarises terminals, and only counts them on a long bar', () => {
     expect(field(ctx({ placementId: 'p2' }), 'terminals')?.value).toBe('top L1 L2 L3 · bottom L1 L2 L3');
     expect(field(ctx({ placementId: 'p3' }), 'terminals')?.value).toBe('top N1 N2 N3 · bottom Nb1 Nb2 Nb3');

@@ -1,4 +1,5 @@
 import houseText from '../examples/house-panel.json?raw';
+import houseVerticalText from '../examples/house-panel-vertical.json?raw';
 import studioText from '../examples/studio-flat.json?raw';
 import workshopText from '../examples/workshop-backup.json?raw';
 import autoBackupText from '../examples/workshop-auto-backup.json?raw';
@@ -25,6 +26,12 @@ export const EXAMPLES: readonly Example[] = [
     title: 'House panel',
     description: 'Three phase: main switch, RCD, neutral and earth bars, a 3-phase comb over single-pole breakers, and three loads with cables.',
     text: houseText,
+  },
+  {
+    id: 'house-panel-vertical',
+    title: 'House panel with vertical bars',
+    description: 'The house panel with its neutral and earth bars as bars of one row of 12 terminals on a vertical rail beside the rows: the input on the first terminal, the loads on the next ones.',
+    text: houseVerticalText,
   },
   {
     id: 'workshop-backup',

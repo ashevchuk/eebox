@@ -32,4 +32,9 @@ describe('the Ukrainian text of the plate and the terminal features', () => {
       expect(t(row(a, b)), row(a, b)).toBe(`\u043c\u043e\u0434\u0443\u043b\u0456\u0432: ${a}, \u0433\u0440\u0435\u0431\u0456\u043d\u043e\u043a: ${b}`);
     }
   });
+
+  it('turns the summary of the terminals of a bar of one row into Ukrainian, on whichever side they are', () => {
+    expect(t('top 12 \u00b7 no bottom')).toBe('\u0432\u0435\u0440\u0445 12 \u00b7 \u0431\u0435\u0437 \u043d\u0438\u0437\u0443');
+    expect(t('no top \u00b7 bottom N1 N2')).toBe('\u0431\u0435\u0437 \u0432\u0435\u0440\u0445\u0443 \u00b7 \u043d\u0438\u0437 N1 N2');
+  });
 });

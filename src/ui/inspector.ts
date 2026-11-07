@@ -342,7 +342,14 @@ function moduleDetails(def: ModuleDef | undefined, widthUnits: number): Inspecto
   if (terminals.length > 0) {
     const side = (s: 'top' | 'bottom') => terminals.filter((t) => t.side === s).map((t) => t.name);
     const describeSide = (names: string[]) => (names.length > 8 ? `${names.length}` : names.join(' '));
-    details.push(readonly('terminals', 'Terminals', `top ${describeSide(side('top'))} · bottom ${describeSide(side('bottom'))}`));
+    const [top, bottom] = [side('top'), side('bottom')];
+    const text =
+      top.length > 0 && bottom.length > 0
+        ? `top ${describeSide(top)} · bottom ${describeSide(bottom)}`
+        : top.length > 0
+          ? `top ${describeSide(top)} · no bottom`
+          : `no top · bottom ${describeSide(bottom)}`;
+    details.push(readonly('terminals', 'Terminals', text));
   }
   return details;
 }
