@@ -5,7 +5,8 @@ import type { Project } from '../project';
 import { FRAME_PADDING, placementRect } from '../view/geometry';
 import { DEFAULT_WIRE_SLACK_MM } from './limits';
 import { lookupsOf } from './lookups';
-import { isFree } from './placement';
+import { isFree, isOnRail } from './placement';
+import { isVertical } from './rail';
 
 /** What a wire adds for going from one plate to another, for example across a hinge to a door. */
 export const CROSS_PLATE_MM = 300;
@@ -42,13 +43,11 @@ export function wireRuns(project: Project, resolve: Resolve): Map<string, number
     const plate = panel.plates.find((p) => p.id === (isFree(placement) ? placement.plate : panel.rails[placement.rail]?.plate));
     if (!terminal || !plate) return null;
     const box = placementRect(panel, sizes, placement);
-    return {
-      plate: plate.id,
-      x: box.x - FRAME_PADDING + terminal.unit * MODULE_UNIT_MM,
-      y: (terminal.side === 'top' ? box.y : box.y + box.height) - FRAME_PADDING,
-      plateWidthMm: plate.widthMm,
-      plateHeightMm: plate.heightMm,
-    };
+    const turned = isOnRail(placement) && isVertical(panel.rails[placement.rail]);
+    const along = terminal.unit * MODULE_UNIT_MM;
+    const x = turned ? (terminal.side === 'top' ? box.x + box.width : box.x) : box.x + along;
+    const y = turned ? box.y + along : terminal.side === 'top' ? box.y : box.y + box.height;
+    return { plate: plate.id, x: x - FRAME_PADDING, y: y - FRAME_PADDING, plateWidthMm: plate.widthMm, plateHeightMm: plate.heightMm };
   };
 
   const runs = new Map<string, number>();
