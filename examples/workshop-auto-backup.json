@@ -509,8 +509,6 @@
       "kind": "relay",
       "name": "Automatic transfer controller 3P+N",
       "widthUnits": 4,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 4,
       "terminals": [
         {
@@ -629,6 +627,8 @@
           }
         ]
       },
+      "heightMm": 90,
+      "mounting": "rail",
       "resizable": {
         "minUnits": 2,
         "maxUnits": 8
@@ -648,9 +648,9 @@
         {
           "kind": "ellipse",
           "cx": 6,
-          "cy": 7,
-          "rx": 2,
-          "ry": 2,
+          "cy": 12.6,
+          "rx": 1.2,
+          "ry": 1.2,
           "fill": "#22c55e",
           "stroke": "#1f2937",
           "strokeWidth": 0.3,
@@ -663,8 +663,6 @@
       "kind": "contactor",
       "name": "Contactor 3P 40A, 230V coil",
       "widthUnits": 3,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 3,
       "ratedCurrentA": 40,
       "terminals": [
@@ -751,6 +749,8 @@
           }
         ]
       },
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",
@@ -762,16 +762,6 @@
           "stroke": "#1f2937",
           "strokeWidth": 0.3,
           "anchor": "stretch"
-        },
-        {
-          "kind": "line",
-          "x1": 4,
-          "y1": 9.5,
-          "x2": 12,
-          "y2": 4.5,
-          "stroke": "#ffffff",
-          "strokeWidth": 0.8,
-          "anchor": "left"
         },
         {
           "kind": "line",
@@ -800,11 +790,12 @@
       "kind": "rcd",
       "name": "RCD 4P 40A 30mA",
       "widthUnits": 4,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 40,
       "residualCurrentMa": 30,
+      "feed": "top",
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",

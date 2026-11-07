@@ -606,11 +606,12 @@
       "kind": "rcd",
       "name": "RCD 4P 63A 30mA",
       "widthUnits": 4,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 63,
       "residualCurrentMa": 30,
+      "feed": "top",
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",

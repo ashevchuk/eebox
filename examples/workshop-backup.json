@@ -594,11 +594,12 @@
       "kind": "rcd",
       "name": "RCD 4P 40A 30mA",
       "widthUnits": 4,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 4,
       "ratedCurrentA": 40,
       "residualCurrentMa": 30,
+      "feed": "top",
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",

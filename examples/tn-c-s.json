@@ -596,13 +596,14 @@
       "kind": "rcbo",
       "name": "RCBO 1P+N C10 30mA",
       "widthUnits": 2,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 10,
       "curve": "C",
       "breakingCapacityKA": 6,
       "residualCurrentMa": 30,
+      "feed": "top",
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",
@@ -642,13 +643,14 @@
       "kind": "rcbo",
       "name": "RCBO 1P+N C16 30mA",
       "widthUnits": 2,
-      "heightMm": 90,
-      "mounting": "rail",
       "poles": 2,
       "ratedCurrentA": 16,
       "curve": "C",
       "breakingCapacityKA": 6,
       "residualCurrentMa": 30,
+      "feed": "top",
+      "heightMm": 90,
+      "mounting": "rail",
       "art": [
         {
           "kind": "rect",

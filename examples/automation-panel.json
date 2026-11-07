@@ -907,6 +907,7 @@
       "poles": 4,
       "ratedCurrentA": 100,
       "residualCurrentMa": 300,
+      "feed": "top",
       "heightMm": 90,
       "mounting": "rail",
       "art": [
@@ -999,22 +1000,26 @@
         {
           "name": "L",
           "conductor": "L",
-          "side": "top"
+          "side": "top",
+          "role": "input"
         },
         {
           "name": "N",
           "conductor": "N",
-          "side": "top"
+          "side": "top",
+          "role": "input"
         },
         {
           "name": "24V",
           "conductor": "DCP",
-          "side": "bottom"
+          "side": "bottom",
+          "role": "output"
         },
         {
           "name": "0V",
           "conductor": "DCN",
-          "side": "bottom"
+          "side": "bottom",
+          "role": "output"
         }
       ],
       "heightMm": 90,
@@ -1027,9 +1032,9 @@
         {
           "kind": "line",
           "x1": 31.5,
-          "y1": 5.5,
+          "y1": 10.8,
           "x2": 38.5,
-          "y2": 5.5,
+          "y2": 10.8,
           "stroke": "#ffffff",
           "strokeWidth": 0.9,
           "anchor": "centre"
@@ -1037,9 +1042,9 @@
         {
           "kind": "line",
           "x1": 31.5,
-          "y1": 8.5,
+          "y1": 12.8,
           "x2": 38.5,
-          "y2": 8.5,
+          "y2": 12.8,
           "stroke": "#ffffff",
           "strokeWidth": 0.9,
           "anchor": "centre"
@@ -1549,37 +1554,43 @@
           "name": "L1",
           "conductor": "L1",
           "side": "top",
-          "unit": 0.643
+          "unit": 0.643,
+          "role": "input"
         },
         {
           "name": "L2",
           "conductor": "L2",
           "side": "top",
-          "unit": 2.929
+          "unit": 2.929,
+          "role": "input"
         },
         {
           "name": "L3",
           "conductor": "L3",
           "side": "top",
-          "unit": 5.214
+          "unit": 5.214,
+          "role": "input"
         },
         {
           "name": "T1",
           "conductor": "L1",
           "side": "bottom",
-          "unit": 0.643
+          "unit": 0.643,
+          "role": "output"
         },
         {
           "name": "T2",
           "conductor": "L2",
           "side": "bottom",
-          "unit": 2.929
+          "unit": 2.929,
+          "role": "output"
         },
         {
           "name": "T3",
           "conductor": "L3",
           "side": "bottom",
-          "unit": 5.214
+          "unit": 5.214,
+          "role": "output"
         }
       ]
     },
