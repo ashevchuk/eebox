@@ -267,6 +267,16 @@ describe('applyEdit: position and width', () => {
 });
 
 describe('applyEdit: rows', () => {
+  it('turns a row, and names its position by the other pair of edges when it is vertical', () => {
+    const turned = ok(applyEdit(ctx({ rail: 0 }), 'orientation', 'vertical'));
+    expect(turned.panel.rails.map((r) => r.orientation)).toEqual(['vertical', 'horizontal']);
+    const vertical = inspect({ ...ctx({ rail: 0 }), project: { ...ctx({ rail: 0 }).project, panel: turned.panel } })!;
+    const labels = vertical.fields.map((f) => f.label);
+    expect(labels).toEqual(expect.arrayContaining(['Orientation', 'Centre line', 'Top end']));
+    expect(labels).not.toContain('Left end');
+    expect(message(applyEdit(ctx({ rail: 0 }), 'orientation', 'diagonal'))).toBe('Orientation is horizontal or vertical.');
+  });
+
   it('changes the length, refusing what would not fit the modules', () => {
     expect(ok(applyEdit(ctx({ rail: 1 }), 'length', '12')).panel.rails.map((r) => r.lengthUnits)).toEqual([24, 12]);
     expect(message(applyEdit(ctx({ rail: 0 }), 'length', '5'))).toBe('Modules on this row would not fit.');

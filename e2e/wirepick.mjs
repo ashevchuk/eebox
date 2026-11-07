@@ -30,7 +30,7 @@ const project = {
   format: 'eebox-project',
   version: 1,
   project: {
-    panel: { plates: [{ id: 'plate1', name: 'Back plate', widthMm: 210, heightMm: 220 }], rails: [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12 }], placements: [], combs: [], shelf: [] },
+    panel: { plates: [{ id: 'plate1', name: 'Back plate', widthMm: 210, heightMm: 220 }], rails: [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12 }], placements: [], combs: [], shelf: [] },
     schematic: {
       nodes: [
         { id: 'n1', kind: 'source', label: 'Mains', x: 0, y: 0, conductors: ['L1', 'L2'] },
@@ -95,7 +95,7 @@ try {
       format: 'eebox-project',
       version: 1,
       project: {
-        panel: { plates: [{ id: 'plate1', name: 'Back plate', widthMm: 420, heightMm: 220 }], rails: [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 24 }], placements: [placement('p1', 'contactor-3p-20-230', 0), placement('p2', 'contactor-3p-25-230', 4), placement('p3', 'contactor-3p-20-230', 8)], combs: [], shelf: [] },
+        panel: { plates: [{ id: 'plate1', name: 'Back plate', widthMm: 420, heightMm: 220 }], rails: [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 24 }], placements: [placement('p1', 'contactor-3p-20-230', 0), placement('p2', 'contactor-3p-25-230', 4), placement('p3', 'contactor-3p-20-230', 8)], combs: [], shelf: [] },
         schematic: {
           nodes: [
             { id: 'n1', kind: 'module', label: 'K1', x: 0, y: 0, placementId: 'p1' },
@@ -125,7 +125,7 @@ try {
         document.getElementById('export-svg').click(); await new Promise((r) => setTimeout(r, 700));
         HTMLAnchorElement.prototype.click = click; URL.createObjectURL = create;
         const text = blob ? await blob.text() : '';
-        return [...text.matchAll(/<path d="([^"]+)"[^>]*?stroke="(#(?:ffd700|008000|ff0000))"/g)].map((m) => m[2] + ' ' + m[1]);
+        return [...text.matchAll(/<path d="([^"]+)"[^>]*?stroke="(#(?:ffd700|008000|ff0000))" stroke-width="2.5"/g)].map((m) => m[2] + ' ' + m[1]);
       })()`);
     const before = await paths();
     expectTrue(before.length === 9, `${before.length} wires are drawn, not nine`);

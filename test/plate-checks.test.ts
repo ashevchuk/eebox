@@ -17,8 +17,9 @@ import { ref, resolve as fixtureResolve, place } from './fixtures';
 
 const PLATE_ONLY: ModuleDef = { id: 'drive', kind: 'vfd', name: 'Drive', widthUnits: 8, heightMm: 250, mounting: 'plate', poles: 3 };
 const BOTH: ModuleDef = { id: 'psu', kind: 'psu', name: 'Supply', widthUnits: 4, heightMm: 100, mounting: 'both', poles: 2 };
+const BAR: ModuleDef = { id: 'bar', kind: 'busbar', name: 'Bar', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 1 };
 const resolve = (r: { libraryId: string; moduleId: string }): ModuleDef | undefined =>
-  r.moduleId === PLATE_ONLY.id ? PLATE_ONLY : r.moduleId === BOTH.id ? BOTH : fixtureResolve(r);
+  r.moduleId === PLATE_ONLY.id ? PLATE_ONLY : r.moduleId === BOTH.id ? BOTH : r.moduleId === BAR.id ? BAR : fixtureResolve(r);
 const sizes = lookupsOf(resolve).sizes;
 
 const at = (id: string, moduleId: string, x: number, y: number): FreePlacement => ({ id, module: ref(moduleId), plate: DEFAULT_PLATE_ID, x, y });
@@ -145,6 +146,15 @@ describe('a device where it was not made to stand', () => {
     expect(messages(lowered)).toEqual(['advice: Drive (p1) is made for the plate, not for a rail.']);
     expect(messages(panelWith([at('p1', 'mcb1', 100, 400)]))).toEqual(['advice: MCB 1P (p1) is made for a DIN rail, not for the plate.']);
     expect(messages(panelWith([place('p1', 'psu', 0, 0), at('p2', 'psu', 100, 400)]))).toEqual([]);
+  });
+
+  it('is advice for a protective device on a vertical rail, and none for a bar', () => {
+    const upright = (placements: Placement[]) => {
+      const base = panelWith(placements);
+      return { ...base, rails: base.rails.map((r) => ({ ...r, orientation: 'vertical' as const, x: 500, y: 60 })) };
+    };
+    expect(messages(upright([place('p1', 'mcb1', 0, 0)]))).toEqual(['advice: MCB 1P (p1) is made for a horizontal rail, not for a vertical one.']);
+    expect(messages(upright([place('p1', 'bar', 0, 0)]))).toEqual([]);
   });
 
   it('is named by its label when it has one', () => {

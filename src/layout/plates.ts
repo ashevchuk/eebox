@@ -2,6 +2,7 @@ import { withNotes, type Annotation } from './annotations';
 import { ductsOf } from './ducts';
 import { normalizeLabel } from './labels';
 import { FIRST_RAIL_Y_MM, MAX_PLATES, MAX_PLATE_SIZE_MM, MAX_RAILS, MIN_PLATE_SIZE_MM } from './limits';
+import { isVertical, type Rail } from './rail';
 import { isFree, isOnRail, type CombPlacement, type Panel, type Placement, type Plate } from './placement';
 
 export const DEFAULT_PLATE_ID = 'plate1';
@@ -174,11 +175,13 @@ function grouped(panel: Panel): Panel {
 export function addRail(panel: Panel, plateId: string): PlateResult {
   if (!plateById(panel, plateId)) return failure('unknown-plate');
   if (panel.rails.length >= MAX_RAILS) return failure('too-many-rails');
-  const mine = panel.rails.filter((r) => r.plate === plateId);
+  const mine = panel.rails.filter((r) => r.plate === plateId && !isVertical(r));
   const last = mine[mine.length - 1];
   const before = mine[mine.length - 2];
   const gap = last && before && last.y > before.y ? last.y - before.y : 150;
-  const rail = last ? { plate: plateId, x: last.x, y: last.y + gap, lengthUnits: last.lengthUnits } : { plate: plateId, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 };
+  const rail: Rail = last
+    ? { plate: plateId, orientation: 'horizontal', x: last.x, y: last.y + gap, lengthUnits: last.lengthUnits }
+    : { plate: plateId, orientation: 'horizontal', x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 };
   return { ok: true, panel: grouped({ ...panel, rails: [...panel.rails, rail] }) };
 }
 

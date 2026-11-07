@@ -43,7 +43,7 @@ const heights = (panel: Panel) => panel.rails.map((r) => r.y);
 describe('createPanel', () => {
   it('stacks the rails one pitch apart, the first at the first rail height', () => {
     expect(heights(createPanel([18, 18, 12]))).toEqual([FIRST_RAIL_Y_MM, FIRST_RAIL_Y_MM + DEFAULT_RAIL_PITCH_MM, FIRST_RAIL_Y_MM + 2 * DEFAULT_RAIL_PITCH_MM]);
-    expect(createPanel([12]).rails).toEqual([{ plate: DEFAULT_PLATE_ID, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 }]);
+    expect(createPanel([12]).rails).toEqual([{ plate: DEFAULT_PLATE_ID, orientation: 'horizontal', x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 }]);
     expect(createPanel([]).rails).toEqual([]);
   });
 });
@@ -136,7 +136,7 @@ describe('setRailPosition', () => {
   it('moves only the chosen rail, in both directions', () => {
     const before = createPanel([12, 12, 12]);
     const panel = unwrap(setRailPosition(before, 1, 30, 220));
-    expect(panel.rails[1]).toEqual({ plate: DEFAULT_PLATE_ID, x: 30, y: 220, lengthUnits: 12 });
+    expect(panel.rails[1]).toEqual({ plate: DEFAULT_PLATE_ID, orientation: 'horizontal', x: 30, y: 220, lengthUnits: 12 });
     expect(panel.rails[0]).toEqual(before.rails[0]);
     expect(panel.rails[2]).toEqual(before.rails[2]);
   });
@@ -162,7 +162,16 @@ describe('setRailPosition', () => {
   it('does not mutate the input panel', () => {
     const panel = createPanel([12, 12]);
     setRailPosition(panel, 0, 300, 300);
-    expect(panel.rails[0]).toEqual({ plate: DEFAULT_PLATE_ID, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 });
+    expect(panel.rails[0]).toEqual({ plate: DEFAULT_PLATE_ID, orientation: 'horizontal', x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 });
+  });
+});
+
+describe('new rows beside a vertical rail', () => {
+  it('are horizontal and follow the last horizontal row', () => {
+    const base = createPanel([12, 12]);
+    const panel = { ...base, rails: [...base.rails, { ...base.rails[0]!, orientation: 'vertical' as const, x: 300, y: 50 }] };
+    const grown = unwrap(setRailCount(panel, 4));
+    expect(grown.rails.slice(3).map((r) => [r.orientation, r.x, r.y])).toEqual([['horizontal', 0, base.rails[1]!.y + DEFAULT_RAIL_PITCH_MM]]);
   });
 });
 
@@ -190,6 +199,19 @@ describe('moveRail', () => {
     const moved = unwrap(moveRail(stocked(), 2, 0));
     expect(lengths(moved)).toEqual([30, 10, 20]);
     expect(railOf(moved)).toEqual({ a: 1, b: 2, c: 0, d: 2 });
+  });
+
+  it('refuses to swap a horizontal row with a vertical one, whose x and y mean something else', () => {
+    const panel = stocked();
+    const mixed = { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r)) };
+    expect(moveRail(mixed, 0, 1)).toEqual({ ok: false, error: 'invalid-value' });
+    expect(moveRail(mixed, 2, 1)).toEqual({ ok: false, error: 'invalid-value' });
+  });
+
+  it('refuses to move a row across a vertical one, since the rows in between would take over places of the other kind', () => {
+    const panel = stocked();
+    const mixed = { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r)) };
+    expect(moveRail(mixed, 0, 2)).toEqual({ ok: false, error: 'invalid-value' });
   });
 
   it('moves the combs of a row together with it', () => {

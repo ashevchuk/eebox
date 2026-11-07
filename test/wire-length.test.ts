@@ -33,6 +33,15 @@ describe('wireRuns', () => {
     expect(wireRuns(project, resolve).get('w1')).toBe(Math.round(Math.abs(along) + DIN_HEIGHT + DEFAULT_WIRE_SLACK_MM));
   });
 
+  it('measures down the rail and across it for modules turned on a vertical rail', () => {
+    const base = twoOnARail();
+    const upright: Project = { ...base, panel: { ...base.panel, rails: base.panel.rails.map((r) => ({ ...r, orientation: 'vertical' as const, x: 200, y: 60 })) } };
+    const sideBySide = wired(upright, ['n1', 'top:L'], ['n2', 'top:L']);
+    expect(wireRuns(sideBySide, resolve).get('w1')).toBe(4 * MODULE_UNIT_MM + DEFAULT_WIRE_SLACK_MM);
+    const across = wired(upright, ['n1', 'top:L'], ['n2', 'bottom:L']);
+    expect(wireRuns(across, resolve).get('w1')).toBe(4 * MODULE_UNIT_MM + DIN_HEIGHT + DEFAULT_WIRE_SLACK_MM);
+  });
+
   it('takes the slack the panel sets, and the default again when it is set back', () => {
     const project = wired(twoOnARail(), ['n1', 'top:L'], ['n2', 'bottom:L']);
     const run = (panel = project.panel) => wireRuns({ ...project, panel }, resolve).get('w1')!;

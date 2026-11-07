@@ -85,6 +85,32 @@ describe('duplicating a row', () => {
     expect(new Set(combIds).size).toBe(combIds.length);
   });
 
+  describe('beside a vertical rail', () => {
+    const withVerticalSecond = () => {
+      const panel = panelOf([place('p1', 'breaker16', 0, 0), place('p2', 'breaker16', 1, 0)], [], [24, 12, 12]);
+      return { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const, x: 300, y: 60 } : r)) };
+    };
+
+    it('copies a horizontal row to the end of the rows when a vertical rail is in the way', () => {
+      const result = duplicateRow(withVerticalSecond(), 0);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.panel.rails.map((r) => r.orientation)).toEqual(['horizontal', 'vertical', 'horizontal', 'horizontal']);
+      const [last, copy] = [result.panel.rails[2]!, result.panel.rails[3]!];
+      expect(copy.x).toBe(last.x);
+      expect(copy.y).toBeGreaterThan(last.y);
+      expect(result.panel.placements.filter((p) => isOnRail(p) && p.rail === 3)).toHaveLength(1);
+    });
+
+    it('copies a vertical row as a vertical row, one pitch to the right', () => {
+      const result = duplicateRow(withVerticalSecond(), 1);
+      if (!result.ok) throw new Error(result.error);
+      const copy = result.panel.rails.filter((r) => r.orientation === 'vertical');
+      expect(copy).toHaveLength(2);
+      expect(copy.every((r) => r.lengthUnits === 12)).toBe(true);
+      expect(result.panel.placements.filter(isOnRail).filter((p) => result.panel.rails[p.rail]!.orientation === 'vertical')).toHaveLength(2);
+    });
+  });
+
   it('refuses an unknown row and a panel that has all the rows it may have', () => {
     expect(duplicateRow(base(), 7)).toEqual({ ok: false, error: 'unknown-rail' });
     const full = panelOf([], [], Array.from({ length: MAX_RAILS }, () => 12));
