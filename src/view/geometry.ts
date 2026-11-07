@@ -283,6 +283,8 @@ export const PRINT_MARGIN_MM = 12;
 const PRINT_LABEL_START_MM = 4;
 const PRINT_LABEL_HALF_WIDTH_MM = 6;
 const PRINT_LABEL_HALF_HEIGHT_MM = 5;
+/** The longest a level label, such as the label of a comb on a vertical rail, is printed. */
+const LEVEL_LABEL_MAX_MM = 110;
 /** A row label stands in the margin to the left of its rail. */
 export const rowLabelX = (panel: Panel, rail: number): number => railRect(panel, rail).x - FRAME_PADDING / 2;
 
@@ -318,7 +320,14 @@ export function printArea(
   }
   for (const c of panel.combs) {
     const info = combInfoOf(c);
-    if (info) rects.push(combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side));
+    if (!info) continue;
+    const r = combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side);
+    rects.push(r);
+    if (c.label && isVertical(panel.rails[c.rail])) {
+      const length = Math.min(measure(c.label), LEVEL_LABEL_MAX_MM);
+      const x = info.side === 'top' ? r.x + r.width : r.x - PRINT_LABEL_START_MM - length;
+      rects.push({ x, y: r.y + 2, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
+    }
   }
   panel.rails.forEach(({ label }, rail) => {
     if (!label) return;

@@ -109,6 +109,7 @@ describe('the label of a module on a vertical rail', () => {
 
 describe('the full-size print of a vertical rail', () => {
   const measure = (text: string) => text.length * 4;
+  const COMB_LABEL = 'Phases of the supply side';
   const labelled = (): Panel => {
     const base = panelWithVerticalRail();
     return {
@@ -136,5 +137,17 @@ describe('the full-size print of a vertical rail', () => {
     const comb = combRect(panel, sizes, 1, 0, 6, 'top');
     const { rects } = printArea(panel, sizes, info, measure);
     expect(rects.some((r) => r.x === comb.x + comb.width && r.width > 0 && r.height === 10)).toBe(true);
+  });
+
+  it('covers the label of a comb on the vertical rail, on the side of its terminals', () => {
+    const base = labelled();
+    const comb = (side: 'top' | 'bottom') => ({ ...base, combs: [{ id: 'c1', module: { libraryId: 'l', moduleId: 'comb' }, rail: 1, slot: 0, label: COMB_LABEL }] });
+    for (const side of ['top', 'bottom'] as const) {
+      const panel = comb(side);
+      const strip = combRect(panel, sizes, 1, 0, 6, side);
+      const { bounds } = printArea(panel, sizes, () => ({ widthUnits: 6, side }), measure);
+      if (side === 'top') expect(bounds.maxX).toBeGreaterThanOrEqual(strip.x + strip.width + measure(COMB_LABEL));
+      else expect(bounds.minX).toBeLessThanOrEqual(strip.x - measure(COMB_LABEL));
+    }
   });
 });
