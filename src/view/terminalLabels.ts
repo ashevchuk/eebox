@@ -1,6 +1,7 @@
 import { terminalsOf, type Terminal } from '../electrical/terminals';
 import { ductsOf } from '../layout/ducts';
-import type { ModuleRef, Panel, Sizes } from '../layout/placement';
+import { isOnRail, type ModuleRef, type Panel, type Sizes } from '../layout/placement';
+import { isVertical } from '../layout/rail';
 import { MODULE_UNIT_MM, type ModuleDef } from '../library/types';
 import { FRAME_PADDING, ductRect, placementRect, rowRect, type Rect } from './geometry';
 
@@ -36,6 +37,7 @@ export function terminalLabels(panel: Panel, sizes: Sizes, resolve: (ref: Module
   for (const placement of panel.placements) {
     const def = resolve(placement.module);
     if (def?.kind !== 'terminal' || !placement.terminalLabels) continue;
+    if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) continue;
     const body = placementRect(panel, sizes, placement);
     const terminals = terminalsOf(def, sizes.widthOf(placement) ?? def.widthUnits);
     const hindrances = [...rows, ...ducts, ...panel.placements.filter((p) => p.id !== placement.id).map((p) => placementRect(panel, sizes, p))];

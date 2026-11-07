@@ -265,6 +265,7 @@ export const PRINT_MARGIN_MM = 12;
 /** A label under a module is cut at the room it has, and starts this far below the module. */
 const PRINT_LABEL_START_MM = 4;
 const PRINT_LABEL_HALF_WIDTH_MM = 6;
+const PRINT_LABEL_HALF_HEIGHT_MM = 5;
 /** A row label stands in the margin to the left of its rail. */
 export const rowLabelX = (panel: Panel, rail: number): number => railRect(panel, rail).x - FRAME_PADDING / 2;
 
@@ -289,7 +290,8 @@ export function printArea(
     rects.push(r);
     if (p.label) {
       const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
-      rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
+      if (isOnRail(p) && isVertical(panel.rails[p.rail])) rects.push({ x: r.x + r.width, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
+      else rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
     }
   }
   for (const c of panel.combs) {
@@ -300,7 +302,12 @@ export function printArea(
     if (!label) return;
     const centre = railCenterY(panel, rail);
     const half = Math.min(measure(label), 110) / 2;
-    rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
+    if (isVertical(panel.rails[rail])) {
+      const bar = railRect(panel, rail);
+      rects.push({ x: bar.x + bar.width / 2 - half, y: bar.y - PRINT_LABEL_START_MM - 2 * PRINT_LABEL_HALF_HEIGHT_MM, width: 2 * half, height: PRINT_LABEL_START_MM + 2 * PRINT_LABEL_HALF_HEIGHT_MM });
+    } else {
+      rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
+    }
   });
   if (rects.length === 0) {
     const frame = frameRect(panel);
