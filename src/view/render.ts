@@ -15,7 +15,7 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, levelLabelStart, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, levelLabelEdge, levelLabelRoom, levelLabelSide, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
 import { ductsOf, type Duct } from '../layout/ducts';
 import { isVertical } from '../layout/rail';
 import type { Guide } from './snap';
@@ -227,9 +227,10 @@ function drawLevelLabel(
   align: CanvasTextAlign,
   baseline: CanvasTextBaseline,
   color: string,
+  font: string = LABEL_FONT,
 ): void {
   ctx.save();
-  ctx.font = LABEL_FONT;
+  ctx.font = font;
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.textBaseline = baseline;
@@ -249,15 +250,19 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
     if (!placement.label || !texts.moduleLabels) continue;
     const r = placementRect(panel, sizesOf(scene), placement);
     if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) {
-      const start = levelLabelStart(panel, sizesOf(scene), (c) => combInfoOf(scene, c), r, placement.rail);
-      const room = placementLabelRoom(panel, placement, { ...r, width: start - r.x });
-      drawLevelLabel(ctx, placement.label, start + LEVEL_LABEL_GAP, r.y + r.height / 2, room, 'left', 'middle', theme().label);
+      const side = levelLabelSide(placement);
+      const edge = levelLabelEdge(panel, sizesOf(scene), (c) => combInfoOf(scene, c), r, placement.rail, side);
+      const room = levelLabelRoom(panel, edge, side);
+      drawLevelLabel(ctx, placement.label, edge + (side === 'right' ? LEVEL_LABEL_GAP : -LEVEL_LABEL_GAP), r.y + r.height / 2, room, side === 'right' ? 'left' : 'right', 'middle', theme().label);
     } else {
       drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
     }
   }
   if (texts.terminalLabels) {
-    for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
+    for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) {
+      if (label.direction === 'up') drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
+      else drawLevelLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', 'middle', theme().label, TERMINAL_LABEL_FONT);
+    }
   }
   ctx.font = LABEL_FONT;
   ctx.fillStyle = theme().label;

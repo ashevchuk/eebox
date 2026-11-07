@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPanel } from '../src/layout/panel';
 import type { Panel, Sizes } from '../src/layout/placement';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM } from '../src/library/types';
-import { COMB_HEIGHT, COMB_OVERHANG, FRAME_PADDING, RAIL_HEIGHT, combRect, levelLabelStart, moduleRect, placementRect, printArea, railAtPoint, railRect, rowRect, snapToSlot } from '../src/view/geometry';
+import { COMB_HEIGHT, COMB_OVERHANG, FRAME_PADDING, RAIL_HEIGHT, combRect, levelLabelEdge, levelLabelSide, moduleRect, placementRect, printArea, railAtPoint, railRect, rowRect, snapToSlot } from '../src/view/geometry';
 
 const AXIS_X_MM = 300;
 const TOP_Y_MM = 60;
@@ -93,17 +93,17 @@ describe('the label of a module on a vertical rail', () => {
   it('starts at the right edge of the module when no comb is over it', () => {
     const panel = panelWithVerticalRail();
     const body = moduleRect(panel, 1, 0, 2, DIN_MODULE_HEIGHT_MM);
-    expect(levelLabelStart(panel, sizes, combOf('top'), body, 1)).toBe(body.x + body.width);
+    expect(levelLabelEdge(panel, sizes, combOf('top'), body, 1, 'right')).toBe(body.x + body.width);
   });
 
   it('starts after a comb of top terminals that lies over the module, and ignores one of bottom terminals or on other modules', () => {
     const panel = withComb();
     const body = moduleRect(panel, 1, 0, 2, DIN_MODULE_HEIGHT_MM);
     const comb = combRect(panel, sizes, 1, 0, 6, 'top');
-    expect(levelLabelStart(panel, sizes, combOf('top'), body, 1)).toBe(comb.x + comb.width);
-    expect(levelLabelStart(panel, sizes, combOf('bottom'), body, 1)).toBe(body.x + body.width);
+    expect(levelLabelEdge(panel, sizes, combOf('top'), body, 1, 'right')).toBe(comb.x + comb.width);
+    expect(levelLabelEdge(panel, sizes, combOf('bottom'), body, 1, 'right')).toBe(body.x + body.width);
     const farBody = moduleRect(panel, 1, 8, 2, DIN_MODULE_HEIGHT_MM);
-    expect(levelLabelStart(panel, sizes, combOf('top'), farBody, 1)).toBe(farBody.x + farBody.width);
+    expect(levelLabelEdge(panel, sizes, combOf('top'), farBody, 1, 'right')).toBe(farBody.x + farBody.width);
   });
 });
 
@@ -139,6 +139,15 @@ describe('the full-size print of a vertical rail', () => {
     expect(rects.some((r) => r.x === comb.x + comb.width && r.width > 0 && r.height === 10)).toBe(true);
   });
 
+  it('covers the label of a module with named top terminals on its left', () => {
+    const base = labelled();
+    const long = 'A long name of a terminal block';
+    const panel = { ...base, placements: [{ ...base.placements[0]!, label: long, terminalLabels: { 'top:1': 'X1:1' } }] };
+    const body = placementRect(panel, sizes, panel.placements[0]!);
+    const { bounds } = printArea(panel, sizes, () => undefined, measure);
+    expect(bounds.minX).toBeLessThanOrEqual(body.x - measure(long));
+  });
+
   it('covers the label of a comb on the vertical rail, on the side of its terminals', () => {
     const base = labelled();
     const comb = (side: 'top' | 'bottom') => ({ ...base, combs: [{ id: 'c1', module: { libraryId: 'l', moduleId: 'comb' }, rail: 1, slot: 0, label: COMB_LABEL }] });
@@ -149,5 +158,25 @@ describe('the full-size print of a vertical rail', () => {
       if (side === 'top') expect(bounds.maxX).toBeGreaterThanOrEqual(strip.x + strip.width + measure(COMB_LABEL));
       else expect(bounds.minX).toBeLessThanOrEqual(strip.x - measure(COMB_LABEL));
     }
+  });
+});
+
+describe('the side of the label of a module on a vertical rail', () => {
+  const placed = (terminalLabels?: Record<string, string>) => ({ id: 'p1', module: { libraryId: 'l', moduleId: 'm' }, rail: 1, slot: 0, ...(terminalLabels ? { terminalLabels } : {}) });
+
+  it('is the right, unless the top terminals have names, which are read on the right, and then the left', () => {
+    expect(levelLabelSide(placed())).toBe('right');
+    expect(levelLabelSide(placed({ 'bottom:1': 'X' }))).toBe('right');
+    expect(levelLabelSide(placed({ 'top:1': 'X1:1' }))).toBe('left');
+  });
+
+  it('starts at the left edge of the module, or the edge of a comb of bottom terminals over it that sticks out on that side', () => {
+    const panel = { ...panelWithVerticalRail(), combs: [{ id: 'c1', module: { libraryId: 'l', moduleId: 'comb' }, rail: 1, slot: 0 }] };
+    const body = moduleRect(panel, 1, 0, 2, DIN_MODULE_HEIGHT_MM);
+    const strip = combRect(panel, sizes, 1, 0, 6, 'bottom');
+    const info = (side: 'top' | 'bottom') => () => ({ widthUnits: 6, side });
+    expect(levelLabelEdge(panel, sizes, info('top'), body, 1, 'left')).toBe(body.x);
+    expect(levelLabelEdge(panel, sizes, info('bottom'), body, 1, 'left')).toBe(strip.x);
+    expect(strip.x).toBeLessThan(body.x);
   });
 });

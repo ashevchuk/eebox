@@ -126,25 +126,39 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
 
 /** How far a label under a placed module may run: down to what is below it on its rail, or to the end of the frame for a device on the plate. */
 export function placementLabelRoom(panel: Panel, placement: Placement, body: Rect): number {
-  if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) return Math.max(0, frameRect(panel).width - (body.x + body.width) - LABEL_GAP);
   return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : Math.max(0, frameRect(panel).height - (body.y + body.height) - LABEL_GAP);
 }
 
 type CombInfoOf = (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined;
 
+export type LabelSide = 'left' | 'right';
+
 /**
- * Where the label of a module on a vertical rail may start: right of the module, and right of a comb of
- * top terminals that lies over it, which sticks out on the same side.
+ * The side of a module on a vertical rail that its label stands on: the right, unless its top terminals carry
+ * names of their own, which are read on the right, and then the left.
  */
-export function levelLabelStart(panel: Panel, sizes: Sizes, combInfoOf: CombInfoOf, body: Rect, rail: number): number {
-  let edge = body.x + body.width;
+export function levelLabelSide(placement: Placement): LabelSide {
+  return Object.keys(placement.terminalLabels ?? {}).some((id) => id.startsWith('top:')) ? 'left' : 'right';
+}
+
+/**
+ * The edge that the level label of a module on a vertical rail starts from: the edge of the module on that side,
+ * or the edge of a comb that lies over it on that side and sticks out (top terminals face right, bottom ones left).
+ */
+export function levelLabelEdge(panel: Panel, sizes: Sizes, combInfoOf: CombInfoOf, body: Rect, rail: number, side: LabelSide): number {
+  let edge = side === 'right' ? body.x + body.width : body.x;
   for (const comb of panel.combs) {
     const info = comb.rail === rail ? combInfoOf(comb) : undefined;
-    if (info?.side !== 'top') continue;
+    if (info?.side !== (side === 'right' ? 'top' : 'bottom')) continue;
     const r = combRect(panel, sizes, comb.rail, comb.slot, info.widthUnits, info.side);
-    if (r.y < body.y + body.height && body.y < r.y + r.height) edge = Math.max(edge, r.x + r.width);
+    if (r.y < body.y + body.height && body.y < r.y + r.height) edge = side === 'right' ? Math.max(edge, r.x + r.width) : Math.min(edge, r.x);
   }
   return edge;
+}
+
+/** How long a level label that starts from `edge` may run: to the frame on that side, as the labels under modules run to the bottom of it. */
+export function levelLabelRoom(panel: Panel, edge: number, side: LabelSide): number {
+  return Math.max(0, side === 'right' ? frameRect(panel).width - edge - LABEL_GAP : edge - LABEL_GAP);
 }
 
 export function combAtPoint(
@@ -309,9 +323,10 @@ export function printArea(
     rects.push(r);
     if (p.label) {
       if (isOnRail(p) && isVertical(panel.rails[p.rail])) {
-        const start = levelLabelStart(panel, sizes, combInfoOf, r, p.rail);
-        const length = Math.min(measure(p.label), placementLabelRoom(panel, p, { ...r, width: start - r.x }));
-        rects.push({ x: start, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
+        const side = levelLabelSide(p);
+        const edge = levelLabelEdge(panel, sizes, combInfoOf, r, p.rail, side);
+        const length = Math.min(measure(p.label), levelLabelRoom(panel, edge, side));
+        rects.push({ x: side === 'right' ? edge : edge - PRINT_LABEL_START_MM - length, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
       } else {
         const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
         rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
