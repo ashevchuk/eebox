@@ -390,6 +390,16 @@ export function drawThumbnail(canvas: HTMLCanvasElement, def: ModuleDef, sizePx:
   else drawFace(ctx, def, box, def.widthUnits, false);
 }
 
+/** A thin frame close to the body, so the frames of modules that stand side by side do not run into each other. */
+const FINDING_FRAME_WIDTH_MM = 1.2;
+const FINDING_FRAME_GAP_MM = 1.5;
+
+function drawFindingFrame(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; width: number; height: number }, mark: 'error' | 'advice'): void {
+  ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
+  ctx.lineWidth = FINDING_FRAME_WIDTH_MM;
+  ctx.strokeRect(rect.x - FINDING_FRAME_GAP_MM, rect.y - FINDING_FRAME_GAP_MM, rect.width + 2 * FINDING_FRAME_GAP_MM, rect.height + 2 * FINDING_FRAME_GAP_MM);
+}
+
 const RULER_COLOR = '#f5c518';
 
 /** A line with a tick at each end and its length beside it; sizes are given in screen pixels so it reads at any zoom. */
@@ -512,10 +522,7 @@ export function render(
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
     const mark = scene.marked?.get(placement.id);
     if (mark) {
-      const r = placementRect(panel, sizes, placement);
-      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+      drawFindingFrame(ctx, placementRect(panel, sizes, placement), mark);
     }
     if (placement.id === scene.selectedPlacementId || scene.selectedIds?.has(placement.id)) {
       const r = placementRect(panel, sizes, placement);
@@ -528,10 +535,7 @@ export function render(
     ctx.globalAlpha = duct.id === scene.moving?.id && scene.moving.kind === 'duct' ? 0.35 : 1;
     const mark = scene.marked?.get(duct.id);
     if (mark) {
-      const r = ductRect(duct);
-      ctx.strokeStyle = mark === 'error' ? '#ef4444' : '#f59e0b';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+      drawFindingFrame(ctx, ductRect(duct), mark);
     }
     if (scene.selectedIds?.has(duct.id)) {
       const r = ductRect(duct);
