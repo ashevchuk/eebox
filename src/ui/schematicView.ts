@@ -52,7 +52,7 @@ import {
 import { CONDUCTORS, type Conductor } from '../library/types';
 import type { Project } from '../project';
 import { Camera, type Bounds, type Point } from '../view/Camera';
-import { drawConductorDot, strokeConductor } from '../view/conductorDraw';
+import { drawConductorDot, drawFerrules, strokeConductor } from '../view/conductorDraw';
 import { rectBetween } from '../view/geometry';
 import { theme } from '../view/theme';
 import type { TextVisibility } from '../view/textVisibility';
@@ -207,7 +207,10 @@ export class SchematicView implements View {
       const dead = power.deadWires.has(wire.id);
       if (chosenWires.has(wire.id)) this.strokePath(ctx, path, SELECTION_HALO, 10);
       if (dead) this.strokePath(ctx, path, COLORS.dead, 2.5, DEAD_WIRE_DASH);
-      else strokeConductor(ctx, path, conductor, 2.5);
+      else {
+        strokeConductor(ctx, path, conductor, 2.5);
+        drawFerrules(ctx, path, conductor);
+      }
     }
     this.drawWireEditing(ctx, frame, routes);
     for (const { node } of frame.layout.values()) {
