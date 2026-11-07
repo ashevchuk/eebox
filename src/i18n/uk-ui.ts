@@ -269,6 +269,9 @@ export const UI: Dictionary = {
   'House panel': `Щит будинку`,
   'Three phase: main switch, RCD, neutral and earth bars, a 3-phase comb over single-pole breakers, and three loads with cables.':
     `Три фази: вступний вимикач, УЗО, шини N і PE, трифазна гребінка над однополюсними автоматами й три навантаження з кабелями.`,
+  'House panel with vertical bars': `Щит будинку з вертикальними шинами`,
+  'The house panel with its neutral and earth bars as bars of one row of 12 terminals on a vertical rail beside the rows: the input on the first terminal, the loads on the next ones.':
+    `Щит будинку, у якого шини N і PE це шини в один ряд на 12 клем на вертикальній рейці поряд з рядами: вхід на першій клемі, навантаження на наступних.`,
   'Workshop with a backup input': `Майстерня з резервним вводом`,
   'Three phase with a generator: a changeover switch between mains and generator, an RCD, a lathe on a 3-pole breaker and the lighting.':
     `Три фази з генератором: перемикач між мережею та генератором, УЗО, верстат на триполюсному автоматі й освітлення.`,

@@ -37,4 +37,36 @@ describe('the Ukrainian text of the plate and the terminal features', () => {
     expect(t('top 12 \u00b7 no bottom')).toBe('\u0432\u0435\u0440\u0445 12 \u00b7 \u0431\u0435\u0437 \u043d\u0438\u0437\u0443');
     expect(t('no top \u00b7 bottom N1 N2')).toBe('\u0431\u0435\u0437 \u0432\u0435\u0440\u0445\u0443 \u00b7 \u043d\u0438\u0437 N1 N2');
   });
+
+  it('turns the side in the end of a wire, and still the sides in a summary of terminals', () => {
+    expect(t('Main switch \u00b7 bottom L1')).toBe('Main switch \u00b7 \u043d\u0438\u0437 L1');
+    expect(t('Kitchen sockets \u00b7 top N')).toBe('Kitchen sockets \u00b7 \u0432\u0435\u0440\u0445 N');
+    expect(t('top 12 \u00b7 bottom 12')).toBe('\u0432\u0435\u0440\u0445 12 \u00b7 \u043d\u0438\u0437 12');
+    expect(t('top L1 L2 \u00b7 bottom L1 L2')).toBe('\u0432\u0435\u0440\u0445 L1 L2 \u00b7 \u043d\u0438\u0437 L1 L2');
+  });
+
+  it('turns the labels, hints and options of the inspector of a source, a load, a comb and a switch into Ukrainian', () => {
+    for (const phrase of ['Source', 'Conductors', 'not stated', 'kA at the panel; empty for unknown', 'mOhm phase to neutral; empty for unknown', 'from 0.1 to 1; empty for 1', 'm from the panel; empty for unknown', 'lighting', 'Current', 'Comb', 'Pins', 'closed', 'rail', 'plate', 'both']) {
+      expect(HAS_ENGLISH.test(t(phrase)), phrase).toBe(false);
+    }
+  });
+
+  it('turns the note about the cable table into Ukrainian as a whole', () => {
+    const note = 'Ampacities (copper, PVC, 30 \u00b0C, 1.5 to 35 mm\u00b2) match IEC 60364-5-52:2009 tables B.52.2, B.52.4 and B.52.10; resistivity, reactance, voltage drop limits and trip multiples are not verified. Replace them in File > Cable settings.';
+    expect(t(note)).not.toBe(note);
+    expect(HAS_ENGLISH.test(t(note).replace(/IEC/g, ''))).toBe(false);
+  });
+
+  it('turns the end of a wire into Ukrainian, and the summary of terminals is still read as a whole', () => {
+    expect(t('Main switch \u00b7 bottom L1')).toBe('Main switch \u00b7 \u043d\u0438\u0437 L1');
+    expect(t('Kitchen \u00b7 top N')).toBe('Kitchen \u00b7 \u0432\u0435\u0440\u0445 N');
+    expect(t('top L1 L2 \u00b7 bottom L1 L2')).toBe('\u0432\u0435\u0440\u0445 L1 L2 \u00b7 \u043d\u0438\u0437 L1 L2');
+  });
+
+  it('turns the labels and hints of the inspector of a source, a load and a comb into Ukrainian', () => {
+    for (const phrase of ['Source', 'Conductors', 'not stated', 'kA at the panel; empty for unknown', 'mOhm phase to neutral; empty for unknown', 'from 0.1 to 1; empty for 1', 'm from the panel; empty for unknown', 'lighting', 'Current', 'Comb', 'Pins', 'closed', 'rail', 'plate', 'both']) {
+      expect(HAS_ENGLISH.test(t(phrase)), phrase).toBe(false);
+    }
+    expect(HAS_ENGLISH.test(t('Ampacities (copper, PVC, 30 \u00b0C, 1.5 to 35 mm\u00b2) match IEC 60364-5-52:2009 tables B.52.2, B.52.4 and B.52.10; resistivity, reactance, voltage drop limits and trip multiples are not verified. Replace them in File > Cable settings.').replace(/IEC|PVC|B\.52\.\d+/g, ''))).toBe(false);
+  });
 });
