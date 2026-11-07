@@ -3,6 +3,7 @@ import { ductsOf, type Duct } from '../layout/ducts';
 import { isFree, isOnRail, type CombPlacement, type Panel, type Placement, type Sizes } from '../layout/placement';
 import { DIN_MODULE_HEIGHT_MM, type TerminalSide } from '../library/types';
 import { FIRST_RAIL_Y_MM } from '../layout/limits';
+import { isVertical } from '../layout/rail';
 import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
 import type { Bounds, Point } from './Camera';
 
@@ -21,26 +22,28 @@ export interface Rect {
   height: number;
 }
 
-export function railCenterY(panel: Panel, rail: number): number {
-  return FRAME_PADDING + (panel.rails[rail]?.y ?? 0);
-}
-
+/** The bar of a rail: along `x` for a horizontal rail, along `y` for a vertical one. */
 export function railRect(panel: Panel, rail: number): Rect {
-  return {
-    x: FRAME_PADDING + (panel.rails[rail]?.x ?? 0),
-    y: railCenterY(panel, rail) - RAIL_HEIGHT / 2,
-    width: (panel.rails[rail]?.lengthUnits ?? 0) * MODULE_UNIT_MM,
-    height: RAIL_HEIGHT,
-  };
+  const r = panel.rails[rail];
+  const length = (r?.lengthUnits ?? 0) * MODULE_UNIT_MM;
+  if (isVertical(r)) return { x: FRAME_PADDING + (r?.x ?? 0) - RAIL_HEIGHT / 2, y: FRAME_PADDING + (r?.y ?? 0), width: RAIL_HEIGHT, height: length };
+  return { x: FRAME_PADDING + (r?.x ?? 0), y: FRAME_PADDING + (r?.y ?? 0) - RAIL_HEIGHT / 2, width: length, height: RAIL_HEIGHT };
 }
 
+/** The middle of the rail's bar, from the top of the drawing. */
+export function railCenterY(panel: Panel, rail: number): number {
+  const r = railRect(panel, rail);
+  return r.y + r.height / 2;
+}
+
+/**
+ * Where a module stands on a rail. On a vertical rail the module is turned a quarter turn clockwise:
+ * its width runs down the rail, its height across it, and its top faces right.
+ */
 export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits: number, heightMm: number): Rect {
-  return {
-    x: railRect(panel, rail).x + slot * MODULE_UNIT_MM,
-    y: railCenterY(panel, rail) - heightMm / 2,
-    width: widthUnits * MODULE_UNIT_MM,
-    height: heightMm,
-  };
+  const bar = railRect(panel, rail);
+  if (isVertical(panel.rails[rail])) return { x: bar.x + bar.width / 2 - heightMm / 2, y: bar.y + slot * MODULE_UNIT_MM, width: heightMm, height: widthUnits * MODULE_UNIT_MM };
+  return { x: bar.x + slot * MODULE_UNIT_MM, y: bar.y + bar.height / 2 - heightMm / 2, width: widthUnits * MODULE_UNIT_MM, height: heightMm };
 }
 
 /** Where a placed module stands, by the size its module has; a module that is not in any library is drawn standard-sized. */
@@ -55,8 +58,9 @@ export function placementRect(panel: Panel, sizes: Sizes, placement: Placement):
 export function rowRect(panel: Panel, sizes: Sizes, rail: number): Rect {
   const heights = panel.placements.filter(isOnRail).filter((p) => p.rail === rail).map((p) => sizes.heightOf(p) ?? DIN_MODULE_HEIGHT_MM);
   const height = Math.max(DIN_MODULE_HEIGHT_MM, ...heights);
-  const { x, width } = railRect(panel, rail);
-  return { x, y: railCenterY(panel, rail) - height / 2, width, height };
+  const bar = railRect(panel, rail);
+  if (isVertical(panel.rails[rail])) return { x: bar.x + bar.width / 2 - height / 2, y: bar.y, width: height, height: bar.height };
+  return { x: bar.x, y: bar.y + bar.height / 2 - height / 2, width: bar.width, height };
 }
 
 export function ductRect(duct: Duct): Rect {
@@ -97,6 +101,10 @@ export function combRect(
   side: TerminalSide,
 ): Rect {
   const module = moduleRect(panel, rail, slot, widthUnits, heightUnderComb(panel, sizes, rail, slot, widthUnits));
+  if (isVertical(panel.rails[rail])) {
+    const x = side === 'top' ? module.x + module.width - (COMB_HEIGHT - COMB_OVERHANG) : module.x - COMB_OVERHANG;
+    return { x, y: module.y, width: COMB_HEIGHT, height: module.height };
+  }
   const y = side === 'top' ? module.y - COMB_OVERHANG : module.y + module.height - (COMB_HEIGHT - COMB_OVERHANG);
   return { x: module.x, y, width: module.width, height: COMB_HEIGHT };
 }
@@ -109,15 +117,16 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
   const bottom = railCenterY(panel, rail) + heightMm / 2;
   const here = railRect(panel, rail);
   const below = panel.rails
-    .map((_r, i) => railRect(panel, i))
-    .filter((r, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
-    .map((r) => r.y + r.height / 2 - DIN_MODULE_HEIGHT_MM / 2 - COMB_OVERHANG);
+    .map((r, i) => ({ r: railRect(panel, i), vertical: isVertical(r) }))
+    .filter(({ r }, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
+    .map(({ r, vertical }) => (vertical ? r.y : r.y + r.height / 2 - DIN_MODULE_HEIGHT_MM / 2) - COMB_OVERHANG);
   const limit = below.length > 0 ? Math.min(...below) : frameRect(panel).height;
   return Math.max(0, limit - bottom - LABEL_GAP);
 }
 
 /** How far a label under a placed module may run: down to what is below it on its rail, or to the end of the frame for a device on the plate. */
 export function placementLabelRoom(panel: Panel, placement: Placement, body: Rect): number {
+  if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) return Math.max(0, frameRect(panel).width - (body.x + body.width) - LABEL_GAP);
   return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : Math.max(0, frameRect(panel).height - (body.y + body.height) - LABEL_GAP);
 }
 
@@ -164,19 +173,26 @@ export function snapToSlot(
   widthUnits: number,
   anchorUnits: number,
   neighbours: readonly Neighbour[] = [],
+  accepts: (rail: number) => boolean = () => true,
 ): { rail: number; slot: number } | null {
-  const heightOf = (i: number) => Math.abs(point.y - railCenterY(panel, i));
-  const outsideOf = (i: number) => {
-    const r = railRect(panel, i);
-    return Math.max(r.x - point.x, 0, point.x - (r.x + r.width));
+  const usable = panel.rails.map((_r, i) => i).filter(accepts);
+  const crossOf = (i: number) => {
+    const bar = railRect(panel, i);
+    return isVertical(panel.rails[i]) ? Math.abs(point.x - (bar.x + bar.width / 2)) : Math.abs(point.y - (bar.y + bar.height / 2));
   };
-  const nearest = Math.min(Infinity, ...panel.rails.map((_r, i) => heightOf(i)));
+  const outsideOf = (i: number) => {
+    const bar = railRect(panel, i);
+    return isVertical(panel.rails[i]) ? Math.max(bar.y - point.y, 0, point.y - (bar.y + bar.height)) : Math.max(bar.x - point.x, 0, point.x - (bar.x + bar.width));
+  };
+  const nearest = Math.min(Infinity, ...usable.map(crossOf));
   // Rails side by side in one row are told apart by how far the point is from their length; a point past the end of a rail still belongs to it.
-  const row = panel.rails.map((_r, i) => i).filter((i) => heightOf(i) <= nearest + RAIL_HEIGHT / 2);
-  const rail = row.reduce((best, i) => (best < 0 || outsideOf(i) < outsideOf(best) || (outsideOf(i) === outsideOf(best) && heightOf(i) < heightOf(best)) ? i : best), -1);
+  const row = usable.filter((i) => crossOf(i) <= nearest + RAIL_HEIGHT / 2);
+  const rail = row.reduce((best, i) => (best < 0 || outsideOf(i) < outsideOf(best) || (outsideOf(i) === outsideOf(best) && crossOf(i) < crossOf(best)) ? i : best), -1);
   const railLength = panel.rails[rail]?.lengthUnits;
   if (railLength === undefined || nearest > SNAP_DISTANCE) return null;
-  const raw = (point.x - railRect(panel, rail).x) / MODULE_UNIT_MM - anchorUnits;
+  const bar = railRect(panel, rail);
+  const alongPoint = isVertical(panel.rails[rail]) ? point.y - bar.y : point.x - bar.x;
+  const raw = alongPoint / MODULE_UNIT_MM - anchorUnits;
   const last = Math.max(0, railLength - widthUnits);
   const edges = [
     0,
