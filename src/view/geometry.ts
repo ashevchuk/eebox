@@ -256,16 +256,18 @@ export const rowLabelX = (panel: Panel, rail: number): number => railRect(panel,
  * What a drawing of the panel at full size has to cover: the rails, the modules, the combs and the
  * labels, with a margin, and not the empty frame around them. `rects` are the parts that hold
  * something, so a sheet that holds none of them can be left out. `measure` is the length of a text
- * in mm, since a label runs only as far as it is long.
+ * in mm, since a label runs only as far as it is long. `extra` are further boxes that hold something,
+ * such as the names over the terminals of a terminal block.
  */
 export function printArea(
   panel: Panel,
   sizes: Sizes,
   combInfoOf: (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined,
   measure: (text: string) => number,
+  extra: readonly Rect[] = [],
 ): { bounds: Bounds; rects: Rect[] } {
   const rects: Rect[] = panel.rails.map((_r, rail) => railRect(panel, rail));
-  rects.push(...ductsOf(panel).map(ductRect));
+  rects.push(...ductsOf(panel).map(ductRect), ...extra);
   for (const p of panel.placements) {
     const r = placementRect(panel, sizes, p);
     rects.push(r);

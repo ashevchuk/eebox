@@ -1,6 +1,7 @@
 import { drawArt } from './art';
 import { FONT_FAMILY } from './font';
 import { drawConductorDot } from './conductorDraw';
+import { terminalLabels, terminalX } from './terminalLabels';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
@@ -114,7 +115,6 @@ export const LEVER_COLORS: Record<ModuleKind, string> = {
 };
 
 const PIN_RADIUS = 2.4;
-const PIN_SPACING = 5;
 
 const COLORS = {
   rail: '#9aa1b3',
@@ -175,6 +175,8 @@ const itemWidth = (scene: Scene, item: { module: ModuleRef; widthUnits?: number 
   item.widthUnits ?? scene.resolve(item.module)?.widthUnits ?? 1;
 
 const LABEL_FONT = `8px ${FONT_FAMILY}`;
+/** Terminals of a clamp stand about 5 mm apart, so their names are set smaller than the labels under modules. */
+const TERMINAL_LABEL_FONT = `4.5px ${FONT_FAMILY}`;
 const ROW_LABEL_MAX_LENGTH = 110;
 
 function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
@@ -193,9 +195,10 @@ function drawUpwardsLabel(
   maxLength: number,
   align: CanvasTextAlign,
   color: string,
+  font: string = LABEL_FONT,
 ): void {
   ctx.save();
-  ctx.font = LABEL_FONT;
+  ctx.font = font;
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
@@ -217,6 +220,9 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
     const r = placementRect(panel, sizesOf(scene), placement);
     drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
   }
+  if (texts.terminalLabels) {
+    for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
+  }
   ctx.font = LABEL_FONT;
   ctx.fillStyle = theme().label;
   ctx.textAlign = 'left';
@@ -237,10 +243,7 @@ function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, conductor:
 function drawTerminals(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number): void {
   const terminals = terminalsOf(def, widthUnits);
   for (const terminal of terminals) {
-    const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
-    const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * PIN_SPACING;
-    const x = r.x + (terminal.unit + 0.5) * MODULE_UNIT_MM + offset;
-    drawPin(ctx, x, terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, terminal.conductor);
+    drawPin(ctx, terminalX(terminals, terminal, r), terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, terminal.conductor);
   }
 }
 

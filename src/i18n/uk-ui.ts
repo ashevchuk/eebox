@@ -178,6 +178,7 @@ export const UI: Dictionary = {
   'Comb labels': `Назви гребінок`,
   'Ratings on modules (B16)': `Номінали на модулях (B16)`,
   'Names on modules': `Найменування на модулях`,
+  'Terminal names over terminal blocks': `Назви клем над клемниками`,
   'Text drawn on module faces': `Текст на лицьових панелях модулів`,
   'Node names': `Назви вузлів`,
   'Terminal names': `Назви клем`,

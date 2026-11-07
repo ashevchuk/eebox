@@ -1,6 +1,7 @@
 import { TILE_HEIGHT_MM, TILE_OVERLAP_MM, TILE_WIDTH_MM, sheetsWithContent, tileLayout } from '../project/tiles';
 import { FONT_FAMILY } from '../view/font';
 import { printArea } from '../view/geometry';
+import { labelBox, terminalLabels } from '../view/terminalLabels';
 import { LIGHT_THEME } from '../view/theme';
 import { renderToSvg } from './exportImage';
 import type { Session } from './session';
@@ -53,7 +54,9 @@ function plateTiles(session: Session, panelView: View, plateName: string): Print
     const def = session.resolve(item.module);
     return def?.comb ? { widthUnits: item.widthUnits ?? def.widthUnits, side: def.comb.side } : undefined;
   };
-  const { bounds, rects } = printArea(session.scope.panel, session.sizes, combInfo, (text) => measuring.measureText(text).width);
+  const measure = (text: string) => measuring.measureText(text).width;
+  const names = session.texts.terminalLabels ? terminalLabels(session.scope.panel, session.sizes, session.resolve).map((label) => labelBox(label, measure)) : [];
+  const { bounds, rects } = printArea(session.scope.panel, session.sizes, combInfo, measure, names);
   const widthMm = bounds.maxX - bounds.minX;
   const heightMm = bounds.maxY - bounds.minY;
   session.bareDrawing = true;
