@@ -103,8 +103,9 @@ export function moveRail(panel: Panel, from: number, to: number): PanelEditResul
   const last = panel.rails.length - 1;
   if (!inRange(from, 0, last) || !inRange(to, 0, last)) return failure('unknown-rail');
   if (panel.rails[from]!.plate !== panel.rails[to]!.plate) return failure('invalid-value');
-  // x and y mean something else on a vertical rail, and they stay with their place.
-  if (panel.rails[from]!.orientation !== panel.rails[to]!.orientation) return failure('invalid-value');
+  // x and y mean something else on a vertical rail and stay with their place, so only rows of one orientation trade places.
+  const between = panel.rails.slice(Math.min(from, to), Math.max(from, to) + 1);
+  if (between.some((r) => r.orientation !== panel.rails[from]!.orientation)) return failure('invalid-value');
   const order = [...panel.rails];
   order.splice(to, 0, ...order.splice(from, 1));
   const rails: Rail[] = order.map((r, i) => ({ ...r, x: panel.rails[i]!.x, y: panel.rails[i]!.y }));

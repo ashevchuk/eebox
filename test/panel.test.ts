@@ -205,7 +205,13 @@ describe('moveRail', () => {
     const panel = stocked();
     const mixed = { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r)) };
     expect(moveRail(mixed, 0, 1)).toEqual({ ok: false, error: 'invalid-value' });
-    expect(moveRail(mixed, 0, 2).ok).toBe(true);
+    expect(moveRail(mixed, 2, 1)).toEqual({ ok: false, error: 'invalid-value' });
+  });
+
+  it('refuses to move a row across a vertical one, since the rows in between would take over places of the other kind', () => {
+    const panel = stocked();
+    const mixed = { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r)) };
+    expect(moveRail(mixed, 0, 2)).toEqual({ ok: false, error: 'invalid-value' });
   });
 
   it('moves the combs of a row together with it', () => {
