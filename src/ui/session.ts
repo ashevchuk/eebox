@@ -81,6 +81,9 @@ export class Session {
   private scopeCache: { panel: object; plate: string; scope: PlateScope } | null = null;
   /** Whether the drawings mark the faults and the advice; off while exporting, so a drawing for others is not full of red. */
   marksVisible = true;
+  /** Whether the list of what Check found is open: the drawings mark the findings only then, and the one that was picked in the list. */
+  checkOpen = false;
+  private focusedMessage: string | null = null;
   private findingCache: { revision: object; libraries: Library[]; settings: CableSettings; list: Finding[] } | null = null;
   /** Draw only the rails and what stands on them, without the frame; set while the full-size print is made. */
   bareDrawing = false;
@@ -113,6 +116,19 @@ export class Session {
       this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: [...findFindings(this.project, this.resolve, this.cableSettings), ...findPlacementFindings(this.project, this.sizes, this.resolve), ...findDuctFillFindings(this.project, this.resolve)] };
     }
     return this.findingCache!.list;
+  }
+
+  /** The finding to keep marked after Check is closed, until something else is selected. */
+  focusFinding(finding: Finding): void {
+    this.focusedMessage = finding.message;
+    this.changed();
+  }
+
+  /** The findings the drawings mark: all while Check is open, the picked one after it is closed, none while exporting. */
+  get markedFindings(): Finding[] {
+    if (!this.marksVisible) return [];
+    if (this.checkOpen) return this.findings;
+    return this.focusedMessage === null ? [] : this.findings.filter((f) => f.message === this.focusedMessage);
   }
 
   get canUndo(): boolean {
@@ -170,6 +186,7 @@ export class Session {
 
   select(selection: Selection): void {
     this.selection = selection;
+    this.focusedMessage = null;
     const plate = plateOfSelection(this.project.panel, selection);
     if (plate) this.plateChosen = plate;
     this.changed();

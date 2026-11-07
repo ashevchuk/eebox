@@ -195,7 +195,7 @@ export class SchematicView implements View {
     this.drawCombLinks(ctx, frame);
     const routes = routeWires(frame.schematic, frame.layout);
     const { currents, power } = this.analysis();
-    const findings = this.session.marksVisible ? this.session.findings : [];
+    const findings = this.session.markedFindings;
     const markedWires = markedBy(findings, 'wires');
     const markedNodes = markedBy(findings, 'nodes');
     for (const wire of frame.schematic.wires) {

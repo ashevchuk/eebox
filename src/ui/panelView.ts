@@ -115,7 +115,7 @@ export class PanelView implements View {
         texts: this.session.texts,
         selectedAnnotationId: this.session.selection.annotationId ?? null,
         annotations: this.session.notesOf('panel'),
-        marked: this.session.marksVisible ? new Map([...markedBy(this.session.findings, 'placements'), ...markedBy(this.session.findings, 'ducts')]) : new Map(),
+        marked: this.session.marksVisible ? new Map([...markedBy(this.session.markedFindings, 'placements'), ...markedBy(this.session.markedFindings, 'ducts')]) : new Map(),
       },
       width,
       height,

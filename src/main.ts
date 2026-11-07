@@ -45,6 +45,7 @@ import { MinimapView } from './ui/minimapView';
 import { overviewOf, type Overview } from './ui/overview';
 import { searchProject } from './ui/search';
 import { SearchView } from './ui/searchView';
+import { checkState, shouldPulse, type CheckState } from './ui/checkState';
 import { ProblemsView } from './ui/problemsView';
 import type { Finding } from './electrical/problems';
 import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
@@ -160,7 +161,29 @@ function requestRender(): void {
   });
 }
 
+const checkButton = byId('check');
+let lastCheckState: CheckState | null = null;
+checkButton.addEventListener('animationend', () => checkButton.classList.remove('pulse'));
+
+/** The button of Check takes the colour of the worst thing found, shows how many there are and pulses when something new is found. */
+function syncCheckButton(): void {
+  const state = checkState(session.findings);
+  checkButton.classList.toggle('check-advice', state.level === 'advice');
+  checkButton.classList.toggle('check-error', state.level === 'error');
+  checkButton.classList.toggle('active', session.checkOpen);
+  // The count is drawn by the style from this attribute, so the text of the button stays "Check" for the translation and for anything that looks for it.
+  if (state.total > 0) checkButton.dataset.count = String(state.total);
+  else delete checkButton.dataset.count;
+  if (shouldPulse(lastCheckState, state)) {
+    checkButton.classList.remove('pulse');
+    void checkButton.offsetWidth;
+    checkButton.classList.add('pulse');
+  }
+  lastCheckState = state;
+}
+
 function syncUi(): void {
+  syncCheckButton();
   undoButton.disabled = !session.canUndo;
   redoButton.disabled = !session.canRedo;
   document.body.dataset.mode = session.mode;
@@ -936,6 +959,10 @@ const problemsView = new ProblemsView(
   byId('problems'),
   () => problemEntries(session.findings, projectWarnings(session.project, session.resolve, session.cableSettings)),
   (finding) => showFinding(finding),
+  (visible) => {
+    session.checkOpen = visible;
+    session.changed();
+  },
 );
 
 /** Takes the view to what a finding is about, selects it and puts it in the middle of the drawing. */
@@ -965,6 +992,7 @@ function showFinding(finding: Finding): void {
   const focus = focusOf(session.project, session.resolve, finding, session.mode);
   if (!focus) return showStatus('That is no longer on the drawing.', true);
   showFocus(focus, false);
+  session.focusFinding(finding);
 }
 
 /** Zooms to what is selected in this view; with nothing selected here it shows the whole drawing. */

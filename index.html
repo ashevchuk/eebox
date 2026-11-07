@@ -451,6 +451,13 @@
       .problem.error .problem-badge { color: var(--error); }
       .problem.advice .problem-badge { color: var(--accent); }
       .problem.note .problem-badge { color: var(--text-dim); }
+      #check.check-advice { border-color: var(--accent); color: var(--accent); --check-glow: rgba(245, 197, 24, 0.75); }
+      #check.check-error { border-color: var(--error); color: var(--error); --check-glow: rgba(248, 113, 113, 0.85); }
+      #check.active { background: rgba(255, 255, 255, 0.08); }
+      #check[data-count]::after { content: attr(data-count); margin-left: 6px; font-variant-numeric: tabular-nums; }
+      #check.pulse { animation: check-pulse 1.4s ease-in-out 3; }
+      @keyframes check-pulse { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 10px 3px var(--check-glow, transparent); } }
+      @media (prefers-reduced-motion: reduce) { #check.pulse { animation: none; } }
       #stage-wrap.drop::after {
         content: 'Drop library JSON';
         position: absolute;

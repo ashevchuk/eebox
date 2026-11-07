@@ -13,6 +13,7 @@ export class ProblemsView {
     private readonly root: HTMLElement,
     private readonly entries: () => ProblemEntry[],
     private readonly onPick: (finding: Finding) => void,
+    private readonly onVisibleChange: (visible: boolean) => void = () => {},
   ) {
     root.hidden = true;
   }
@@ -25,6 +26,7 @@ export class ProblemsView {
     this.shown = !this.shown;
     this.root.hidden = !this.shown;
     this.drawnFrom = null;
+    this.onVisibleChange(this.shown);
     if (this.shown) this.render();
   }
 
@@ -32,6 +34,7 @@ export class ProblemsView {
     this.shown = false;
     this.root.hidden = true;
     this.drawnFrom = null;
+    this.onVisibleChange(false);
   }
 
   /**
