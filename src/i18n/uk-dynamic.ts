@@ -130,6 +130,7 @@ export const DYNAMIC: Dictionary = {
   '{a} ({b}) is {c} mm from {d} ({e}), closer than the {f} mm kept clear.': `{a} ({b}) за {c} мм від {d} ({e}), ближче, ніж потрібні {f} мм зазору.`,
   '{a} ({b}) stands on the rail of row {c}.': `{a} ({b}) стоїть на рейці ряду {c}.`,
   '{a} ({b}) is made for the plate, not for a rail.': `{a} ({b}) призначений для плити, а не для рейки.`,
+  '{a} ({b}) is made for a horizontal rail, not for a vertical one.': `{a} ({b}) призначений для горизонтальної рейки, а не для вертикальної.`,
   '{a} ({b}) is made for a DIN rail, not for the plate.': `{a} ({b}) призначений для DIN-рейки, а не для плити.`,
   'Clearance is 0 to {n} mm.': `Зазор — від 0 до {n} мм.`,
   '{n} wire numbered.': ['{n} провід пронумеровано.', '{n} проводи пронумеровано.', '{n} проводів пронумеровано.'],

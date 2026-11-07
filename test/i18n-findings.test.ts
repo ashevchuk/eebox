@@ -51,6 +51,7 @@ const OTHER = [
   'placement p1: out-of-rail',
   'comb c1: not-a-comb',
   'duct d1 (d1) stands on MCB (p1).',
+  'MCB (p1) is made for a horizontal rail, not for a vertical one.',
 ];
 
 describe('the Ukrainian text of the findings of Check', () => {

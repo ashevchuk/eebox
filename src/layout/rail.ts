@@ -1,3 +1,5 @@
+import type { ModuleKind } from '../library/types';
+
 export const RAIL_ORIENTATIONS = ['horizontal', 'vertical'] as const;
 export type RailOrientation = (typeof RAIL_ORIENTATIONS)[number];
 
@@ -20,3 +22,6 @@ export interface Rail {
 }
 
 export const isVertical = (rail: Rail | undefined): boolean => rail?.orientation === 'vertical';
+
+/** What may stand on a vertical rail: bars, terminal blocks and combs. A protective device is made for a horizontal rail. */
+export const VERTICAL_RAIL_KINDS: readonly ModuleKind[] = ['terminal', 'busbar', 'comb'];
