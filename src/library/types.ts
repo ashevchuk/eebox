@@ -190,6 +190,12 @@ export interface ModuleDef {
    * units; single terminals stay single.
    */
   resizable?: ResizeSpec;
+  /**
+   * The terminals stand in a column down the side of a narrow bar, and not in a row along its top and bottom: the top
+   * ones down the right side, the bottom ones down the left. The `unit` of each is its distance from the top edge in
+   * units of 17.5 mm. Needs explicit terminals, each with a `unit` and none with a `count`, and cannot be resizable.
+   */
+  sideTerminals?: boolean;
   /** Needs explicit `terminals`, which it refers to. */
   logic?: ModuleLogic;
   /** What is drawn on the face of the module, under its name and terminals. */

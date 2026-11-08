@@ -1,5 +1,5 @@
 import { genericArt } from './genericArt';
-import { blockTerminals, evenPositions } from './terminalLayouts';
+import { blockTerminals, evenPositions, sidePositions } from './terminalLayouts';
 import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type ModuleDef, type SpdType, type TerminalDef } from './types';
 
 /**
@@ -23,7 +23,8 @@ const RESIZABLE_BAR = { minUnits: 2, maxUnits: 24 };
 const RESIZABLE_COMB = { minUnits: 2, maxUnits: 54 };
 
 /** What the series below describe: modules of the standard height that clip on a rail. */
-type DinModule = Omit<ModuleDef, 'heightMm' | 'mounting'>;
+/** A device on a DIN rail; it is a standard 90 mm high unless it says how high it is. */
+type DinModule = Omit<ModuleDef, 'heightMm' | 'mounting'> & { heightMm?: number };
 
 const poleLabel = (poles: 1 | 2 | 3 | 4) => `${poles}P`;
 const POLES = [1, 2, 3, 4] as const;
@@ -328,21 +329,25 @@ function contactors(): DinModule[] {
 
 type BarConductor = 'N' | 'PE' | 'PEN' | 'L' | 'L1' | 'L2' | 'L3';
 
-/** The bars of one row of terminals: the conductor each carries, and the prefixes of the names of the terminals on the top and the bottom side. */
-const ONE_ROW_BARS: ReadonlyArray<{ id: string; name: string; conductor: BarConductor; top: string; bottom: string }> = [
-  { id: 'n', name: 'Neutral', conductor: 'N', top: 'N', bottom: 'Nb' },
-  { id: 'pe', name: 'Earth', conductor: 'PE', top: 'PE', bottom: 'PEb' },
-  { id: 'pen', name: 'PEN', conductor: 'PEN', top: 'PEN', bottom: 'PENb' },
-  { id: 'l', name: 'Phase', conductor: 'L', top: 'L.', bottom: 'Lb.' },
-  { id: 'l1', name: 'Phase L1', conductor: 'L1', top: 'L1.', bottom: 'L1b.' },
-  { id: 'l2', name: 'Phase L2', conductor: 'L2', top: 'L2.', bottom: 'L2b.' },
-  { id: 'l3', name: 'Phase L3', conductor: 'L3', top: 'L3.', bottom: 'L3b.' },
+/** The narrow bars with a column of terminals: the conductor each carries, and the prefixes of the names of the terminals on the right (top) and the left (bottom) side. */
+const SIDE_BARS: ReadonlyArray<{ id: string; name: string; conductor: BarConductor; right: string; left: string }> = [
+  { id: 'n', name: 'Neutral', conductor: 'N', right: 'N', left: 'Nb' },
+  { id: 'pe', name: 'Earth', conductor: 'PE', right: 'PE', left: 'PEb' },
+  { id: 'pen', name: 'PEN', conductor: 'PEN', right: 'PEN', left: 'PENb' },
+  { id: 'l', name: 'Phase', conductor: 'L', right: 'L.', left: 'Lb.' },
+  { id: 'l1', name: 'Phase L1', conductor: 'L1', right: 'L1.', left: 'L1b.' },
+  { id: 'l2', name: 'Phase L2', conductor: 'L2', right: 'L2.', left: 'L2b.' },
+  { id: 'l3', name: 'Phase L3', conductor: 'L3', right: 'L3.', left: 'L3b.' },
 ];
 
-/** The distance between the terminals of a bar of one row, as drawn on the picture of real bars it follows: about 5 mm. */
-const ONE_ROW_PITCH_UNITS = 0.3;
-const ONE_ROW_COUNTS = [10, 12, 16];
-const roundUnits = (n: number): number => Math.round(n * 1e6) / 1e6;
+/** How many terminals a narrow bar has, and how tall it is for them, a little under 90 mm like any terminal block: about 5.5 to 6 mm for each terminal. */
+const SIDE_BAR_SIZES: ReadonlyArray<{ count: number; heightMm: number }> = [
+  { count: 10, heightMm: 60 },
+  { count: 12, heightMm: 72 },
+  { count: 16, heightMm: 88 },
+];
+/** As wide as a narrow bar on the pictures of real ones, which are about 12 mm. */
+const SIDE_BAR_WIDTH_UNITS = 0.7;
 
 function bars(): DinModule[] {
   const bar = (id: string, name: string, conductor: 'N' | 'PE' | 'PEN', top: string, bottom: string): DinModule => ({
@@ -358,26 +363,26 @@ function bars(): DinModule[] {
     ],
   });
   /**
-   * A bar of fixed width with all its terminals in one evenly spread row on one side: on a vertical rail the top side
-   * is the right and the bottom side the left. It is not resizable, because its terminals stand at fractions of a unit.
+   * A narrow bar of fixed size whose terminals stand in one evenly spread column down a side: the top (right) side or the
+   * bottom (left) side. It is not resizable, because its terminals stand at fractions of a unit.
    */
-  const oneRowBar = (id: string, name: string, conductor: BarConductor, terminal: string, side: 'top' | 'bottom', count: number): DinModule => {
-    const widthUnits = roundUnits(count * ONE_ROW_PITCH_UNITS);
-    return {
-      id,
-      kind: 'busbar',
-      name,
-      widthUnits,
-      poles: 1,
-      terminals: evenPositions(count, widthUnits).map((unit, i): TerminalDef => ({ name: `${terminal}${i + 1}`, conductor, side, net: conductor, unit })),
-    };
-  };
+  const sideBar = (id: string, name: string, conductor: BarConductor, prefix: string, side: 'top' | 'bottom', count: number, heightMm: number): DinModule => ({
+    id,
+    kind: 'terminal',
+    name,
+    shortName: `${conductor} ${count}`,
+    widthUnits: SIDE_BAR_WIDTH_UNITS,
+    heightMm,
+    poles: 1,
+    sideTerminals: true,
+    terminals: sidePositions(count, heightMm).map((unit, i): TerminalDef => ({ name: `${prefix}${i + 1}`, conductor, side, net: conductor, unit })),
+  });
   return [
     bar('n-bar-12', 'Neutral bar 12 terminals', 'N', 'N', 'Nb'),
-    ...ONE_ROW_BARS.flatMap(({ id, name, conductor, top, bottom }) =>
-      ONE_ROW_COUNTS.flatMap((count) => [
-        oneRowBar(`${id}-row-${count}`, `${name} bar ${count} terminals, one row`, conductor, top, 'top', count),
-        oneRowBar(`${id}-row-${count}-bottom`, `${name} bar ${count} terminals, one row, bottom`, conductor, bottom, 'bottom', count),
+    ...SIDE_BARS.flatMap(({ id, name, conductor, right, left }) =>
+      SIDE_BAR_SIZES.flatMap(({ count, heightMm }) => [
+        sideBar(`${id}-side-${count}-right`, `${name} bar ${count} terminals, right`, conductor, right, 'top', count, heightMm),
+        sideBar(`${id}-side-${count}-left`, `${name} bar ${count} terminals, left`, conductor, left, 'bottom', count, heightMm),
       ]),
     ),
     bar('pe-bar-12', 'Earth bar 12 terminals', 'PE', 'PE', 'PEb'),
@@ -684,7 +689,7 @@ const WIDTH_RANGES: Record<string, readonly [number, number]> = {
 const RELAY_WIDTH_RANGE = [1, 4] as const;
 const CHANGEOVER_EXTRA_UNITS = 6;
 
-const onRail = (def: DinModule): ModuleDef => ({ ...def, heightMm: DIN_MODULE_HEIGHT_MM, mounting: 'rail' });
+const onRail = (def: DinModule): ModuleDef => ({ ...def, heightMm: def.heightMm ?? DIN_MODULE_HEIGHT_MM, mounting: 'rail' });
 
 function withWidthRange(def: ModuleDef): ModuleDef {
   if (def.resizable) return def;
@@ -731,7 +736,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '19';
+export const GENERIC_LIBRARY_VERSION = '20';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths and the marked inputs of RCDs, surge protectors and power supplies are typical, not taken from any manufacturer; check the datasheet before ordering.';
 

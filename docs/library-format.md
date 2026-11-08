@@ -45,6 +45,7 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | `feed` | `top` or `bottom` | optional; the side that the maker makes the input of a device whose terminals are derived from `poles`, the other side being the output. Not allowed with `terminals` (give each terminal a `role`) or on a comb |
 | `comb` | object | required for, and only allowed on, kind `comb` |
 | `resizable` | object | optional, any kind; lets a placed copy have its own width |
+| `sideTerminals` | boolean | optional; the terminals stand in a column down the side of a narrow bar and not in a row along its top and bottom: the `top` ones down the right side, the `bottom` ones down the left. Their `unit` is the distance from the top edge in module units, `0.15` to `heightMm / 17.5 - 0.15`. Needs explicit `terminals`, each with a `unit` and none with a `count`; cannot be combined with `resizable` |
 | `logic` | object | optional; what a relay or contactor does with the voltages it senses, see below. Needs explicit `terminals` |
 | `price`, `currency` | optional | what one costs and its currency code, for pricing the parts list |
 

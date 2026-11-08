@@ -1,5 +1,5 @@
 import houseText from '../examples/house-panel.json?raw';
-import houseVerticalText from '../examples/house-panel-vertical.json?raw';
+import houseBarsText from '../examples/house-panel-bars.json?raw';
 import studioText from '../examples/studio-flat.json?raw';
 import workshopText from '../examples/workshop-backup.json?raw';
 import autoBackupText from '../examples/workshop-auto-backup.json?raw';
@@ -28,10 +28,10 @@ export const EXAMPLES: readonly Example[] = [
     text: houseText,
   },
   {
-    id: 'house-panel-vertical',
-    title: 'House panel with vertical bars',
-    description: 'The house panel with its neutral and earth bars as bars of one row of 12 terminals on a vertical rail beside the rows: the input on the first terminal, the loads on the next ones.',
-    text: houseVerticalText,
+    id: 'house-panel-bars',
+    title: 'House panel with narrow bars',
+    description: 'The house panel with its neutral and earth bars as narrow bars of 12 terminals in a column on the rail, the way they stand in a real board: the input on the first terminal, the loads on the next ones.',
+    text: houseBarsText,
   },
   {
     id: 'workshop-backup',

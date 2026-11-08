@@ -5,8 +5,7 @@ import type { Project } from '../project';
 import { FRAME_PADDING, placementRect } from '../view/geometry';
 import { DEFAULT_WIRE_SLACK_MM } from './limits';
 import { lookupsOf } from './lookups';
-import { isFree, isOnRail } from './placement';
-import { isVertical } from './rail';
+import { isFree } from './placement';
 
 /** What a wire adds for going from one plate to another, for example across a hinge to a door. */
 export const CROSS_PLATE_MM = 300;
@@ -43,10 +42,10 @@ export function wireRuns(project: Project, resolve: Resolve): Map<string, number
     const plate = panel.plates.find((p) => p.id === (isFree(placement) ? placement.plate : panel.rails[placement.rail]?.plate));
     if (!terminal || !plate) return null;
     const box = placementRect(panel, sizes, placement);
-    const turned = isOnRail(placement) && isVertical(panel.rails[placement.rail]);
     const along = terminal.unit * MODULE_UNIT_MM;
-    const x = turned ? (terminal.side === 'top' ? box.x + box.width : box.x) : box.x + along;
-    const y = turned ? box.y + along : terminal.side === 'top' ? box.y : box.y + box.height;
+    // Down a side of a narrow bar: the right edge for a top terminal and the left for a bottom one, at its distance from the top edge.
+    const x = def.sideTerminals ? box.x + (terminal.side === 'top' ? box.width : 0) : box.x + along;
+    const y = def.sideTerminals ? box.y + along : terminal.side === 'top' ? box.y : box.y + box.height;
     return { plate: plate.id, x: x - FRAME_PADDING, y: y - FRAME_PADDING, plateWidthMm: plate.widthMm, plateHeightMm: plate.heightMm };
   };
 

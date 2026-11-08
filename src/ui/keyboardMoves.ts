@@ -1,5 +1,4 @@
 import { isFree, isOnRail, type Panel } from '../layout/placement';
-import { isVertical } from '../layout/rail';
 import type { Schematic } from '../schematic/model';
 
 export type Arrow = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown';
@@ -10,25 +9,10 @@ const FINE_STEP_UNITS = 0.25;
 export const NODE_STEP_MM = 10;
 export const NODE_BIG_STEP_MM = 50;
 
-/**
- * How many rows and units an arrow key moves modules: along the rail and between rails. Along a horizontal
- * rail is left and right and between rails up and down; on a vertical rail it is the other way round.
- */
-export function panelStep(key: Arrow, fine: boolean, vertical = false): { rail: number; slot: number } {
+/** How many rows and units an arrow key moves modules: left and right along the rail, up and down between rails. */
+export function panelStep(key: Arrow, fine: boolean): { rail: number; slot: number } {
   const unit = fine ? FINE_STEP_UNITS : 1;
-  const sign = (negative: Arrow, positive: Arrow) => (key === negative ? -1 : key === positive ? 1 : 0);
-  return vertical
-    ? { rail: sign('ArrowLeft', 'ArrowRight'), slot: sign('ArrowUp', 'ArrowDown') * unit }
-    : { rail: sign('ArrowUp', 'ArrowDown'), slot: sign('ArrowLeft', 'ArrowRight') * unit };
-}
-
-/** True when every chosen module and comb that stands on a rail stands on a vertical one, so the arrows run the other way round. */
-export function onVerticalRails(panel: Panel, placementIds: readonly string[], combIds: readonly string[]): boolean {
-  const rails = [
-    ...panel.placements.filter(isOnRail).filter((p) => placementIds.includes(p.id)).map((p) => p.rail),
-    ...panel.combs.filter((c) => combIds.includes(c.id)).map((c) => c.rail),
-  ];
-  return rails.length > 0 && rails.every((rail) => isVertical(panel.rails[rail]));
+  return { rail: key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0, slot: key === 'ArrowLeft' ? -unit : key === 'ArrowRight' ? unit : 0 };
 }
 
 /** How far an arrow key moves a device on the plate or a duct, in millimetres: 1, with Shift 10, with Alt 0.5. */

@@ -272,6 +272,10 @@
         "resizable": {
           "$ref": "#/definitions/resizable"
         },
+        "sideTerminals": {
+          "type": "boolean",
+          "description": "The terminals stand in a column down the side of a narrow bar, and not in a row along its top and bottom: the top ones down the right side, the bottom ones down the left. The `unit` of each is its distance from the top edge in module units. Needs explicit terminals, each with a `unit` and none with a `count`, and cannot be combined with `resizable`."
+        },
         "price": {
           "type": "number",
           "minimum": 0,

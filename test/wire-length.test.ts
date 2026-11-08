@@ -33,13 +33,15 @@ describe('wireRuns', () => {
     expect(wireRuns(project, resolve).get('w1')).toBe(Math.round(Math.abs(along) + DIN_HEIGHT + DEFAULT_WIRE_SLACK_MM));
   });
 
-  it('measures down the rail and across it for modules turned on a vertical rail', () => {
-    const base = twoOnARail();
-    const upright: Project = { ...base, panel: { ...base.panel, rails: base.panel.rails.map((r) => ({ ...r, orientation: 'vertical' as const, x: 200, y: 60 })) } };
-    const sideBySide = wired(upright, ['n1', 'top:L'], ['n2', 'top:L']);
-    expect(wireRuns(sideBySide, resolve).get('w1')).toBe(4 * MODULE_UNIT_MM + DEFAULT_WIRE_SLACK_MM);
-    const across = wired(upright, ['n1', 'top:L'], ['n2', 'bottom:L']);
-    expect(wireRuns(across, resolve).get('w1')).toBe(4 * MODULE_UNIT_MM + DIN_HEIGHT + DEFAULT_WIRE_SLACK_MM);
+  it('measures between the terminals of narrow bars along the rail and down their height', () => {
+    const panel = panelOf([place('p1', 'colRight', 0, 0), place('p2', 'colRight', 0, 4)], [], [24]);
+    const base: Project = { panel, schematic: syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId) };
+    // The same side of the two bars: only the distance between them along the rail, 4 units.
+    const alongRail = wired(base, ['n1', 'top:A'], ['n2', 'top:A']);
+    expect(wireRuns(alongRail, resolve).get('w1')).toBe(4 * MODULE_UNIT_MM + DEFAULT_WIRE_SLACK_MM);
+    // Terminal B stands one unit lower on its bar than terminal A.
+    const down = wired(base, ['n1', 'top:A'], ['n2', 'top:B']);
+    expect(wireRuns(down, resolve).get('w1')).toBe(Math.round(4 * MODULE_UNIT_MM + MODULE_UNIT_MM + DEFAULT_WIRE_SLACK_MM));
   });
 
   it('takes the slack the panel sets, and the default again when it is set back', () => {

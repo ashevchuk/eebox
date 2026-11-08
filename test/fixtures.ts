@@ -89,6 +89,10 @@ export const defs: Record<string, ModuleDef> = {
     terminals: [{ name: 'PE', conductor: 'PE', side: 'top', net: 'PE', count: 3 }],
   },
   combLN: { id: 'combLN', kind: 'comb', name: 'Comb L+N', widthUnits: 4, heightMm: 90, mounting: 'rail', poles: 2, comb: { pattern: ['L', 'N'], side: 'top' } },
+  colRight: {
+    id: 'colRight', kind: 'terminal', name: 'Column, right', widthUnits: 0.7, heightMm: 70, mounting: 'rail', poles: 1, sideTerminals: true,
+    terminals: [{ name: 'A', conductor: 'N', side: 'top', unit: 0.5 }, { name: 'B', conductor: 'N', side: 'top', unit: 1.5 }],
+  },
   rowTop: {
     id: 'rowTop', kind: 'busbar', name: 'One row, top', widthUnits: 2, heightMm: 90, mounting: 'rail', poles: 1,
     terminals: [{ name: 'A', conductor: 'N', side: 'top', unit: 0 }, { name: 'B', conductor: 'N', side: 'top', unit: 1 }],

@@ -1,5 +1,6 @@
 import { placeArtFrom, type ArtShape, type PlacedShape } from '../library/art';
 import { MODULE_UNIT_MM, type Library, type ModuleDef } from '../library/types';
+import { pinPoint } from '../view/terminalLabels';
 import { terminalsOf } from '../electrical/terminals';
 import { FONT_FAMILY } from '../view/font';
 import { LEVER_COLORS } from '../view/render';
@@ -291,10 +292,7 @@ export class ArtEditorView {
   private drawReference(face: SVGElement, module: ModuleDef, scale: number): void {
     const terminals = terminalsOf(module, module.widthUnits);
     for (const terminal of terminals) {
-      const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
-      const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * 5;
-      const x = (terminal.unit + 0.5) * MODULE_UNIT_MM + offset;
-      const y = terminal.side === 'top' ? 7 : module.heightMm - 6;
+      const { x, y } = pinPoint(module, terminals, terminal, module.widthUnits * MODULE_UNIT_MM, module.heightMm);
       const style = conductorStyle(terminal.conductor);
       face.append(svgElement('circle', { cx: x * scale, cy: y * scale, r: 2.4 * scale, fill: style.color, stroke: style.outline ?? '#14161d', 'stroke-width': 1, 'pointer-events': 'none', opacity: 0.85 }));
     }

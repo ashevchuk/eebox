@@ -1,8 +1,6 @@
 import { nextCombId } from './combs';
 import { addRail } from './plates';
-import { DEFAULT_RAIL_PITCH_MM, MAX_RAIL_POSITION_MM } from './limits';
-import { moveRail, setRailLabel, setRailLength, setRailOrientation, setRailPosition, type PanelEditError, type PanelEditResult } from './panel';
-import { isVertical, type Rail } from './rail';
+import { moveRail, setRailLabel, setRailLength, type PanelEditError } from './panel';
 import { findProblems, isOnRail, nextPlacementId, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { roundUnits } from './units';
 
@@ -59,12 +57,6 @@ export function arrangeModules(panel: Panel, widthOf: WidthOf, ids: readonly str
 export type DuplicateRowResult = { ok: true; panel: Panel; placementIds: string[] } | { ok: false; error: PanelEditError };
 
 /** Puts a copy of a row, with its modules, combs and label, right below it. */
-/** The copy of a vertical row stands upright too, one pitch to the right of its source. */
-function turnedLikeSource(panel: Panel, copy: number, source: Rail): PanelEditResult {
-  const turned = setRailOrientation(panel, copy, source.orientation);
-  return turned.ok ? setRailPosition(turned.panel, copy, Math.min(source.x + DEFAULT_RAIL_PITCH_MM, MAX_RAIL_POSITION_MM), source.y) : turned;
-}
-
 export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   const source = panel.rails[rail];
   if (source === undefined) return { ok: false, error: 'unknown-rail' };
@@ -73,9 +65,7 @@ export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   const lastIndex = added.panel.rails.map((r) => r.plate).lastIndexOf(source.plate);
   const sized = setRailLength(added.panel, () => 1, lastIndex, source.lengthUnits);
   if (!sized.ok) return sized;
-  const turned: PanelEditResult = isVertical(source) ? turnedLikeSource(sized.panel, lastIndex, source) : sized;
-  if (!turned.ok) return turned;
-  const labelled = setRailLabel(turned.panel, lastIndex, source.label ?? '');
+  const labelled = setRailLabel(sized.panel, lastIndex, source.label ?? '');
   if (!labelled.ok) return labelled;
   let next: Panel = labelled.panel;
   const placementIds: string[] = [];
@@ -87,7 +77,6 @@ export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   for (const source of panel.combs.filter((c) => c.rail === rail)) {
     next = { ...next, combs: [...next.combs, { ...source, id: nextCombId(next), rail: lastIndex }] };
   }
-  // The copy goes right after its row when only rows of its own orientation lie in between, and at the end of the plate's rows otherwise.
   const placed = moveRail(next, lastIndex, rail + 1);
-  return { ok: true, panel: placed.ok ? placed.panel : next, placementIds };
+  return placed.ok ? { ok: true, panel: placed.panel, placementIds } : placed;
 }

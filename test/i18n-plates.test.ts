@@ -69,4 +69,10 @@ describe('the Ukrainian text of the plate and the terminal features', () => {
     }
     expect(HAS_ENGLISH.test(t('Ampacities (copper, PVC, 30 \u00b0C, 1.5 to 35 mm\u00b2) match IEC 60364-5-52:2009 tables B.52.2, B.52.4 and B.52.10; resistivity, reactance, voltage drop limits and trip multiples are not verified. Replace them in File > Cable settings.').replace(/IEC|PVC|B\.52\.\d+/g, ''))).toBe(false);
   });
+
+  it('turns what the inspector and the designer say of terminals down the sides into Ukrainian', () => {
+    for (const phrase of ['right N1 N2 \u00b7 no left', 'no right \u00b7 left Nb1', 'right 12 \u00b7 left 12', 'N1 (right)', 'N1 (left)', 'Label the right terminals', 'Label the left terminals', 'Terminal layout', 'in a row across the width', 'in a column down the sides', 'units from the top edge, decimals allowed']) {
+      expect(HAS_ENGLISH.test(t(phrase).replace(/N\d+|Nb\d+/g, '')), phrase).toBe(false);
+    }
+  });
 });

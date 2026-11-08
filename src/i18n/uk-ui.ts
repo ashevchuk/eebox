@@ -90,9 +90,6 @@ export const UI: Dictionary = {
   'No differences.': `Різниць немає.`,
   Project: `Проєкт`,
   Rows: `Ряди`,
-  '+ Vertical row': `+ Вертикальний ряд`,
-  'Add a row that runs down the plate, for bars, terminal blocks and combs': `Додати ряд уздовж плити, для шин, клемників і гребінок`,
-  centre: `вісь`,
   'Modules on the panel': `Модулі на щиті`,
   Combs: `Гребінки`,
   'Schematic nodes': `Вузли схеми`,
@@ -269,9 +266,9 @@ export const UI: Dictionary = {
   'House panel': `Щит будинку`,
   'Three phase: main switch, RCD, neutral and earth bars, a 3-phase comb over single-pole breakers, and three loads with cables.':
     `Три фази: вступний вимикач, УЗО, шини N і PE, трифазна гребінка над однополюсними автоматами й три навантаження з кабелями.`,
-  'House panel with vertical bars': `Щит будинку з вертикальними шинами`,
-  'The house panel with its neutral and earth bars as bars of one row of 12 terminals on a vertical rail beside the rows: the input on the first terminal, the loads on the next ones.':
-    `Щит будинку, у якого шини N і PE це шини в один ряд на 12 клем на вертикальній рейці поряд з рядами: вхід на першій клемі, навантаження на наступних.`,
+  'House panel with narrow bars': `Щит будинку з вузькими шинами`,
+  'The house panel with its neutral and earth bars as narrow bars of 12 terminals in a column on the rail, the way they stand in a real board: the input on the first terminal, the loads on the next ones.':
+    `Щит будинку, у якого шини N і PE це вузькі шини на 12 клем колонкою на рейці, як у справжньому щитку: вхід на першій клемі, навантаження на наступних.`,
   'Workshop with a backup input': `Майстерня з резервним вводом`,
   'Three phase with a generator: a changeover switch between mains and generator, an RCD, a lathe on a 3-pole breaker and the lighting.':
     `Три фази з генератором: перемикач між мережею та генератором, УЗО, верстат на триполюсному автоматі й освітлення.`,

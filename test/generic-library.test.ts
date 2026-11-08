@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import libraryText from '../libraries/generic-iec.json?raw';
 import { genericEnclosures, genericLibraryText, genericModules } from '../src/library/genericSeries';
 import { terminalsOf } from '../src/electrical/terminals';
-import { placeArt } from '../src/library/art';
 import { parseLibraryJson } from '../src/library/validate';
 
 const parsed = parseLibraryJson(libraryText);
@@ -23,7 +22,7 @@ describe('the bundled library', () => {
   });
 
   it('is valid and has metadata that says where the numbers come from', () => {
-    expect(library.version).toBe('19');
+    expect(library.version).toBe('20');
     expect(library.description).toMatch(/not taken from any manufacturer/);
   });
 
@@ -88,13 +87,13 @@ describe('the bundled library', () => {
   });
 
   it('lets bars and combs be resized, except the bars of fixed width, and gives combs the patterns of the devices they serve', () => {
-    const fixedWidthBars = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [10, 12, 16].flatMap((count) => [`${id}-row-${count}`, `${id}-row-${count}-bottom`]));
+    const fixedWidthBars = ['n', 'pe', 'pen', 'l', 'l1', 'l2', 'l3'].flatMap((id) => [10, 12, 16].flatMap((count) => [`${id}-side-${count}-right`, `${id}-side-${count}-left`]));
     for (const m of library.modules.filter((x) => (x.kind === 'busbar' || x.kind === 'comb') && !fixedWidthBars.includes(x.id))) {
       expect(m.resizable).toBeDefined();
     }
     for (const id of fixedWidthBars) {
       expect(byId.get(id)?.resizable).toBeUndefined();
-      expect(byId.get(id)?.terminals).toHaveLength(Number(/-row-(\d+)/.exec(id)![1]));
+      expect(byId.get(id)?.terminals).toHaveLength(Number(/-side-(\d+)-/.exec(id)![1]));
     }
     expect(byId.get('comb-3phn-12')?.comb?.pattern).toEqual(['L1', 'L2', 'L3', 'N']);
   });
@@ -170,36 +169,48 @@ describe('devices with control circuits', () => {
   });
 });
 
-describe('the bars of one row of terminals', () => {
+describe('the narrow bars with a column of terminals', () => {
   const CONDUCTORS = { n: 'N', pe: 'PE', pen: 'PEN', l: 'L', l1: 'L1', l2: 'L2', l3: 'L3' } as const;
+  const SIZES = [{ count: 10, heightMm: 60 }, { count: 12, heightMm: 72 }, { count: 16, heightMm: 88 }];
   const BARS = Object.entries(CONDUCTORS).flatMap(([id, conductor]) =>
-    [10, 12, 16].flatMap((count) => [
-      [`${id}-row-${count}`, conductor, 'top', count],
-      [`${id}-row-${count}-bottom`, conductor, 'bottom', count],
+    SIZES.flatMap(({ count, heightMm }) => [
+      [`${id}-side-${count}-right`, conductor, 'top', count, heightMm],
+      [`${id}-side-${count}-left`, conductor, 'bottom', count, heightMm],
     ] as const),
   );
 
-  it.each(BARS)('%s has its terminals of %s on its %s side, evenly spread at 0.3 unit and joined into one net', (id, conductor, side, count) => {
+  it.each(BARS)('%s is as narrow as a real bar, stands its terminals of %s on the %s side down its height, joined into one net', (id, conductor, side, count, heightMm) => {
     const def = byId.get(id)!;
+    expect(def.widthUnits).toBe(0.7);
+    expect(def.heightMm).toBe(heightMm);
+    expect(def.sideTerminals).toBe(true);
     const terminals = terminalsOf(def);
     expect(terminals).toHaveLength(count);
-    expect(def.widthUnits).toBeCloseTo(count * 0.3, 6);
     expect(terminals.every((t) => t.side === side && t.conductor === conductor && t.net === conductor)).toBe(true);
-    const spacing = terminals.slice(1).map((t, i) => Math.round((t.unit - terminals[i]!.unit) * 1000) / 1000);
-    expect(new Set(spacing)).toEqual(new Set([0.3]));
+    const pitch = heightMm / 17.5 / count;
+    const spacing = terminals.slice(1).map((t, i) => t.unit - terminals[i]!.unit);
+    for (const step of spacing) expect(step).toBeCloseTo(pitch, 2);
+    expect(terminals[0]!.unit).toBeCloseTo(pitch / 2, 2);
+    expect(terminals.at(-1)!.unit).toBeCloseTo(heightMm / 17.5 - pitch / 2, 2);
     expect(new Set(terminals.map((t) => t.id)).size).toBe(count);
   });
 
-  it.each(BARS)('%s draws one screw for each terminal on the side of the terminals only', (id, _conductor, side, count) => {
+  it.each(BARS)('%s draws one screw head under each terminal, on the side of the terminals', (id, _conductor, side, count) => {
     const def = byId.get(id)!;
-    const screws = placeArt(def.art!, def.widthUnits, def.widthUnits).filter((s) => s.kind === 'ellipse');
-    expect(new Set(screws.map((s) => (s.kind === 'ellipse' ? s.cy : 0)))).toEqual(new Set([side === 'top' ? 7 : 84]));
-    expect(screws).toHaveLength(count);
+    const heads = def.art!.filter((s) => s.kind === 'ellipse');
+    expect(heads).toHaveLength(count);
+    const widthMm = def.widthUnits * 17.5;
+    const expectedX = side === 'top' ? widthMm - 4 : 4;
+    for (const head of heads) expect(head.kind === 'ellipse' && head.cx).toBeCloseTo(expectedX, 3);
+    const ys = heads.map((s) => (s.kind === 'ellipse' ? s.cy : 0));
+    expect(ys).toEqual(terminalsOf(def).map((t) => t.unit * 17.5).map((y) => expect.closeTo(y, 3)));
   });
 
-  it('have a blue stripe for the neutral and a neutral one for every phase, whose colour comes from the colour scheme of the terminals', () => {
-    const stripe = (id: string) => byId.get(id)!.art!.find((s) => s.kind === 'rect' && s.anchor === 'stretch')!;
-    expect(stripe('n-row-16')).toMatchObject({ fill: '#2f7de1' });
-    for (const id of ['l-row-10', 'l1-row-12', 'l2-row-16', 'l3-row-16-bottom']) expect(stripe(id), id).toMatchObject({ fill: '#a8a29e' });
+  it('have a band down the side away from the terminals: blue for the neutral, green for the earth and a neutral one for every phase', () => {
+    const band = (id: string) => byId.get(id)!.art!.find((s) => s.kind === 'rect')!;
+    expect(band('n-side-16-right')).toMatchObject({ fill: '#2f7de1', x: 1.5 });
+    expect(band('n-side-16-left')).toMatchObject({ fill: '#2f7de1', x: 12.25 - 1.5 - 3 });
+    expect(band('pe-side-12-right')).toMatchObject({ fill: '#2f9e44' });
+    for (const id of ['l-side-10-right', 'l1-side-12-right', 'l2-side-16-left', 'l3-side-16-left']) expect(band(id), id).toMatchObject({ fill: '#a8a29e' });
   });
 });

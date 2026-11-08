@@ -73,10 +73,10 @@ export const DESIGNER: Dictionary = {
   // module designer
   'Module designer': `Конструктор модулів`,
   'The logic of this module named terminals that are gone, so it was taken off. Undo brings it back.': `Логіка цього модуля називала клеми, яких уже немає, тому її прибрано. Скасування повертає її.`,
-  'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ':
-    `Розміщення: клацніть верхню чи нижню половину, щоб додати; клацніть клему, щоб вибрати; тягніть, щоб пересунути; Delete видаляє. Клацніть «Розмістити» ще раз, щоб вимкнути його, і тоді клацання лише вибирає. `,
-  'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. Connect: click two terminals to join them inside the module.':
-    `Розміщення: клацніть верхню чи нижню половину, щоб додати; клацніть клему, щоб вибрати; тягніть, щоб пересунути; Delete видаляє. Клацніть «Розмістити» ще раз, щоб вимкнути його, і тоді клацання лише вибирає. З’єднання: клацніть дві клеми, щоб з’єднати їх усередині модуля.`,
+  'Place: click the top or bottom half (the right or left half when the terminals stand down the sides) to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ':
+    `Розміщення: клацніть верхню чи нижню половину (праву чи ліву, коли клеми стоять уздовж сторін), щоб додати; клацніть клему, щоб вибрати; тягніть, щоб пересунути; Delete видаляє. Клацніть «Розмістити» ще раз, щоб вимкнути його, і тоді клацання лише вибирає. `,
+  'Place: click the top or bottom half (the right or left half when the terminals stand down the sides) to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. Connect: click two terminals to join them inside the module.':
+    `Розміщення: клацніть верхню чи нижню половину (праву чи ліву, коли клеми стоять уздовж сторін), щоб додати; клацніть клему, щоб вибрати; тягніть, щоб пересунути; Delete видаляє. Клацніть «Розмістити» ще раз, щоб вимкнути його, і тоді клацання лише вибирає. З’єднання: клацніть дві клеми, щоб з’єднати їх усередині модуля.`,
   'Click again to switch placing off and only select and move terminals': `Клацніть ще раз, щоб вимкнути розміщення й лише вибирати та переміщувати клеми`,
   'Connect: click two terminals to join them inside the module.': `З’єднання: клацніть дві клеми, щоб з’єднати їх усередині модуля.`,
   'Place and join the terminals': `Розмістити й з’єднати клеми`,
@@ -161,6 +161,12 @@ export const DESIGNER: Dictionary = {
   'Analog input module, 4 channels': `Модуль аналогових входів, 4 канали`,
   'Label the top terminals': `Підписати верхні клеми`,
   'Label the bottom terminals': `Підписати нижні клеми`,
+  'Label the right terminals': `Підписати праві клеми`,
+  'Label the left terminals': `Підписати ліві клеми`,
+  'Terminal layout': `Розташування клем`,
+  'in a row across the width': `рядом уздовж ширини`,
+  'in a column down the sides': `колонкою вздовж сторін`,
+  'units from the top edge, decimals allowed': `модулів від верхнього краю, можна дробові`,
   'Analog signal (SIG+, SIG-)': `Аналоговий сигнал (SIG+, SIG-)`,
   'Cable shield (SH)': `Екран кабелю (SH)`,
   'Serial bus (A, B)': `Послідовна шина (A, B)`,

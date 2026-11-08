@@ -33,6 +33,7 @@ import {
   repairPositions,
   fitTerminalsToWidth,
   setAllConductors,
+  SIDE_PIN_INSET_PX,
   slotAt,
   spreadSide,
   TERMINAL_PRESETS,
@@ -167,7 +168,7 @@ export class ModuleDesignerView {
     const hint = document.createElement('p');
     hint.className = 'designer-hint';
     hint.textContent =
-      'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ' +
+      'Place: click the top or bottom half (the right or left half when the terminals stand down the sides) to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. ' +
       'Connect: click two terminals to join them inside the module.';
     this.face = new ArtEditorView({
       draft: () => this.draft,
@@ -507,8 +508,9 @@ export class ModuleDesignerView {
       svg.append(group);
     }
     if (this.hover && this.drag?.moved) {
-      const x = body.x + (this.hover.unit + 0.5) * UNIT_PX;
-      const y = this.hover.side === 'top' ? body.y + 18 : body.y + body.height - 18;
+      const inset = Math.min(SIDE_PIN_INSET_PX, body.width / 2);
+      const x = layout.sideways ? (this.hover.side === 'top' ? body.x + body.width - inset : body.x + inset) : body.x + (this.hover.unit + 0.5) * UNIT_PX;
+      const y = layout.sideways ? body.y + (this.hover.unit / layout.heightUnits) * body.height : this.hover.side === 'top' ? body.y + 18 : body.y + body.height - 18;
       svg.append(svgElement('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#f5c518', 'stroke-dasharray': '3 3', 'stroke-width': 2 }));
     }
     const labels = pinLabels(layout);
@@ -521,11 +523,18 @@ export class ModuleDesignerView {
         const r = layout.pinRadius;
         svg.append(svgElement('path', { d: `M${pin.x} ${pin.y - r}A${r} ${r} 0 0 1 ${pin.x} ${pin.y + r}Z`, fill: style.stripe, 'pointer-events': 'none' }));
       }
-      const marker = roleMarker(pin, layout.pinRadius);
+      const marker = roleMarker(pin, layout.pinRadius, layout.sideways);
       if (marker) svg.append(svgElement('polygon', { points: marker.points, fill: '#14161d', 'pointer-events': 'none' }));
+      const label = labels[layout.pins.indexOf(pin)]!;
+      if (layout.sideways) {
+        // In a column the name stands beside its pin, outside the narrow body, on the side the terminal faces.
+        const right = pin.terminal.side === 'top';
+        svg.append(svgElement('text', { x: pin.x + (right ? 1 : -1) * (layout.pinRadius + 5), y: pin.y + 3, 'text-anchor': right ? 'start' : 'end', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, label));
+        continue;
+      }
       const stagger = layout.crowded ? (layout.pins.indexOf(pin) % 2) * LABEL_STAGGER_PX : 0;
       const labelY = pin.terminal.side === 'top' ? pin.y + 19 + stagger : pin.y - 11 - stagger;
-      svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, labels[layout.pins.indexOf(pin)]!));
+      svg.append(svgElement('text', { x: pin.x, y: labelY, 'text-anchor': 'middle', 'font-size': layout.crowded ? 8 : 9, fill: '#14161d', ...HALO }, label));
     }
     // At its own size, so the stage keeps its height while the width is dragged and what is below it does not jump.
     svg.style.width = `${layout.width}px`;

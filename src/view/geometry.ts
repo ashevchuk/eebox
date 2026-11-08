@@ -3,7 +3,6 @@ import { ductsOf, type Duct } from '../layout/ducts';
 import { isFree, isOnRail, type CombPlacement, type Panel, type Placement, type Sizes } from '../layout/placement';
 import { DIN_MODULE_HEIGHT_MM, type TerminalSide } from '../library/types';
 import { FIRST_RAIL_Y_MM } from '../layout/limits';
-import { isVertical } from '../layout/rail';
 import { LAYOUT_EPSILON_UNITS, isWholeUnits, roundUnits } from '../layout/units';
 import type { Bounds, Point } from './Camera';
 
@@ -22,28 +21,26 @@ export interface Rect {
   height: number;
 }
 
-/** The bar of a rail: along `x` for a horizontal rail, along `y` for a vertical one. */
-export function railRect(panel: Panel, rail: number): Rect {
-  const r = panel.rails[rail];
-  const length = (r?.lengthUnits ?? 0) * MODULE_UNIT_MM;
-  if (isVertical(r)) return { x: FRAME_PADDING + (r?.x ?? 0) - RAIL_HEIGHT / 2, y: FRAME_PADDING + (r?.y ?? 0), width: RAIL_HEIGHT, height: length };
-  return { x: FRAME_PADDING + (r?.x ?? 0), y: FRAME_PADDING + (r?.y ?? 0) - RAIL_HEIGHT / 2, width: length, height: RAIL_HEIGHT };
-}
-
-/** The middle of the rail's bar, from the top of the drawing. */
 export function railCenterY(panel: Panel, rail: number): number {
-  const r = railRect(panel, rail);
-  return r.y + r.height / 2;
+  return FRAME_PADDING + (panel.rails[rail]?.y ?? 0);
 }
 
-/**
- * Where a module stands on a rail. On a vertical rail the module is turned a quarter turn clockwise:
- * its width runs down the rail, its height across it, and its top faces right.
- */
+export function railRect(panel: Panel, rail: number): Rect {
+  return {
+    x: FRAME_PADDING + (panel.rails[rail]?.x ?? 0),
+    y: railCenterY(panel, rail) - RAIL_HEIGHT / 2,
+    width: (panel.rails[rail]?.lengthUnits ?? 0) * MODULE_UNIT_MM,
+    height: RAIL_HEIGHT,
+  };
+}
+
 export function moduleRect(panel: Panel, rail: number, slot: number, widthUnits: number, heightMm: number): Rect {
-  const bar = railRect(panel, rail);
-  if (isVertical(panel.rails[rail])) return { x: bar.x + bar.width / 2 - heightMm / 2, y: bar.y + slot * MODULE_UNIT_MM, width: heightMm, height: widthUnits * MODULE_UNIT_MM };
-  return { x: bar.x + slot * MODULE_UNIT_MM, y: bar.y + bar.height / 2 - heightMm / 2, width: widthUnits * MODULE_UNIT_MM, height: heightMm };
+  return {
+    x: railRect(panel, rail).x + slot * MODULE_UNIT_MM,
+    y: railCenterY(panel, rail) - heightMm / 2,
+    width: widthUnits * MODULE_UNIT_MM,
+    height: heightMm,
+  };
 }
 
 /** Where a placed module stands, by the size its module has; a module that is not in any library is drawn standard-sized. */
@@ -58,9 +55,8 @@ export function placementRect(panel: Panel, sizes: Sizes, placement: Placement):
 export function rowRect(panel: Panel, sizes: Sizes, rail: number): Rect {
   const heights = panel.placements.filter(isOnRail).filter((p) => p.rail === rail).map((p) => sizes.heightOf(p) ?? DIN_MODULE_HEIGHT_MM);
   const height = Math.max(DIN_MODULE_HEIGHT_MM, ...heights);
-  const bar = railRect(panel, rail);
-  if (isVertical(panel.rails[rail])) return { x: bar.x + bar.width / 2 - height / 2, y: bar.y, width: height, height: bar.height };
-  return { x: bar.x, y: bar.y + bar.height / 2 - height / 2, width: bar.width, height };
+  const { x, width } = railRect(panel, rail);
+  return { x, y: railCenterY(panel, rail) - height / 2, width, height };
 }
 
 export function ductRect(duct: Duct): Rect {
@@ -101,10 +97,6 @@ export function combRect(
   side: TerminalSide,
 ): Rect {
   const module = moduleRect(panel, rail, slot, widthUnits, heightUnderComb(panel, sizes, rail, slot, widthUnits));
-  if (isVertical(panel.rails[rail])) {
-    const x = side === 'top' ? module.x + module.width - (COMB_HEIGHT - COMB_OVERHANG) : module.x - COMB_OVERHANG;
-    return { x, y: module.y, width: COMB_HEIGHT, height: module.height };
-  }
   const y = side === 'top' ? module.y - COMB_OVERHANG : module.y + module.height - (COMB_HEIGHT - COMB_OVERHANG);
   return { x: module.x, y, width: module.width, height: COMB_HEIGHT };
 }
@@ -117,9 +109,9 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
   const bottom = railCenterY(panel, rail) + heightMm / 2;
   const here = railRect(panel, rail);
   const below = panel.rails
-    .map((r, i) => ({ r: railRect(panel, i), vertical: isVertical(r) }))
-    .filter(({ r }, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
-    .map(({ r, vertical }) => (vertical ? r.y : r.y + r.height / 2 - DIN_MODULE_HEIGHT_MM / 2) - COMB_OVERHANG);
+    .map((_r, i) => railRect(panel, i))
+    .filter((r, i) => i !== rail && r.y > here.y && r.x < here.x + here.width && here.x < r.x + r.width)
+    .map((r) => r.y + r.height / 2 - DIN_MODULE_HEIGHT_MM / 2 - COMB_OVERHANG);
   const limit = below.length > 0 ? Math.min(...below) : frameRect(panel).height;
   return Math.max(0, limit - bottom - LABEL_GAP);
 }
@@ -127,38 +119,6 @@ export function labelRoom(panel: Panel, rail: number, heightMm: number): number 
 /** How far a label under a placed module may run: down to what is below it on its rail, or to the end of the frame for a device on the plate. */
 export function placementLabelRoom(panel: Panel, placement: Placement, body: Rect): number {
   return isOnRail(placement) ? labelRoom(panel, placement.rail, body.height) : Math.max(0, frameRect(panel).height - (body.y + body.height) - LABEL_GAP);
-}
-
-type CombInfoOf = (comb: CombPlacement) => { widthUnits: number; side: TerminalSide } | undefined;
-
-export type LabelSide = 'left' | 'right';
-
-/**
- * The side of a module on a vertical rail that its label stands on: the right, unless its top terminals carry
- * names of their own, which are read on the right, and then the left.
- */
-export function levelLabelSide(placement: Placement): LabelSide {
-  return Object.keys(placement.terminalLabels ?? {}).some((id) => id.startsWith('top:')) ? 'left' : 'right';
-}
-
-/**
- * The edge that the level label of a module on a vertical rail starts from: the edge of the module on that side,
- * or the edge of a comb that lies over it on that side and sticks out (top terminals face right, bottom ones left).
- */
-export function levelLabelEdge(panel: Panel, sizes: Sizes, combInfoOf: CombInfoOf, body: Rect, rail: number, side: LabelSide): number {
-  let edge = side === 'right' ? body.x + body.width : body.x;
-  for (const comb of panel.combs) {
-    const info = comb.rail === rail ? combInfoOf(comb) : undefined;
-    if (info?.side !== (side === 'right' ? 'top' : 'bottom')) continue;
-    const r = combRect(panel, sizes, comb.rail, comb.slot, info.widthUnits, info.side);
-    if (r.y < body.y + body.height && body.y < r.y + r.height) edge = side === 'right' ? Math.max(edge, r.x + r.width) : Math.min(edge, r.x);
-  }
-  return edge;
-}
-
-/** How long a level label that starts from `edge` may run: to the frame on that side, as the labels under modules run to the bottom of it. */
-export function levelLabelRoom(panel: Panel, edge: number, side: LabelSide): number {
-  return Math.max(0, side === 'right' ? frameRect(panel).width - edge - LABEL_GAP : edge - LABEL_GAP);
 }
 
 export function combAtPoint(
@@ -204,26 +164,19 @@ export function snapToSlot(
   widthUnits: number,
   anchorUnits: number,
   neighbours: readonly Neighbour[] = [],
-  accepts: (rail: number) => boolean = () => true,
 ): { rail: number; slot: number } | null {
-  const usable = panel.rails.map((_r, i) => i).filter(accepts);
-  const crossOf = (i: number) => {
-    const bar = railRect(panel, i);
-    return isVertical(panel.rails[i]) ? Math.abs(point.x - (bar.x + bar.width / 2)) : Math.abs(point.y - (bar.y + bar.height / 2));
-  };
+  const heightOf = (i: number) => Math.abs(point.y - railCenterY(panel, i));
   const outsideOf = (i: number) => {
-    const bar = railRect(panel, i);
-    return isVertical(panel.rails[i]) ? Math.max(bar.y - point.y, 0, point.y - (bar.y + bar.height)) : Math.max(bar.x - point.x, 0, point.x - (bar.x + bar.width));
+    const r = railRect(panel, i);
+    return Math.max(r.x - point.x, 0, point.x - (r.x + r.width));
   };
-  const nearest = Math.min(Infinity, ...usable.map(crossOf));
+  const nearest = Math.min(Infinity, ...panel.rails.map((_r, i) => heightOf(i)));
   // Rails side by side in one row are told apart by how far the point is from their length; a point past the end of a rail still belongs to it.
-  const row = usable.filter((i) => crossOf(i) <= nearest + RAIL_HEIGHT / 2);
-  const rail = row.reduce((best, i) => (best < 0 || outsideOf(i) < outsideOf(best) || (outsideOf(i) === outsideOf(best) && crossOf(i) < crossOf(best)) ? i : best), -1);
+  const row = panel.rails.map((_r, i) => i).filter((i) => heightOf(i) <= nearest + RAIL_HEIGHT / 2);
+  const rail = row.reduce((best, i) => (best < 0 || outsideOf(i) < outsideOf(best) || (outsideOf(i) === outsideOf(best) && heightOf(i) < heightOf(best)) ? i : best), -1);
   const railLength = panel.rails[rail]?.lengthUnits;
   if (railLength === undefined || nearest > SNAP_DISTANCE) return null;
-  const bar = railRect(panel, rail);
-  const alongPoint = isVertical(panel.rails[rail]) ? point.y - bar.y : point.x - bar.x;
-  const raw = alongPoint / MODULE_UNIT_MM - anchorUnits;
+  const raw = (point.x - railRect(panel, rail).x) / MODULE_UNIT_MM - anchorUnits;
   const last = Math.max(0, railLength - widthUnits);
   const edges = [
     0,
@@ -296,9 +249,6 @@ export const PRINT_MARGIN_MM = 12;
 /** A label under a module is cut at the room it has, and starts this far below the module. */
 const PRINT_LABEL_START_MM = 4;
 const PRINT_LABEL_HALF_WIDTH_MM = 6;
-const PRINT_LABEL_HALF_HEIGHT_MM = 5;
-/** The longest a level label, such as the label of a comb on a vertical rail, is printed. */
-const LEVEL_LABEL_MAX_MM = 110;
 /** A row label stands in the margin to the left of its rail. */
 export const rowLabelX = (panel: Panel, rail: number): number => railRect(panel, rail).x - FRAME_PADDING / 2;
 
@@ -322,38 +272,19 @@ export function printArea(
     const r = placementRect(panel, sizes, p);
     rects.push(r);
     if (p.label) {
-      if (isOnRail(p) && isVertical(panel.rails[p.rail])) {
-        const side = levelLabelSide(p);
-        const edge = levelLabelEdge(panel, sizes, combInfoOf, r, p.rail, side);
-        const length = Math.min(measure(p.label), levelLabelRoom(panel, edge, side));
-        rects.push({ x: side === 'right' ? edge : edge - PRINT_LABEL_START_MM - length, y: r.y + r.height / 2 - PRINT_LABEL_HALF_HEIGHT_MM, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
-      } else {
-        const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
-        rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
-      }
+      const length = Math.min(measure(p.label), placementLabelRoom(panel, p, r));
+      rects.push({ x: r.x + r.width / 2 - PRINT_LABEL_HALF_WIDTH_MM, y: r.y + r.height, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: PRINT_LABEL_START_MM + length });
     }
   }
   for (const c of panel.combs) {
     const info = combInfoOf(c);
-    if (!info) continue;
-    const r = combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side);
-    rects.push(r);
-    if (c.label && isVertical(panel.rails[c.rail])) {
-      const length = Math.min(measure(c.label), LEVEL_LABEL_MAX_MM);
-      const x = info.side === 'top' ? r.x + r.width : r.x - PRINT_LABEL_START_MM - length;
-      rects.push({ x, y: r.y + 2, width: PRINT_LABEL_START_MM + length, height: 2 * PRINT_LABEL_HALF_HEIGHT_MM });
-    }
+    if (info) rects.push(combRect(panel, sizes, c.rail, c.slot, info.widthUnits, info.side));
   }
   panel.rails.forEach(({ label }, rail) => {
     if (!label) return;
     const centre = railCenterY(panel, rail);
     const half = Math.min(measure(label), 110) / 2;
-    if (isVertical(panel.rails[rail])) {
-      const bar = railRect(panel, rail);
-      rects.push({ x: bar.x + bar.width / 2 - half, y: bar.y - PRINT_LABEL_START_MM - 2 * PRINT_LABEL_HALF_HEIGHT_MM, width: 2 * half, height: PRINT_LABEL_START_MM + 2 * PRINT_LABEL_HALF_HEIGHT_MM });
-    } else {
-      rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
-    }
+    rects.push({ x: rowLabelX(panel, rail) - PRINT_LABEL_HALF_WIDTH_MM, y: centre - half, width: 2 * PRINT_LABEL_HALF_WIDTH_MM, height: 2 * half });
   });
   if (rects.length === 0) {
     const frame = frameRect(panel);

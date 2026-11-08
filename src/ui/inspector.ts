@@ -27,10 +27,8 @@ import {
   setRailCount,
   setRailLabel,
   setRailLength,
-  setRailOrientation,
   setRailPosition,
 } from '../layout/panel';
-import { RAIL_ORIENTATIONS, isVertical } from '../layout/rail';
 import { takeOff } from '../layout/shelf';
 import {
   LABEL_NUMBER_MARK,
@@ -343,12 +341,13 @@ function moduleDetails(def: ModuleDef | undefined, widthUnits: number): Inspecto
     const side = (s: 'top' | 'bottom') => terminals.filter((t) => t.side === s).map((t) => t.name);
     const describeSide = (names: string[]) => (names.length > 8 ? `${names.length}` : names.join(' '));
     const [top, bottom] = [side('top'), side('bottom')];
+    const [first, second] = sideWords(def);
     const text =
       top.length > 0 && bottom.length > 0
-        ? `top ${describeSide(top)} · bottom ${describeSide(bottom)}`
+        ? `${first} ${describeSide(top)} · ${second} ${describeSide(bottom)}`
         : top.length > 0
-          ? `top ${describeSide(top)} · no bottom`
-          : `no top · bottom ${describeSide(bottom)}`;
+          ? `${first} ${describeSide(top)} · no ${second}`
+          : `no ${first} · ${second} ${describeSide(bottom)}`;
     details.push(readonly('terminals', 'Terminals', text));
   }
   return details;
@@ -356,6 +355,9 @@ function moduleDetails(def: ModuleDef | undefined, widthUnits: number): Inspecto
 
 /** The key of the field that picks how lengths are shown; it changes the display, not the project. */
 export const LENGTH_UNIT_FIELD = 'lengthUnit';
+
+/** What the top and the bottom side are called: terminals down the sides of a narrow bar are on its right and its left. */
+const sideWords = (def: ModuleDef): readonly [string, string] => (def.sideTerminals ? ['right', 'left'] : ['top', 'bottom']);
 
 const lengthIn = (unit: LengthUnit, units: number): number => (unit === 'mm' ? mmFromUnits(units) : units);
 const lengthText = (unit: LengthUnit, units: number): string => (unit === 'mm' ? `${units} units` : `${mmFromUnits(units)} mm`);
@@ -425,15 +427,15 @@ function fillFields(def: ModuleDef | undefined, width: number): InspectorField[]
   if (!def) return [];
   return (['top', 'bottom'] as const).flatMap((side) =>
     sideTerminals(def, width, side).length > 1
-      ? [text(side === 'top' ? 'fillTop' : 'fillBottom', side === 'top' ? 'Label the top terminals' : 'Label the bottom terminals', '', 'X1:{n}')]
+      ? [text(side === 'top' ? 'fillTop' : 'fillBottom', `Label the ${sideWords(def)[side === 'top' ? 0 : 1]} terminals`, '', 'X1:{n}')]
       : [],
-  ).map((field) => ({ ...field, hint: `a pattern with {n} for the number, such as DI{n}; labels the ${field.key === 'fillTop' ? 'top' : 'bottom'} terminals in order along the module, an empty one clears them` }));
+  ).map((field) => ({ ...field, hint: `a pattern with {n} for the number, such as DI{n}; labels the ${sideWords(def)[field.key === 'fillTop' ? 0 : 1]} terminals in order along the module, an empty one clears them` }));
 }
 
 function terminalLabelFields(placement: Placement, def: ModuleDef | undefined, width: number): InspectorField[] {
   if (!def) return [];
   return terminalsOf(def, width).map((t) =>
-    text(`terminal:${t.id}`, `${t.name} (${t.side})`, placement.terminalLabels?.[t.id] ?? '', t.name),
+    text(`terminal:${t.id}`, `${t.name} (${sideWords(def)[t.side === 'top' ? 0 : 1]})`, placement.terminalLabels?.[t.id] ?? '', t.name),
   );
 }
 
@@ -606,16 +608,8 @@ export function inspect(ctx: InspectContext): InspectorView {
           text('label', 'Label', panel.rails[rail]?.label ?? '', `Row ${rowNumber(panel, rail)}`),
           integer('position', 'Position', rowNumber(panel, rail), 1, rowsOnPlateOf(panel, rail)),
           decimal('length', 'Length', panel.rails[rail]?.lengthUnits ?? 0, 1, MAX_RAIL_LENGTH_UNITS, `units, ${mmFromUnits(panel.rails[rail]?.lengthUnits ?? 0)} mm`),
-          { key: 'orientation', label: 'Orientation', kind: 'select', value: panel.rails[rail]?.orientation ?? 'horizontal', options: [...RAIL_ORIENTATIONS], hint: 'a vertical rail holds bars, terminal blocks and combs' },
-          ...(isVertical(panel.rails[rail])
-            ? [
-                decimal('x', 'Centre line', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge to the middle of the rail'),
-                decimal('y', 'Top end', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top'),
-              ]
-            : [
-                decimal('x', 'Left end', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge'),
-                decimal('y', 'Height', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top to the middle of the rail'),
-              ]),
+          decimal('x', 'Left end', panel.rails[rail]?.x ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the left edge'),
+          decimal('y', 'Height', panel.rails[rail]?.y ?? 0, 0, MAX_RAIL_POSITION_MM, 'mm from the top to the middle of the rail'),
           ...plateField(panel, panel.rails[rail]?.plate ?? ''),
           readonly('contents', 'Contents', `${onRail} module${onRail === 1 ? '' : 's'}, ${combsOnRail} comb${combsOnRail === 1 ? '' : 's'}`),
         ],
@@ -967,12 +961,6 @@ export function applyEdit(
       if (key === 'label') {
         const result = setRailLabel(panel, rail, text);
         return result.ok ? withPanel(result.panel) : fail(LABEL_MESSAGE);
-      }
-      if (key === 'orientation') {
-        const orientation = RAIL_ORIENTATIONS.find((o) => o === text);
-        if (!orientation) return fail('Orientation is horizontal or vertical.');
-        const result = setRailOrientation(panel, rail, orientation);
-        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       const value = key === 'length' || key === 'x' || key === 'y' ? numberOf(raw) : integerOf(raw);
       if (value === null) return fail(NOT_A_NUMBER);

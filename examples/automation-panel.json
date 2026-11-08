@@ -20,7 +20,6 @@
       "rails": [
         {
           "plate": "plate1",
-          "orientation": "horizontal",
           "x": 20,
           "y": 110,
           "lengthUnits": 30,
@@ -28,7 +27,6 @@
         },
         {
           "plate": "plate1",
-          "orientation": "horizontal",
           "x": 20,
           "y": 680,
           "lengthUnits": 24,
@@ -36,7 +34,6 @@
         },
         {
           "plate": "plate2",
-          "orientation": "horizontal",
           "x": 30,
           "y": 150,
           "lengthUnits": 12,

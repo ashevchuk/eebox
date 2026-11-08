@@ -1,5 +1,5 @@
 import { fixedRange } from './positions';
-import type { Conductor, TerminalDef, TerminalSide } from './types';
+import { MODULE_UNIT_MM, type Conductor, type TerminalDef, type TerminalSide } from './types';
 
 const PRECISION = 1000;
 
@@ -16,6 +16,15 @@ export function evenPositions(count: number, width: number): number[] {
   return Array.from({ length: count }, (_, i) => round(min + (i * (max - min)) / (count - 1)));
 }
 
+/**
+ * Where `count` terminals stand down a side of a module `heightMm` high, evenly spread from its top edge to its bottom
+ * edge: each one in the middle of its share, so the first and the last keep half a pitch from the ends.
+ */
+export function sidePositions(count: number, heightMm: number): number[] {
+  const heightUnits = heightMm / MODULE_UNIT_MM;
+  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * heightUnits * PRECISION) / count) / PRECISION);
+}
+
 export interface RowSpec {
   side: TerminalSide;
   count: number;
@@ -24,6 +33,18 @@ export interface RowSpec {
   prefix: string;
   /** Join them all inside the module, as the terminals of a distribution block are. */
   joined: boolean;
+}
+
+/** The terminals of one side of a module with its terminals down the sides: evenly spread down its height from the top edge. */
+export function sideRowEntries(spec: RowSpec, heightMm: number, net: string | undefined): TerminalDef[] {
+  const joined = net ? { net } : {};
+  return sidePositions(spec.count, heightMm).map((unit, i) => ({
+    name: spec.count === 1 ? spec.prefix : `${spec.prefix}${i + 1}`,
+    conductor: spec.conductor,
+    side: spec.side,
+    unit,
+    ...joined,
+  }));
 }
 
 /**

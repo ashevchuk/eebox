@@ -1,9 +1,7 @@
 import { withNotes, type Annotation } from './annotations';
 import { ductsOf } from './ducts';
 import { normalizeLabel } from './labels';
-import { DEFAULT_RAIL_LENGTH_UNITS, FIRST_RAIL_Y_MM, MAX_PLATES, MAX_PLATE_SIZE_MM, MAX_RAILS, MIN_PLATE_SIZE_MM } from './limits';
-import { isVertical, type Rail } from './rail';
-import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM } from '../library/types';
+import { FIRST_RAIL_Y_MM, MAX_PLATES, MAX_PLATE_SIZE_MM, MAX_RAILS, MIN_PLATE_SIZE_MM } from './limits';
 import { isFree, isOnRail, type CombPlacement, type Panel, type Placement, type Plate } from './placement';
 
 export const DEFAULT_PLATE_ID = 'plate1';
@@ -176,38 +174,11 @@ function grouped(panel: Panel): Panel {
 export function addRail(panel: Panel, plateId: string): PlateResult {
   if (!plateById(panel, plateId)) return failure('unknown-plate');
   if (panel.rails.length >= MAX_RAILS) return failure('too-many-rails');
-  const mine = panel.rails.filter((r) => r.plate === plateId && !isVertical(r));
+  const mine = panel.rails.filter((r) => r.plate === plateId);
   const last = mine[mine.length - 1];
   const before = mine[mine.length - 2];
   const gap = last && before && last.y > before.y ? last.y - before.y : 150;
-  const rail: Rail = last
-    ? { plate: plateId, orientation: 'horizontal', x: last.x, y: last.y + gap, lengthUnits: last.lengthUnits }
-    : { plate: plateId, orientation: 'horizontal', x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 };
-  return { ok: true, panel: grouped({ ...panel, rails: [...panel.rails, rail] }) };
-}
-
-/** Where a vertical rail added to a plate stands: its top end this far down, and its centre line this far from what is beside it. */
-const VERTICAL_RAIL_TOP_MM = 40;
-const VERTICAL_RAIL_CLEARANCE_MM = 60;
-
-/**
- * Adds a vertical row to a plate, as long as a default row or as the plate is tall. It stands to the right of the
- * horizontal rows when the plate has room there, and by the right edge of the plate when it has not, where it crosses them.
- */
-export function addVerticalRail(panel: Panel, plateId: string): PlateResult {
-  const plate = plateById(panel, plateId);
-  if (!plate) return failure('unknown-plate');
-  if (panel.rails.length >= MAX_RAILS) return failure('too-many-rails');
-  const rowsEnd = Math.max(0, ...panel.rails.filter((r) => r.plate === plateId && !isVertical(r)).map((r) => r.x + r.lengthUnits * MODULE_UNIT_MM));
-  const beside = rowsEnd + VERTICAL_RAIL_CLEARANCE_MM;
-  const fits = Math.floor((plate.heightMm - VERTICAL_RAIL_TOP_MM) / MODULE_UNIT_MM);
-  const rail: Rail = {
-    plate: plateId,
-    orientation: 'vertical',
-    x: beside + DIN_MODULE_HEIGHT_MM / 2 <= plate.widthMm ? beside : Math.max(DIN_MODULE_HEIGHT_MM / 2, plate.widthMm - VERTICAL_RAIL_CLEARANCE_MM),
-    y: VERTICAL_RAIL_TOP_MM,
-    lengthUnits: Math.max(1, Math.min(DEFAULT_RAIL_LENGTH_UNITS, fits)),
-  };
+  const rail = last ? { plate: plateId, x: last.x, y: last.y + gap, lengthUnits: last.lengthUnits } : { plate: plateId, x: 0, y: FIRST_RAIL_Y_MM, lengthUnits: 12 };
   return { ok: true, panel: grouped({ ...panel, rails: [...panel.rails, rail] }) };
 }
 

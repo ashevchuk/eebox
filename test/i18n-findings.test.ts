@@ -51,7 +51,6 @@ const OTHER = [
   'placement p1: out-of-rail',
   'comb c1: not-a-comb',
   'duct d1 (d1) stands on MCB (p1).',
-  'MCB (p1) is made for a horizontal rail, not for a vertical one.',
 ];
 
 describe('the Ukrainian text of the findings of Check', () => {
@@ -105,7 +104,7 @@ describe('the Ukrainian text of the findings of Check', () => {
 
   it('has the hint of the module designer as one text, as it is shown', () => {
     const hint =
-      'Place: click the top or bottom half to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. Connect: click two terminals to join them inside the module.';
+      'Place: click the top or bottom half (the right or left half when the terminals stand down the sides) to add, click a terminal to select it, drag it to move it, Delete removes it. Click Place again to switch it off, and a click then only selects. Connect: click two terminals to join them inside the module.';
     expect(t(hint)).not.toBe(hint);
     expect(ENGLISH_WORD.test(t(hint))).toBe(false);
   });

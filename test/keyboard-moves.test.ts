@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { moveGroup } from '../src/layout/group';
 import { emptySchematic, addNode } from '../src/schematic/model';
-import { nextModuleId, nextNodeId, nodeStep, onVerticalRails, panelStep } from '../src/ui/keyboardMoves';
+import { nextModuleId, nextNodeId, nodeStep, panelStep } from '../src/ui/keyboardMoves';
 import { lookupsOf } from '../src/layout/lookups';
 import { panelOf, place, resolve, widthOf } from './fixtures';
 
@@ -13,21 +13,6 @@ describe('what the arrow keys do', () => {
     expect(panelStep('ArrowLeft', true)).toEqual({ rail: 0, slot: -0.25 });
     expect(panelStep('ArrowUp', false)).toEqual({ rail: -1, slot: 0 });
     expect(panelStep('ArrowDown', true)).toEqual({ rail: 1, slot: 0 });
-  });
-
-  it('run the other way round on a vertical rail: down and up along it, left and right between rails', () => {
-    expect(panelStep('ArrowDown', false, true)).toEqual({ rail: 0, slot: 1 });
-    expect(panelStep('ArrowUp', true, true)).toEqual({ rail: 0, slot: -0.25 });
-    expect(panelStep('ArrowLeft', false, true)).toEqual({ rail: -1, slot: 0 });
-    expect(panelStep('ArrowRight', true, true)).toEqual({ rail: 1, slot: 0 });
-  });
-
-  it('count a choice as being on vertical rails only when everything chosen on a rail is', () => {
-    const panel = panelOf([place('a', 'breaker16', 0, 0), place('b', 'breaker16', 1, 0)], [], [12, 12]);
-    const turned = { ...panel, rails: panel.rails.map((r, i) => (i === 1 ? { ...r, orientation: 'vertical' as const } : r)) };
-    expect(onVerticalRails(turned, ['b'], [])).toBe(true);
-    expect(onVerticalRails(turned, ['a', 'b'], [])).toBe(false);
-    expect(onVerticalRails(turned, [], [])).toBe(false);
   });
 
   it('move nodes by 10 mm, or 50 with Shift', () => {

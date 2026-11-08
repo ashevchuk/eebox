@@ -21,7 +21,7 @@ import {
   parsePath,
   type ArtKind,
 } from './art';
-import { positionProblem } from './positions';
+import { positionProblem, sidePositionProblem } from './positions';
 import {
   CONDUCTORS,
   MODULE_KINDS,
@@ -141,6 +141,7 @@ export const MODULE_SPEC: FieldSpec = {
   feed: { required: false, check: oneOf(TERMINAL_SIDES) },
   comb: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   resizable: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
+  sideTerminals: { required: false, check: (v) => (typeof v === 'boolean' ? null : 'must be true or false') },
   logic: { required: false, check: (v) => (isRecord(v) ? null : 'must be an object') },
   art: { required: false, check: (v) => (Array.isArray(v) ? null : 'must be an array') },
 };
@@ -262,9 +263,13 @@ export function validateModuleDeep(
   if (def.logic !== undefined && !Array.isArray(def.terminals)) {
     errors.push({ path: `${path}.logic`, message: 'needs explicit terminals to refer to' });
   }
+  const sideways = def.sideTerminals === true;
+  if (sideways && def.resizable !== undefined) errors.push({ path: `${path}.sideTerminals`, message: 'cannot be combined with resizable: the terminals stand at fractions of a unit' });
+  if (sideways && !Array.isArray(def.terminals)) errors.push({ path: `${path}.sideTerminals`, message: 'needs explicit terminals, each with a unit' });
   if (!Array.isArray(def.terminals)) return;
 
   const width = def.widthUnits as number;
+  const height = typeof def.heightMm === 'number' ? def.heightMm : 0;
   const ids = new Set<string>();
   let total = 0;
   def.terminals.forEach((entry, index) => {
@@ -274,7 +279,14 @@ export function validateModuleDeep(
     const count = (t.count as number | undefined) ?? 1;
     total += count;
     if (t.unit !== undefined && count > 1) errors.push({ path: `${entryPath}.unit`, message: 'cannot be combined with count' });
-    if (t.unit !== undefined) checkUnit(t.unit as number, narrowest, width, `${entryPath}.unit`, errors);
+    if (sideways) {
+      if (t.unit === undefined) errors.push({ path: `${entryPath}.unit`, message: 'is required when the terminals stand down the sides' });
+      else if (count === 1) {
+        const problem = sidePositionProblem(t.unit as number, height);
+        if (problem) errors.push({ path: `${entryPath}.unit`, message: problem });
+      }
+      if (count > 1) errors.push({ path: `${entryPath}.count`, message: 'a group cannot stand down the sides; give each terminal its own unit' });
+    } else if (t.unit !== undefined) checkUnit(t.unit as number, narrowest, width, `${entryPath}.unit`, errors);
     for (let i = 0; i < count; i++) {
       const name = count > 1 ? `${t.name as string}${i + 1}` : (t.name as string);
       const id = `${t.side as string}:${name}`;

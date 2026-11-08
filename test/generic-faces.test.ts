@@ -11,7 +11,7 @@ const TOP_PIN_Y_MM = 7;
 const BOTTOM_PIN_Y_MM = 84;
 const PIN_SPACING_MM = 5;
 
-/** The bars carry a screw head under every terminal on purpose. */
+/** The bars carry a screw head under every terminal on purpose, and so do the narrow bars with a column of terminals. */
 const SCREWS_UNDER_TERMINALS = new Set(['busbar']);
 
 const library = JSON.parse(raw) as Library;
@@ -33,7 +33,7 @@ describe('the faces of the bundled devices', () => {
     let checked = 0;
     const touching: string[] = [];
     for (const def of library.modules) {
-      if (!def.art || SCREWS_UNDER_TERMINALS.has(def.kind)) continue;
+      if (!def.art || SCREWS_UNDER_TERMINALS.has(def.kind) || def.sideTerminals) continue;
       for (const width of widthsOf(def)) {
         const pins = pinsAt(def, width);
         for (const shape of placeArt(def.art, def.widthUnits, width)) {

@@ -18,6 +18,7 @@ import {
   type TerminalRole,
   type TerminalSide,
 } from '../library/types';
+import { evenPositions, sidePositions } from '../library/terminalLayouts';
 import { DIN_MODULE_HEIGHT_MM, MOUNTINGS, SCHEMA_VERSION, type Mounting } from '../library/types';
 import { mmFromUnits, roundUnits, unitsFromMm } from '../layout/units';
 import { validateLibrary, type ValidationError } from '../library/validate';
@@ -190,7 +191,10 @@ function moduleView(module: ModuleDef): InspectorView {
       select('combSide', 'Side', module.comb?.side ?? 'top', TERMINAL_SIDES),
     );
   } else {
-    fields.push(readonly('terminalsSummary', 'Terminals', summariseTerminals(module)));
+    fields.push(
+      select('sideTerminals', 'Terminal layout', module.sideTerminals ? TERMINALS_DOWN : TERMINALS_ACROSS, [TERMINALS_ACROSS, TERMINALS_DOWN]),
+      readonly('terminalsSummary', 'Terminals', summariseTerminals(module)),
+    );
     (module.terminals ?? []).forEach((t, i) => {
       const n = i + 1;
       fields.push(
@@ -199,7 +203,7 @@ function moduleView(module: ModuleDef): InspectorView {
         select(`t.${i}.side`, `T${n} side`, t.side, TERMINAL_SIDES),
         text(`t.${i}.net`, `T${n} net`, t.net ?? ''),
         select(`t.${i}.role`, `T${n} role`, t.role ?? '', ['', ...TERMINAL_ROLES]),
-        { key: `t.${i}.unit`, label: `T${n} position`, kind: 'number', value: optional(t.unit), hint: 'units from the left, decimals allowed, negative from the right; empty spreads evenly' },
+        { key: `t.${i}.unit`, label: `T${n} position`, kind: 'number', value: optional(t.unit), hint: module.sideTerminals ? 'units from the top edge, decimals allowed' : 'units from the left, decimals allowed, negative from the right; empty spreads evenly' },
         integer(`t.${i}.count`, `T${n} copies`, optional(t.count), 'repeats with numbered names'),
       );
       actions.push({ key: `removeTerminal:${i}`, label: `Remove T${n}` });
@@ -208,6 +212,29 @@ function moduleView(module: ModuleDef): InspectorView {
     if (module.terminals) actions.push({ key: 'defaultTerminals', label: 'Use pole count' });
   }
   return { title: module.name || module.id, fields, actions };
+}
+
+const TERMINALS_ACROSS = 'in a row across the width';
+const TERMINALS_DOWN = 'in a column down the sides';
+
+/**
+ * Moves the terminals of a module between standing in a row across its width and standing in a column down its sides,
+ * spacing each side evenly again in the order its terminals stand in. A group with a count becomes single terminals,
+ * since terminals down a side have positions of their own, and a module that could be resized stops being resizable,
+ * because those positions do not follow a width. The names stay, so what the logic of the module refers to stays valid.
+ */
+export function withTerminalAxis(def: ModuleDef, sideways: boolean): ModuleDef {
+  if ((def.sideTerminals === true) === sideways || def.kind === 'comb') return def;
+  const placed = terminalsOf(def);
+  const spaced = new Map<string, number>();
+  for (const side of ['top', 'bottom'] as const) {
+    const onSide = placed.filter((t) => t.side === side).sort((a, b) => a.unit - b.unit);
+    const units = sideways ? sidePositions(onSide.length, def.heightMm) : evenPositions(onSide.length, def.widthUnits);
+    onSide.forEach((t, i) => spaced.set(t.id, units[i]!));
+  }
+  const terminals = placed.map((t): TerminalDef => ({ name: t.name, conductor: t.conductor, side: t.side, unit: spaced.get(t.id)!, ...(t.net ? { net: t.net } : {}), ...(t.role ? { role: t.role } : {}) }));
+  const { feed: _feed, resizable: _resizable, sideTerminals: _sideways, ...rest } = def;
+  return { ...rest, ...(sideways ? { sideTerminals: true } : {}), terminals };
 }
 
 export function describeEditor({ draft, target }: EditorState): InspectorView {
@@ -339,6 +366,8 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
     }
     case 'mounting':
       return apply((m) => ({ ...m, mounting: raw as Mounting }));
+    case 'sideTerminals':
+      return apply((m) => withTerminalAxis(m, raw === TERMINALS_DOWN));
     case 'poles':
       return apply((m) => ({ ...m, poles: Number(raw) as ModuleDef['poles'] }));
     case 'sku':

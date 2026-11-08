@@ -1,9 +1,9 @@
 import { terminalSources, terminalsOf, type Terminal } from '../electrical/terminals';
 import { createPanel } from '../layout/panel';
-import { fixedRange, isValidPosition, leftPosition } from '../library/positions';
-import { blockTerminals, evenPositions, rowEntries, type BlockSpec, type RowSpec } from '../library/terminalLayouts';
+import { SIDE_PIN_INSET_MM, fixedRange, isValidPosition, leftPosition, sideRange } from '../library/positions';
+import { blockTerminals, evenPositions, rowEntries, sidePositions, sideRowEntries, type BlockSpec, type RowSpec } from '../library/terminalLayouts';
 import type { ModuleRef, Panel, Placement } from '../layout/placement';
-import { DIN_MODULE_HEIGHT_MM, type Conductor, type Library, type ModuleDef, type TerminalDef, type TerminalSide, type TripCurve } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type Library, type ModuleDef, type TerminalDef, type TerminalSide, type TripCurve } from '../library/types';
 
 export const UNIT_PX = 44;
 const MARGIN = 28;
@@ -14,6 +14,8 @@ const BODY_HEIGHT = 190;
 const MIN_BODY_HEIGHT = 120;
 const MAX_BODY_HEIGHT = 400;
 const PIN_INSET = 18;
+/** How far from the edge a pin stands when the terminals stand down the sides of a narrow module, in pixels. */
+export const SIDE_PIN_INSET_PX = (SIDE_PIN_INSET_MM * UNIT_PX) / MODULE_UNIT_MM;
 const PIN_SPACING_PX = 13;
 const PIN_HIT_RADIUS = 10;
 const MIN_PIN_RADIUS = 3;
@@ -35,6 +37,10 @@ export interface DesignerLayout {
   width: number;
   height: number;
   widthUnits: number;
+  /** True when the terminals stand in a column down a side, at their distance from the top edge, and not in a row along the top and bottom. */
+  sideways: boolean;
+  /** The height of the drawn body in module units, for positions counted from its top edge. */
+  heightUnits: number;
   /** Radius of a pin: smaller when terminals stand close together. */
   pinRadius: number;
   /** True when neighbouring pins are so close that their names would overlap on one line. */
@@ -47,9 +53,15 @@ export interface DesignerLayout {
 export function designerLayout(def: ModuleDef, widthUnits: number = def.widthUnits): DesignerLayout {
   const bodyHeight = Math.max(MIN_BODY_HEIGHT, Math.min(MAX_BODY_HEIGHT, (BODY_HEIGHT * def.heightMm) / DIN_MODULE_HEIGHT_MM));
   const body = { x: MARGIN, y: MARGIN, width: widthUnits * UNIT_PX, height: bodyHeight };
+  const sideways = def.sideTerminals === true;
+  const heightUnits = def.heightMm / MODULE_UNIT_MM;
   const terminals = terminalsOf(def, widthUnits);
   const sources = terminalSources(def, widthUnits);
   const pins = terminals.map((terminal, i): DesignerPin => {
+    if (sideways) {
+      const inset = Math.min(SIDE_PIN_INSET_PX, body.width / 2);
+      return { source: sources[i] ?? null, terminal, x: terminal.side === 'top' ? body.x + body.width - inset : body.x + inset, y: body.y + (terminal.unit / heightUnits) * body.height };
+    }
     const sharing = terminals.filter((t) => t.side === terminal.side && t.unit === terminal.unit);
     const offset = (sharing.indexOf(terminal) - (sharing.length - 1) / 2) * PIN_SPACING_PX;
     return {
@@ -60,12 +72,12 @@ export function designerLayout(def: ModuleDef, widthUnits: number = def.widthUni
     };
   });
   const gaps = (['top', 'bottom'] as const).flatMap((side) => {
-    const xs = pins.filter((p) => p.terminal.side === side).map((p) => p.x).sort((a, b) => a - b);
-    return xs.slice(1).map((x, i) => x - xs[i]!);
+    const along = pins.filter((p) => p.terminal.side === side).map((p) => (sideways ? p.y : p.x)).sort((a, b) => a - b);
+    return along.slice(1).map((v, i) => v - along[i]!);
   });
   const tightest = Math.min(Infinity, ...gaps);
   const pinRadius = Math.max(MIN_PIN_RADIUS, Math.min(MAX_PIN_RADIUS, tightest * PIN_GAP_SHARE));
-  return { width: Math.max(body.width + 2 * MARGIN, MIN_STAGE_WIDTH_PX), height: body.height + 2 * MARGIN, widthUnits, pinRadius, crowded: tightest < CROWDED_GAP_PX, body, pins };
+  return { width: Math.max(body.width + 2 * MARGIN, MIN_STAGE_WIDTH_PX), height: body.height + 2 * MARGIN, widthUnits, sideways, heightUnits, pinRadius, crowded: tightest < CROWDED_GAP_PX, body, pins };
 }
 
 /** The pin under a point, the nearest one when several are within reach. */
@@ -91,6 +103,15 @@ export const POSITION_STEP = 0.25;
  */
 export function slotAt(layout: DesignerLayout, x: number, y: number): { unit: number; side: TerminalSide } | null {
   const { body, widthUnits } = layout;
+  if (layout.sideways) {
+    // Down the sides the position is the distance from the top edge, and the half of the body the point is in names the side.
+    const within = x >= body.x - EDGE_TOLERANCE_PX && x <= body.x + body.width + EDGE_TOLERANCE_PX && y >= body.y && y <= body.y + body.height;
+    if (!within) return null;
+    const { min, max } = sideRange(layout.heightUnits * MODULE_UNIT_MM);
+    const snapped = Math.round((((y - body.y) / body.height) * layout.heightUnits) / POSITION_STEP) * POSITION_STEP;
+    const unit = Math.min(Math.floor(max / POSITION_STEP) * POSITION_STEP, Math.max(Math.ceil(min / POSITION_STEP) * POSITION_STEP, snapped));
+    return { unit, side: x < body.x + body.width / 2 ? 'bottom' : 'top' };
+  }
   const inside =
     x >= body.x && x <= body.x + body.width && y >= body.y - EDGE_TOLERANCE_PX && y <= body.y + body.height + EDGE_TOLERANCE_PX;
   if (!inside) return null;
@@ -107,6 +128,10 @@ export function slotAt(layout: DesignerLayout, x: number, y: number): { unit: nu
  * does not exist at the narrowest width is moved to the nearest unit centre that does.
  */
 export function storedUnit(def: ModuleDef, unit: number, width: number = def.widthUnits): number {
+  if (def.sideTerminals) {
+    const { min, max } = sideRange(def.heightMm);
+    return Math.min(max, Math.max(min, unit));
+  }
   if (!def.resizable) return isValidPosition(unit, undefined, width) ? unit : Math.min(width - 1, Math.max(0, Math.round(unit)));
   const narrowest = def.resizable.minUnits;
   const candidate = unit < width / 2 ? unit : unit - width;
@@ -121,7 +146,7 @@ export function storedUnit(def: ModuleDef, unit: number, width: number = def.wid
  */
 export function repairPositions(draft: Library, moduleId: string): Library {
   const def = draft.modules.find((m) => m.id === moduleId);
-  if (!def?.terminals || !def.resizable) return draft;
+  if (!def?.terminals || !def.resizable || def.sideTerminals) return draft;
   const { minUnits } = def.resizable;
   const width = def.widthUnits;
   const valid = (unit: number) => isValidPosition(unit, minUnits, width);
@@ -140,7 +165,7 @@ export function repairPositions(draft: Library, moduleId: string): Library {
  */
 export function fitTerminalsToWidth(draft: Library, moduleId: string, previousWidth: number): Library {
   const def = draft.modules.find((m) => m.id === moduleId);
-  if (!def?.terminals || def.resizable) return draft;
+  if (!def?.terminals || def.resizable || def.sideTerminals) return draft;
   const width = def.widthUnits;
   if (width >= previousWidth || def.terminals.every((t) => t.unit === undefined || isValidPosition(t.unit, undefined, width))) return draft;
   const { min, max } = fixedRange(width);
@@ -453,7 +478,8 @@ export function addRow(draft: Library, moduleId: string, spec: RowSpec, width?: 
   const problem = rowProblem(spec);
   if (problem) return { ok: false, message: problem };
   const listed = listedTerminals(def);
-  const added = rowEntries(def.resizable !== undefined, spec, width ?? def.widthUnits, spec.joined ? freeNet(listed) : undefined);
+  const net = spec.joined ? freeNet(listed) : undefined;
+  const added = def.sideTerminals ? sideRowEntries(spec, def.heightMm, net) : rowEntries(def.resizable !== undefined, spec, width ?? def.widthUnits, net);
   const taken = new Set(listed.filter((t) => t.side === spec.side).map((t) => t.name));
   const clash = added.find((t) => taken.has(t.name));
   if (clash) return { ok: false, message: `The ${spec.side} side already has a terminal named ${clash.name}.` };
@@ -467,7 +493,7 @@ export function addRow(draft: Library, moduleId: string, spec: RowSpec, width?: 
 export function spreadSide(draft: Library, moduleId: string, side: TerminalSide, width?: number): Change {
   const def = draft.modules.find((m) => m.id === moduleId);
   if (!def) return { ok: false, message: 'That module does not exist.' };
-  if (def.resizable) return { ok: false, message: 'A module whose width can change keeps its terminals at the edges; use a group with a count to spread them.' };
+  if (def.resizable && !def.sideTerminals) return { ok: false, message: 'A module whose width can change keeps its terminals at the edges; use a group with a count to spread them.' };
   const listed = listedTerminals(def);
   const positions = (t: TerminalDef, i: number) => (t.unit === undefined ? Math.floor((i * def.widthUnits) / Math.max(1, listed.filter((x) => x.side === side).length)) : t.unit);
   const singles = listed
@@ -475,7 +501,7 @@ export function spreadSide(draft: Library, moduleId: string, side: TerminalSide,
     .filter(({ t }) => t.side === side && (t.count ?? 1) === 1)
     .sort((a, b) => positions(a.t, a.i) - positions(b.t, b.i) || a.i - b.i);
   if (singles.length === 0) return { ok: false, message: `The ${side} side has no single terminals to space.` };
-  const spaced = evenPositions(singles.length, width ?? def.widthUnits);
+  const spaced = def.sideTerminals ? sidePositions(singles.length, def.heightMm) : evenPositions(singles.length, width ?? def.widthUnits);
   const moved = new Map(singles.map(({ i }, order) => [i, spaced[order]!]));
   return { ok: true, draft: replaceTerminals(draft, moduleId, listed.map((t, i) => (moved.has(i) ? { ...t, unit: moved.get(i)! } : t))), index: 0 };
 }
@@ -489,7 +515,12 @@ export function makeBlock(draft: Library, moduleId: string, spec: BlockSpec, wid
     if (!Number.isInteger(count) || count < 0 || count > MAX_ROW) return { ok: false, message: `A side takes from 0 to ${MAX_ROW} terminals.` };
   }
   if (spec.top + spec.bottom < 2) return { ok: false, message: 'A block needs at least two terminals.' };
-  const terminals = blockTerminals(spec, width ?? def.widthUnits, def.resizable !== undefined);
+  const terminals = def.sideTerminals
+    ? [
+        ...sideRowEntries({ side: 'top', count: spec.top, conductor: spec.conductor, prefix: 'IN', joined: spec.joined }, def.heightMm, spec.joined ? 'NET1' : undefined),
+        ...sideRowEntries({ side: 'bottom', count: spec.bottom, conductor: spec.conductor, prefix: 'OUT', joined: spec.joined }, def.heightMm, spec.joined ? 'NET1' : undefined),
+      ]
+    : blockTerminals(spec, width ?? def.widthUnits, def.resizable !== undefined);
   return { ok: true, draft: replaceTerminals(draft, moduleId, terminals), index: 0 };
 }
 
@@ -556,9 +587,9 @@ const ROLE_MARKER_HALF_HEIGHT_PX = 3;
  * A small arrow on the edge side of a pin whose maker fixes the way it is fed: it points into the module
  * for an input and out of it for an output. A pin with no role has none.
  */
-export function roleMarker(pin: DesignerPin, pinRadius: number): { points: string } | null {
+export function roleMarker(pin: DesignerPin, pinRadius: number, sideways = false): { points: string } | null {
   const role = pin.terminal.role;
-  if (role === undefined) return null;
+  if (role === undefined || sideways) return null;
   const towardEdge = pin.terminal.side === 'top' ? -1 : 1;
   const pointing = role === 'input' ? -towardEdge : towardEdge;
   const centreY = pin.y + towardEdge * (pinRadius + ROLE_MARKER_GAP_PX);

@@ -12,6 +12,22 @@ export const edgeMargin = (width: number): number => Math.min(TERMINAL_EDGE_MARG
 
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
+/** How far from the edge the dot of a terminal stands when the terminals stand down the sides of a narrow module. */
+export const SIDE_PIN_INSET_MM = 4;
+
+/**
+ * What a terminal of a module with terminals down its sides allows: a position is the distance from the top edge to
+ * the centre of the terminal, in units of 17.5 mm, and keeps the same margin from either end as a position along the width.
+ */
+export function sideRange(heightMm: number): Range {
+  return { min: round(TERMINAL_EDGE_MARGIN_UNITS), max: round(heightMm / 17.5 - TERMINAL_EDGE_MARGIN_UNITS) };
+}
+
+export function sidePositionProblem(unit: number, heightMm: number): string | null {
+  const { min, max } = sideRange(heightMm);
+  return unit >= min && unit <= max ? null : `must be from ${min} to ${max}, counted from the top edge (the module is ${heightMm} mm high)`;
+}
+
 export interface Range {
   min: number;
   max: number;

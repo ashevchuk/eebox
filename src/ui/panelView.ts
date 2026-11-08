@@ -6,7 +6,6 @@ import { addComb, moveComb, nextCombId, removeComb } from '../layout/combs';
 import { addDuct, ductsOf, nextDuctId, type Duct } from '../layout/ducts';
 import { addFreePlacement, moveFreeGroup, moveFreePlacement, roundMm } from '../layout/free';
 import { MAX_RAIL_POSITION_MM, MIN_DUCT_SIZE_MM } from '../layout/limits';
-import { VERTICAL_RAIL_KINDS, isVertical } from '../layout/rail';
 import {
   insertPlacement,
   isFree,
@@ -374,7 +373,7 @@ export class PanelView implements View {
     drag.guides = [];
     const onRailAllowed = drag.kind === 'comb' || drag.def.mounting !== 'plate';
     const onPlateAllowed = drag.kind === 'placement' && drag.def.mounting !== 'rail';
-    const snap = overCanvas && onRailAllowed ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits, this.neighboursOf(drag, panel), (rail) => !isVertical(panel.rails[rail]) || VERTICAL_RAIL_KINDS.includes(drag.def.kind)) : null;
+    const snap = overCanvas && onRailAllowed ? snapToSlot(panel, world, drag.widthUnits, drag.anchorUnits, this.neighboursOf(drag, panel)) : null;
     if (snap) {
       const result = this.tryDrop(drag, full, snap);
       drag.ghost = { module: drag.def, widthUnits: drag.widthUnits, ...snap, valid: result.ok };

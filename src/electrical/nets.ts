@@ -66,7 +66,8 @@ export function combContacts(panel: Project['panel'], resolve: Resolve): CombCon
       const pin = pattern[offset % pattern.length]!;
       for (const placement of panel.placements.filter(isOnRail)) {
         const placed = placement.rail === comb.rail ? resolve(placement.module) : undefined;
-        if (!placed) continue;
+        // A terminal in a column down the side of a bar is not under a comb.
+        if (!placed || placed.sideTerminals) continue;
         // A pin is one unit of the comb; a terminal belongs to the pin whose unit holds its centre.
         const pinOf = (unit: number) => Math.floor(placement.slot + unit + 0.5 - comb.slot + LAYOUT_EPSILON_UNITS);
         const terminal = terminalsOf(placed, placement.widthUnits ?? placed.widthUnits).find(

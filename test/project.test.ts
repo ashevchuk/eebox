@@ -225,28 +225,17 @@ describe('panel spacing in the project file', () => {
     const file = validFile();
     file.project.panel.rails = [];
     expect(parseProjectJson(JSON.stringify(file)).ok).toBe(true);
-    file.project.panel.rails = Array.from({ length: 21 }, () => ({ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12 }));
+    file.project.panel.rails = Array.from({ length: 21 }, () => ({ plate: 'plate1', x: 0, y: 110, lengthUnits: 12 }));
     expect(errorPaths(file)).toEqual(['project.panel.rails']);
-  });
-
-  it('rejects a rail without an orientation or with one that does not exist', () => {
-    const file = validFile();
-    const { orientation: _o, ...bare } = file.project.panel.rails[0]!;
-    file.project.panel.rails = [bare as never];
-    expect(errorPaths(file)).toEqual(['project.panel.rails[0].orientation']);
-    file.project.panel.rails = [{ ...bare, orientation: 'diagonal' } as never];
-    expect(errorPaths(file)).toEqual(['project.panel.rails[0].orientation']);
-    file.project.panel.rails = [{ ...bare, orientation: 'vertical' } as never];
-    expect(parseProjectJson(JSON.stringify(file)).ok).toBe(true);
   });
 
   it('rejects a rail with a position outside the limits or an absurd length', () => {
     const file = validFile();
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: -1, y: 110, lengthUnits: 12 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: -1, y: 110, lengthUnits: 12 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].x']);
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 1_000_000, lengthUnits: 12 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 1_000_000, lengthUnits: 12 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].y']);
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 1_000_000_000 }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 1_000_000_000 }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].lengthUnits']);
   });
 });
@@ -377,11 +366,11 @@ describe('labels in the project file', () => {
 
   it('accepts only a valid label on a rail, and no other field', () => {
     const file = validFile();
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12, label: 'a\nb' }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, label: 'a\nb' }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12, label: '' }];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, label: '' }];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].label']);
-    file.project.panel.rails = [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12, colour: 'red' } as never];
+    file.project.panel.rails = [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12, colour: 'red' } as never];
     expect(errorPaths(file)).toEqual(['project.panel.rails[0].colour']);
   });
 

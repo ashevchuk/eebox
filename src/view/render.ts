@@ -1,13 +1,13 @@
 import { drawArt } from './art';
 import { FONT_FAMILY } from './font';
 import { drawConductorDot } from './conductorDraw';
-import { terminalLabels, terminalX } from './terminalLabels';
+import { pinPoint, terminalLabels } from './terminalLabels';
 import { describeMeasurement, measurement, type RulerLine } from './ruler';
 import { wrapText } from './textFit';
 import { terminalsOf } from '../electrical/terminals';
-import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind, type TerminalSide } from '../library/types';
+import { DIN_MODULE_HEIGHT_MM, MODULE_UNIT_MM, type Conductor, type ModuleDef, type ModuleKind } from '../library/types';
 import { lookupsOf } from '../layout/lookups';
-import { isOnRail, type CombPlacement, type ModuleRef, type Panel, type Sizes } from '../layout/placement';
+import type { ModuleRef, Panel, Sizes } from '../layout/placement';
 import type { Camera } from './Camera';
 import { theme } from './theme';
 import type { Annotation } from '../layout/annotations';
@@ -15,9 +15,8 @@ import { stampParts } from '../layout/info';
 import { t } from '../i18n';
 import { drawAnnotations } from './annotationDraw';
 import { ALL_TEXT, type TextVisibility } from './textVisibility';
-import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, levelLabelEdge, levelLabelRoom, levelLabelSide, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
+import { COMB_HEIGHT, FRAME_PADDING, combRect, ductRect, frameRect, moduleRect, placementLabelRoom, placementRect, railRect, rowLabelX, type Rect } from './geometry';
 import { ductsOf, type Duct } from '../layout/ducts';
-import { isVertical } from '../layout/rail';
 import type { Guide } from './snap';
 import type { Dimension } from './dimensions';
 
@@ -159,7 +158,8 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts
     ctx.font = `bold 8px ${FONT_FAMILY}`;
     ctx.fillText(rating, r.x + r.width / 2, r.y + 22);
   }
-  if (texts.moduleNames && r.width >= MIN_NAME_WIDTH_MM) {
+  // A column of terminals takes the whole narrow face, so the name would be written over it.
+  if (texts.moduleNames && r.width >= MIN_NAME_WIDTH_MM && !def.sideTerminals) {
     const room = r.height - NAME_TOP_MM - NAME_BOTTOM_MM;
     ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
     ctx.rotate(-Math.PI / 2);
@@ -209,60 +209,20 @@ function drawUpwardsLabel(
   ctx.restore();
 }
 
-const LEVEL_LABEL_GAP = 4;
-
-/** The width and side of a comb as the geometry wants them; nothing for a comb whose module is missing. */
-function combInfoOf(scene: Scene, comb: CombPlacement): { widthUnits: number; side: TerminalSide } | undefined {
-  const def = scene.resolve(comb.module);
-  return def?.comb ? { widthUnits: itemWidth(scene, comb), side: def.comb.side } : undefined;
-}
-
-/** Text that reads from left to right, for what stands on a vertical rail, where nothing is below it to print under. */
-function drawLevelLabel(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxLength: number,
-  align: CanvasTextAlign,
-  baseline: CanvasTextBaseline,
-  color: string,
-  font: string = LABEL_FONT,
-): void {
-  ctx.save();
-  ctx.font = font;
-  ctx.fillStyle = color;
-  ctx.textAlign = align;
-  ctx.textBaseline = baseline;
-  ctx.fillText(fitText(ctx, text, maxLength), x, y);
-  ctx.restore();
-}
-
 function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisibility): void {
   const { panel } = scene;
   panel.rails.forEach(({ label }, rail) => {
     if (!label || !texts.rowLabels) return;
     const r = railRect(panel, rail);
-    if (isVertical(panel.rails[rail])) drawLevelLabel(ctx, label, r.x + r.width / 2, r.y - LEVEL_LABEL_GAP, ROW_LABEL_MAX_LENGTH, 'center', 'bottom', theme().rowLabel);
-    else drawUpwardsLabel(ctx, label, rowLabelX(panel, rail), r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
+    drawUpwardsLabel(ctx, label, rowLabelX(panel, rail), r.y + r.height / 2, ROW_LABEL_MAX_LENGTH, 'center', theme().rowLabel);
   });
   for (const placement of panel.placements) {
     if (!placement.label || !texts.moduleLabels) continue;
     const r = placementRect(panel, sizesOf(scene), placement);
-    if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) {
-      const side = levelLabelSide(placement);
-      const edge = levelLabelEdge(panel, sizesOf(scene), (c) => combInfoOf(scene, c), r, placement.rail, side);
-      const room = levelLabelRoom(panel, edge, side);
-      drawLevelLabel(ctx, placement.label, edge + (side === 'right' ? LEVEL_LABEL_GAP : -LEVEL_LABEL_GAP), r.y + r.height / 2, room, side === 'right' ? 'left' : 'right', 'middle', theme().label);
-    } else {
-      drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
-    }
+    drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
   }
   if (texts.terminalLabels) {
-    for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) {
-      if (label.direction === 'up') drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
-      else drawLevelLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', 'middle', theme().label, TERMINAL_LABEL_FONT);
-    }
+    for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);
   }
   ctx.font = LABEL_FONT;
   ctx.fillStyle = theme().label;
@@ -271,10 +231,6 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
     const def = scene.resolve(comb.module);
     if (!comb.label || !texts.combLabels || !def?.comb) continue;
     const r = combRect(panel, sizesOf(scene), comb.rail, comb.slot, itemWidth(scene, comb), def.comb.side);
-    if (isVertical(panel.rails[comb.rail])) {
-      drawLevelLabel(ctx, comb.label, def.comb.side === 'top' ? r.x + r.width + LEVEL_LABEL_GAP : r.x - LEVEL_LABEL_GAP, r.y + 2, ROW_LABEL_MAX_LENGTH, def.comb.side === 'top' ? 'left' : 'right', 'top', theme().label);
-      continue;
-    }
     ctx.textBaseline = def.comb.side === 'top' ? 'bottom' : 'top';
     ctx.fillText(fitText(ctx, comb.label, r.width), r.x + 2, def.comb.side === 'top' ? r.y - 3 : r.y + r.height + 3);
   }
@@ -288,20 +244,9 @@ function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, conductor:
 function drawTerminals(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number): void {
   const terminals = terminalsOf(def, widthUnits);
   for (const terminal of terminals) {
-    drawPin(ctx, terminalX(terminals, terminal, r), terminal.side === 'top' ? r.y + 7 : r.y + r.height - 6, terminal.conductor);
+    const at = pinPoint(def, terminals, terminal, r.width, r.height);
+    drawPin(ctx, r.x + at.x, r.y + at.y, terminal.conductor);
   }
-}
-
-/**
- * Draws what `draw` makes in an upright box into `r`, whose width and height are the other way round,
- * turned a quarter turn clockwise: what is on top of the upright drawing ends up on the right.
- */
-function drawTurned(ctx: CanvasRenderingContext2D, r: Rect, draw: (upright: Rect) => void): void {
-  ctx.save();
-  ctx.translate(r.x + r.width, r.y);
-  ctx.rotate(Math.PI / 2);
-  draw({ x: 0, y: 0, width: r.height, height: r.width });
-  ctx.restore();
 }
 
 function drawComb(
@@ -315,10 +260,7 @@ function drawComb(
   color: string,
 ): void {
   if (!def.comb) return;
-  const r = combRect(panel, sizes, rail, slot, widthUnits, def.comb.side);
-  const strip = (box: Rect) => drawCombStrip(ctx, def, box, widthUnits, color);
-  if (isVertical(panel.rails[rail])) drawTurned(ctx, r, strip);
-  else strip(r);
+  drawCombStrip(ctx, def, combRect(panel, sizes, rail, slot, widthUnits, def.comb.side), widthUnits, color);
 }
 
 function drawCombStrip(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, color: string): void {
@@ -550,12 +492,8 @@ export function render(
     const r = railRect(panel, rail);
     fillRect(ctx, r, COLORS.rail);
     ctx.fillStyle = theme().frameFill;
-    const vertical = isVertical(panel.rails[rail]);
-    const units = (vertical ? r.height : r.width) / MODULE_UNIT_MM;
-    for (let unit = 0; unit < units; unit++) {
-      const along = unit * MODULE_UNIT_MM + MODULE_UNIT_MM / 2 - 3;
-      if (vertical) ctx.fillRect(r.x + r.width / 2 - 1.5, r.y + along, 3, 6);
-      else ctx.fillRect(r.x + along, r.y + r.height / 2 - 1.5, 6, 3);
+    for (let unit = 0; unit < r.width / MODULE_UNIT_MM; unit++) {
+      ctx.fillRect(r.x + unit * MODULE_UNIT_MM + MODULE_UNIT_MM / 2 - 3, r.y + r.height / 2 - 1.5, 6, 3);
     }
   });
 
@@ -576,11 +514,7 @@ export function render(
   const sizes = sizesOf(scene);
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
-    const def = scene.resolve(placement.module);
-    const body = placementRect(panel, sizes, placement);
-    const face = (box: Rect) => drawModule(ctx, def, box, itemWidth(scene, placement), texts);
-    if (isOnRail(placement) && isVertical(panel.rails[placement.rail])) drawTurned(ctx, body, face);
-    else face(body);
+    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizes, placement), itemWidth(scene, placement), texts);
   }
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);

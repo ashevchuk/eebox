@@ -4,7 +4,6 @@ import type { Project } from '../project';
 import { FRAME_PADDING, ductRect, placementRect, railRect, type Rect } from '../view/geometry';
 import { ductsOf } from './ducts';
 import { scopeToPlate } from './plates';
-import { VERTICAL_RAIL_KINDS, isVertical } from './rail';
 import { isFree, isOnRail, type Panel, type Plate, type Sizes } from './placement';
 
 /** Overlaps smaller than this are rounding, not two things on one place. */
@@ -97,12 +96,8 @@ function findOnPlate(panel: Panel, offset: number, plate: Plate, sizes: Sizes, r
   });
 
   for (const placement of panel.placements) {
-    const def = resolve(placement.module);
-    const mounting = def?.mounting;
+    const mounting = resolve(placement.module)?.mounting;
     const body = bodies.find((b) => b.id === placement.id)!;
-    if (def && isOnRail(placement) && isVertical(panel.rails[placement.rail]) && !VERTICAL_RAIL_KINDS.includes(def.kind)) {
-      add('advice', `${body.name} (${body.id}) is made for a horizontal rail, not for a vertical one.`, body);
-    }
     if (mounting === 'plate' && isOnRail(placement)) add('advice', `${body.name} (${body.id}) is made for the plate, not for a rail.`, body);
     if (mounting === 'rail' && isFree(placement)) add('advice', `${body.name} (${body.id}) is made for a DIN rail, not for the plate.`, body);
   }

@@ -36,7 +36,7 @@ const project = {
         { id: 'plate1', name: 'Back plate', widthMm: 300, heightMm: 300 },
         { id: 'plate2', name: 'Door', widthMm: 300, heightMm: 300 },
       ],
-      rails: [{ plate: 'plate1', orientation: 'horizontal', x: 0, y: 110, lengthUnits: 12 }],
+      rails: [{ plate: 'plate1', x: 0, y: 110, lengthUnits: 12 }],
       placements: [
         { id: 'p1', module: { libraryId: 'lib', moduleId: 'dev' }, rail: 0, slot: 0 },
         { id: 'p2', module: { libraryId: 'lib', moduleId: 'dev' }, plate: 'plate2', x: 40, y: 60 },

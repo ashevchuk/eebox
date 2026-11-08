@@ -111,6 +111,15 @@ describe('inspect: what is shown', () => {
     expect(field(ctx({ placementId: 'p9' }, 'panel', project), 'terminals')?.value).toBe('no top · bottom A B');
   });
 
+  it('calls the sides of a bar with its terminals in a column right and left, in the summary and in the fields that label them', () => {
+    const base = build();
+    const project = { ...base, panel: { ...base.panel, placements: [...base.panel.placements, place('p8', 'colRight', 0, 14)] } };
+    const column = ctx({ placementId: 'p8' }, 'panel', project);
+    expect(field(column, 'terminals')?.value).toBe('right A B · no left');
+    expect(field(column, 'fillTop')?.label).toBe('Label the right terminals');
+    expect(field(column, 'terminal:top:A')?.label).toBe('A (right)');
+  });
+
   it('summarises terminals, and only counts them on a long bar', () => {
     expect(field(ctx({ placementId: 'p2' }), 'terminals')?.value).toBe('top L1 L2 L3 · bottom L1 L2 L3');
     expect(field(ctx({ placementId: 'p3' }), 'terminals')?.value).toBe('top N1 N2 N3 · bottom Nb1 Nb2 Nb3');
@@ -274,16 +283,6 @@ describe('applyEdit: position and width', () => {
 });
 
 describe('applyEdit: rows', () => {
-  it('turns a row, and names its position by the other pair of edges when it is vertical', () => {
-    const turned = ok(applyEdit(ctx({ rail: 0 }), 'orientation', 'vertical'));
-    expect(turned.panel.rails.map((r) => r.orientation)).toEqual(['vertical', 'horizontal']);
-    const vertical = inspect({ ...ctx({ rail: 0 }), project: { ...ctx({ rail: 0 }).project, panel: turned.panel } })!;
-    const labels = vertical.fields.map((f) => f.label);
-    expect(labels).toEqual(expect.arrayContaining(['Orientation', 'Centre line', 'Top end']));
-    expect(labels).not.toContain('Left end');
-    expect(message(applyEdit(ctx({ rail: 0 }), 'orientation', 'diagonal'))).toBe('Orientation is horizontal or vertical.');
-  });
-
   it('changes the length, refusing what would not fit the modules', () => {
     expect(ok(applyEdit(ctx({ rail: 1 }), 'length', '12')).panel.rails.map((r) => r.lengthUnits)).toEqual([24, 12]);
     expect(message(applyEdit(ctx({ rail: 0 }), 'length', '5'))).toBe('Modules on this row would not fit.');
