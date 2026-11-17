@@ -38,6 +38,14 @@ Narrow bars with a column of terminals, as in a real board, are in the library f
 
 ![The neutral and earth bars as narrow bars with a column of terminals](docs/images/narrow-bars.png)
 
+The module designer (*New module...* in the sidebar, or *Edit module...* in the inspector of a placed module) makes a module of your own, with no JSON to write. In *Terminals* mode you start from a template or from nothing, click the top or bottom half of the drawing to add a terminal, drag it to move it, and join terminals inside the module with *Connect*; the fields on the right hold the name, width, height, mounting, ratings and the selected terminal. The slider shows the module at another width, and the drawing below it shows how it stands on a rail. A width typed outside the resizable range widens the range.
+
+![The module designer, Terminals mode, on a contactor template](docs/images/designer-terminals.png)
+
+*Face* mode draws what the module looks like on the panel: lines, rectangles, ellipses, polylines and text, or an imported SVG, each set to follow the width of a resizable copy.
+
+![The module designer, Face mode](docs/images/designer-face.png)
+
 ## Features
 
 - **Panel layout.** Rails of any length, put anywhere on the panel (one under another or side by side), in 17.5 mm module units. Drag modules from the palette, reorder modules and rails, take modules off a rail onto a shelf and put them back.
