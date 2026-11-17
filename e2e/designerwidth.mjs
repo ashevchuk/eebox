@@ -71,6 +71,15 @@ try {
     expectTrue(new Set(seen.map((m) => m.railTop)).size === 1 && new Set(seen.map((m) => m.railHeight)).size === 1, 'the rail preview moved or changed its height');
   });
 
+  await step('a width typed beyond the resizable range widens the range and the slider follows', async () => {
+    await browser.evaluate(`(() => { const r = [...document.querySelectorAll('.designer-dialog[open] .inspector-field')].find((x) => x.querySelector('label')?.textContent === 'Width'); const i = r.querySelector('input'); i.value = '30'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(500);
+    const m = await browser.evaluate(`(() => { const d = document.querySelector('.designer-dialog[open]'); const sl = d.querySelector('.designer-width input'); return { label: d.querySelector('.designer-width span').textContent, max: sl.max, value: sl.value, saveDisabled: [...d.querySelectorAll('button')].find((b) => b.textContent === 'Save').disabled, errors: d.querySelector('.editor-errors')?.textContent ?? '' }; })()`);
+    expectTrue(m.max === '30' && m.value === '30', `the slider did not follow: ${JSON.stringify(m)}`);
+    expectTrue(/Shown at 30 units/.test(m.label), `the label says ${m.label}`);
+    expectTrue(!m.saveDisabled && !/resizable range/.test(m.errors), `the draft is still invalid: ${JSON.stringify(m)}`);
+  });
+
   expectTrue(browser.problems.length === 0, `the page raised errors: ${JSON.stringify(browser.problems)}`);
 } finally {
   await browser?.close();

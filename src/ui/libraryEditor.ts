@@ -356,7 +356,11 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       const parsed = optionalNumber(raw, false);
       if (!parsed.ok || parsed.value === undefined) return fail(parsed.ok ? NOT_A_NUMBER : parsed.message);
       const units = key === 'widthMm' ? unitsFromMm(parsed.value) : roundUnits(parsed.value);
-      return apply((m) => ({ ...m, widthUnits: units }));
+      return apply((m) => ({
+        ...m,
+        widthUnits: units,
+        ...(m.resizable && { resizable: { minUnits: Math.min(m.resizable.minUnits, units), maxUnits: Math.max(m.resizable.maxUnits, units) } }),
+      }));
     }
     case 'heightMm': {
       const parsed = optionalNumber(raw, false);

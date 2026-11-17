@@ -56,6 +56,22 @@ const sample = (): Library => ({
   enclosures: [{ id: 'box', name: 'Box', railLengthsUnits: [12, 12] }],
 });
 
+describe('width of a resizable module', () => {
+  it('widens the resizable range to hold a width typed outside it', () => {
+    const s = state(sample(), { kind: 'module', id: 'bar' });
+    const wider = edit(s, 'widthUnits', '30').draft;
+    expect(moduleOf(wider, 'bar').resizable).toEqual({ minUnits: 2, maxUnits: 30 });
+    const narrower = edit(state(wider, s.target), 'widthUnits', '1').draft;
+    expect(moduleOf(narrower, 'bar').resizable).toEqual({ minUnits: 1, maxUnits: 30 });
+    expect(errorPaths(narrower)).toEqual([]);
+  });
+
+  it('leaves a fixed module without a range', () => {
+    const draft = edit(state(sample(), { kind: 'module', id: 'mcb' }), 'widthUnits', '2').draft;
+    expect(moduleOf(draft, 'mcb').resizable).toBeUndefined();
+  });
+});
+
 describe('creating libraries and items', () => {
   it('starts a valid empty library', () => {
     expect(validateDraft(newLibrary('mine', 'Mine'))).toEqual([]);
@@ -400,11 +416,10 @@ describe('what the validator says about a draft', () => {
   it('has no complaints about the sample, and reports a chain of edits with paths', () => {
     expect(validateDraft(sample())).toEqual([]);
     let s = state(sample(), { kind: 'module', id: 'bar' });
-    s = state(edit(s, 'widthUnits', '40').draft, s.target);
+    s = state(edit(s, 'widthUnits', '200').draft, s.target);
     expect(errorPaths(s.draft)).toEqual(['modules[1].widthUnits']);
     s = state(edit(s, 'name', ' ').draft, s.target);
-    // Field errors come first; the rules that tie fields together are checked once the fields are fine.
-    expect(errorPaths(s.draft)).toEqual(['modules[1].name']);
+    expect(errorPaths(s.draft).sort()).toEqual(['modules[1].name', 'modules[1].widthUnits']);
   });
 
   it('flags a duplicate id created by renaming', () => {
