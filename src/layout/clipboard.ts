@@ -1,5 +1,6 @@
 import { addComb, nextCombId, type CombLookup } from './combs';
 import { addDuct, ductsOf, nextDuctId, type Duct } from './ducts';
+import { withoutRef } from './designations';
 import { addFreePlacement, roundMm } from './free';
 import { addPlacement, isFree, isOnRail, nextPlacementId, type CombPlacement, type FreePlacement, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { LAYOUT_EPSILON_UNITS, roundUnits } from './units';
@@ -41,7 +42,7 @@ function tryPaste(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: 
   const ductIds: string[] = [];
   for (const source of clip.placements) {
     const id = nextPlacementId(next);
-    const result = addPlacement(next, widthOf, { ...source, id, slot: roundUnits(source.slot + dx) });
+    const result = addPlacement(next, widthOf, { ...withoutRef(source), id, slot: roundUnits(source.slot + dx) });
     if (!result.ok) return { ok: false, error: 'no-room' };
     next = result.panel;
     placementIds.push(id);
@@ -55,7 +56,7 @@ function tryPaste(panel: Panel, widthOf: WidthOf, combLookup: CombLookup, clip: 
   }
   for (const source of clip.free) {
     const id = nextPlacementId(next);
-    const result = addFreePlacement(next, widthOf, { ...source, id, x: roundMm(source.x + FREE_PASTE_OFFSET_MM), y: roundMm(source.y + FREE_PASTE_OFFSET_MM) });
+    const result = addFreePlacement(next, widthOf, { ...withoutRef(source), id, x: roundMm(source.x + FREE_PASTE_OFFSET_MM), y: roundMm(source.y + FREE_PASTE_OFFSET_MM) });
     if (!result.ok) return { ok: false, error: 'no-room' };
     next = result.panel;
     placementIds.push(id);

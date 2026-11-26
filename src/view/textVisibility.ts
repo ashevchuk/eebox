@@ -1,4 +1,4 @@
-export const PANEL_TEXTS = ['title', 'rowLabels', 'moduleLabels', 'terminalLabels', 'combLabels', 'ratings', 'moduleNames', 'faceText'] as const;
+export const PANEL_TEXTS = ['title', 'rowLabels', 'moduleLabels', 'terminalLabels', 'combLabels', 'ratings', 'moduleNames', 'faceText', 'refs'] as const;
 export const SCHEMATIC_TEXTS = ['nodeLabels', 'terminalNames', 'earthing', 'wireLabels', 'currents'] as const;
 /** Text of the print sheet around the drawings; it has no place on the screen. */
 export const SHEET_TEXTS = ['sheetTitle', 'captions'] as const;
@@ -19,6 +19,7 @@ export const TEXT_NAMES: Record<TextKind, string> = {
   ratings: 'Ratings on modules (B16)',
   moduleNames: 'Names on modules',
   faceText: 'Text drawn on module faces',
+  refs: 'Designations on modules (QF1)',
   nodeLabels: 'Node names',
   terminalNames: 'Terminal names',
   earthing: 'Earthing system on sources',

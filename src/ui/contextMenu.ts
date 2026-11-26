@@ -53,7 +53,7 @@ export function contextMenuEntries(ctx: MenuContext): MenuEntry[] {
     }
     if (selection.rail !== undefined) return grouped([[command('duplicate-row', 'Duplicate the row')], undo]);
     if (selection.annotationId !== undefined) return grouped([actions, undo]);
-    return grouped([[command('paste', 'Paste', 'Ctrl+V', !ctx.hasClipboard), command('select-all', 'Select all', 'Ctrl+A'), command('button:fit', 'Fit to the window')], undo]);
+    return grouped([[command('paste', 'Paste', 'Ctrl+V', !ctx.hasClipboard), command('select-all', 'Select all', 'Ctrl+A'), command('button:number-devices', 'Number the devices'), command('button:fit', 'Fit to the window')], undo]);
   }
 
   const nodes = selectedNodes(selection).length;

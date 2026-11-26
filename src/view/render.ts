@@ -209,6 +209,29 @@ function drawUpwardsLabel(
   ctx.restore();
 }
 
+/** The designation is a sticker above the bottom terminals, below where the name ends; a sticker is yellow on any background. */
+const REF_FONT = `bold 5px ${FONT_FAMILY}`;
+const REF_CENTRE_ABOVE_BOTTOM_MM = 15;
+const REF_HEIGHT_MM = 6;
+const REF_PADDING_MM = 1;
+const REF_COLOURS = { sticker: '#facc15', text: '#111827' };
+
+function drawRef(ctx: CanvasRenderingContext2D, ref: string, r: Rect): void {
+  if (r.width < MIN_NAME_WIDTH_MM) return;
+  ctx.save();
+  ctx.font = REF_FONT;
+  const text = fitText(ctx, ref, r.width - 2 * REF_PADDING_MM - 1);
+  const width = ctx.measureText(text).width + 2 * REF_PADDING_MM;
+  const centreY = r.y + r.height - REF_CENTRE_ABOVE_BOTTOM_MM;
+  ctx.fillStyle = REF_COLOURS.sticker;
+  ctx.fillRect(r.x + (r.width - width) / 2, centreY - REF_HEIGHT_MM / 2, width, REF_HEIGHT_MM);
+  ctx.fillStyle = REF_COLOURS.text;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, r.x + r.width / 2, centreY);
+  ctx.restore();
+}
+
 function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisibility): void {
   const { panel } = scene;
   panel.rails.forEach(({ label }, rail) => {
@@ -220,6 +243,12 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
     if (!placement.label || !texts.moduleLabels) continue;
     const r = placementRect(panel, sizesOf(scene), placement);
     drawUpwardsLabel(ctx, placement.label, r.x + r.width / 2, r.y + r.height + 4, placementLabelRoom(panel, placement, r), 'right', theme().label);
+  }
+  if (texts.refs) {
+    for (const placement of panel.placements) {
+      const def = scene.resolve(placement.module);
+      if (placement.ref && def && !def.sideTerminals) drawRef(ctx, placement.ref, placementRect(panel, sizesOf(scene), placement));
+    }
   }
   if (texts.terminalLabels) {
     for (const label of terminalLabels(panel, sizesOf(scene), scene.resolve)) drawUpwardsLabel(ctx, label.text, label.x, label.y, label.maxLength, 'left', theme().label, TERMINAL_LABEL_FONT);

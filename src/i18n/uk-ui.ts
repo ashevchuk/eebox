@@ -9,6 +9,7 @@ export const UI: Dictionary = {
   'Number the wires': `Нумерація проводів`,
   Pattern: `Шаблон`,
   'Every wire already has a label.': `Кожен провід уже має підпис.`,
+  'Every device already has a designation.': `Кожен апарат уже має позначення.`,
   'That pattern makes a label that cannot be kept: up to 60 characters, no line breaks.': `З цього шаблону виходить підпис, який не можна зберегти: до 60 символів, без розривів рядка.`,
   'No enclosure available: import a library that defines one.': `Немає жодного корпусу: імпортуйте бібліотеку, що його описує.`,
   'Discard the current panel and schematic? Its last state stays under File > Projects, in Earlier states.':
@@ -180,6 +181,7 @@ export const UI: Dictionary = {
   'Names on modules': `Найменування на модулях`,
   'Terminal names over terminal blocks': `Назви клем над клемниками`,
   'Text drawn on module faces': `Текст на лицьових панелях модулів`,
+  'Designations on modules (QF1)': `Позначення на модулях (QF1)`,
   'Node names': `Назви вузлів`,
   'Terminal names': `Назви клем`,
   'Earthing system on sources': `Система заземлення на джерелах`,

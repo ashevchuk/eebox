@@ -15,6 +15,8 @@ interface PlacementCommon {
   module: ModuleRef;
   /** What the user calls this module on the panel, e.g. the circuit it protects. */
   label?: string;
+  /** Reference designation of the device on the drawings, such as `QF1`. */
+  ref?: string;
   /** Own width of this copy; only for modules that are resizable in the library. */
   widthUnits?: number;
   /** Labels of single terminals, keyed by terminal id (e.g. `top:N3`). */
@@ -127,6 +129,7 @@ export type PlacementError =
   | { kind: 'duplicate-id' }
   | { kind: 'unknown-placement' }
   | { kind: 'invalid-label' }
+  | { kind: 'invalid-ref' }
   | { kind: 'not-resizable' }
   | { kind: 'invalid-state' }
   | { kind: 'width-out-of-range' };

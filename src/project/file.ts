@@ -1,4 +1,5 @@
 import { annotationsCheck, type Annotation } from '../layout/annotations';
+import { isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
 import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
@@ -193,10 +194,12 @@ const flagsCheck = (v: unknown) =>
   Object.entries(v).every(([name, value]) => /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && typeof value === 'boolean')
     ? null
     : `must map flag names to true or false, at most ${MAX_FLAGS}`;
+const refCheck = (v: unknown) => (isStoredRef(v) ? null : `must be 1 to ${MAX_REF_LENGTH} letters, digits or . - + = : _ /`);
 const SHELF_ITEM_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   module: { required: true, check: moduleRefCheck },
   label: { required: false, check: labelCheck },
+  ref: { required: false, check: refCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
@@ -211,6 +214,7 @@ const PLACEMENT_SPEC: FieldSpec = {
   y: { required: false, check: railPositionCheck },
   plate: { required: false, check: identifier },
   label: { required: false, check: labelCheck },
+  ref: { required: false, check: refCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },

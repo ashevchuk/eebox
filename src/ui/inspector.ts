@@ -1,5 +1,6 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { changeDuct, ductsOf, setDuctDepth, setDuctLabel, type Duct } from '../layout/ducts';
+import { MAX_REF_LENGTH, nextRef, setPlacementRef } from '../layout/designations';
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
@@ -520,6 +521,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           ...faultFields(ctx.findings, (p) => p.placements.includes(placement.id)),
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
+          text('ref', 'Designation', placement.ref ?? '', nextRef(project.panel, def)),
           ...positionFields(placement, def, project, width, ctx.lengthUnit ?? 'units'),
           ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
@@ -675,6 +677,7 @@ const ERROR_TEXT: Record<string, string> = {
   'invalid-state': 'That position is not one this device has.',
   'width-out-of-range': 'The width is outside what the library allows.',
   'invalid-label': LABEL_MESSAGE,
+  'invalid-ref': `A designation is 1 to ${MAX_REF_LENGTH} letters, digits or . - + = : _ /, such as QF1.`,
   'modules-do-not-fit': 'Modules on this row would not fit.',
   'rail-not-empty': 'Move the modules off the rows you remove first.',
   'invalid-conductors': 'A conductor can be ticked once, and at least one is needed.',
@@ -830,6 +833,10 @@ export function applyEdit(
       const { placement, node } = target;
       if (key === 'label') {
         const result = setPlacementLabel(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key === 'ref') {
+        const result = setPlacementRef(panel, placement.id, text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if (key.startsWith('flag:')) {

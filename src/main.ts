@@ -98,6 +98,7 @@ import { SKIPPED_SHOWN, importTerminalLabels } from './project/terminalLabelsImp
 import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
 import { ContextMenuView } from './ui/contextMenuView';
 import { DEFAULT_WIRE_PATTERN, numberWires } from './schematic/numbering';
+import { numberDevices } from './layout/designations';
 import { PlateTabs } from './ui/plateTabs';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
@@ -1093,6 +1094,16 @@ async function numberTheWires(): Promise<void> {
   showStatus(`${result.numbered} wire${result.numbered === 1 ? '' : 's'} numbered.`);
 }
 
+function numberTheDevices(): void {
+  const result = numberDevices(session.project.panel, session.resolve);
+  if (result.numbered === 0) {
+    showStatus('Every device already has a designation.');
+    return;
+  }
+  session.commit({ ...session.project, panel: result.panel });
+  showStatus(`${result.numbered} device${result.numbered === 1 ? '' : 's'} numbered.`);
+}
+
 function removeOrphans(): void {
   const { project } = session;
   const { schematic, removed, keptWired } = removeOrphanNodes(project.schematic, project.panel);
@@ -1640,6 +1651,7 @@ byId('route-automatically').addEventListener('click', () => schematicView.routeA
 byId('spread-wires').addEventListener('click', () => schematicView.spreadWires());
 byId('remove-orphans').addEventListener('click', removeOrphans);
 byId('number-wires').addEventListener('click', () => void numberTheWires());
+byId('number-devices').addEventListener('click', numberTheDevices);
 byId<HTMLInputElement>('import-terminal-labels').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];

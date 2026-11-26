@@ -1,5 +1,6 @@
 import { nextCombId } from './combs';
 import { addRail } from './plates';
+import { withoutRef } from './designations';
 import { moveRail, setRailLabel, setRailLength, type PanelEditError } from './panel';
 import { findProblems, isOnRail, nextPlacementId, type Panel, type RailPlacement, type WidthOf } from './placement';
 import { roundUnits } from './units';
@@ -71,7 +72,7 @@ export function duplicateRow(panel: Panel, rail: number): DuplicateRowResult {
   const placementIds: string[] = [];
   for (const source of panel.placements.filter(isOnRail).filter((p) => p.rail === rail)) {
     const id = nextPlacementId(next);
-    next = { ...next, placements: [...next.placements, { ...source, id, rail: lastIndex }] };
+    next = { ...next, placements: [...next.placements, { ...withoutRef(source), id, rail: lastIndex }] };
     placementIds.push(id);
   }
   for (const source of panel.combs.filter((c) => c.rail === rail)) {

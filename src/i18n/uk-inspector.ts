@@ -4,6 +4,8 @@ import type { Dictionary } from './catalogue';
 export const INSPECTOR: Dictionary = {
   // field names
   Label: `Назва`,
+  Designation: `Позначення`,
+  'A designation is 1 to 16 letters, digits or . - + = : _ /, such as QF1.': `Позначення: від 1 до 16 літер, цифр або . - + = : _ /, наприклад QF1.`,
   Row: `Ряд`,
   Position: `Положення`,
   Width: `Ширина`,
