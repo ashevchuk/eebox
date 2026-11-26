@@ -5,6 +5,8 @@ export const INSPECTOR: Dictionary = {
   // field names
   Label: `Назва`,
   Designation: `Позначення`,
+  yes: `так`,
+  no: `ні`,
   'Strip text': `Текст смуги`,
   'Strip colour': `Колір смуги`,
   'Strip group': `Група смуги`,

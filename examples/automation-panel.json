@@ -194,7 +194,7 @@
           "rail": 2,
           "slot": 1,
           "label": "Run 1",
-          "ref": "A5"
+          "ref": "HL1"
         },
         {
           "id": "p15",
@@ -205,7 +205,7 @@
           "rail": 2,
           "slot": 3,
           "label": "Run 2",
-          "ref": "A6"
+          "ref": "HL2"
         },
         {
           "id": "p16",
@@ -216,7 +216,7 @@
           "rail": 2,
           "slot": 5,
           "label": "Fault",
-          "ref": "A7"
+          "ref": "HL3"
         }
       ],
       "combs": [],
@@ -1621,6 +1621,7 @@
       "id": "pilot-light-230",
       "kind": "other",
       "name": "Pilot light 230 V",
+      "refCode": "HL",
       "widthUnits": 1,
       "poles": 2,
       "terminals": [

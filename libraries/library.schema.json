@@ -144,6 +144,11 @@
           "pattern": "^\\S(.*\\S)?$",
           "description": "What the face shows in place of the name, which is too long there. The palette and the parts list keep the name."
         },
+        "refCode": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,4}$",
+          "description": "The letters that start the designation of a placed copy, such as HL for a pilot light; when absent the kind decides."
+        },
         "widthUnits": {
           "type": "number",
           "minimum": 0.1,

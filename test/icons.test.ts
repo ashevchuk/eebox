@@ -249,3 +249,23 @@ describe('the icons a project uses', () => {
     expect(iconKeysUsed({ ...project, panel: refused.panel }).sort()).toEqual(['generic/oven', 'my/boat']);
   });
 });
+
+describe('the words of an icon import', () => {
+  it('speak of an icon, not of the face of a module', () => {
+    const many = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10">${Array.from({ length: 40 }, (_, i) => `<rect x="${i * 2}" y="0" width="1" height="10"/>`).join('')}</svg>`;
+    const refused = iconFromSvg(many, 'many', 'Many', 'my', MAX_ART_SHAPES);
+    expect(!refused.ok && refused.message).toContain('an icon has room for 32');
+    const grey = iconFromSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18"><rect x="1" y="1" width="9" height="9" fill="url(#g)"/></svg>', 'grey', 'Grey', 'my', MAX_ART_SHAPES);
+    expect(grey.ok && grey.notes.join()).toContain('in an icon');
+    expect(grey.ok && grey.notes.join()).not.toContain('face');
+  });
+});
+
+describe('icons that came with a project', () => {
+  it('are listed after the own ones, under My icons', () => {
+    const fromProject: IconDef = { ...OWN, id: 'ship', name: 'Ship' };
+    const entries = iconEntries([OWN], [fromProject]);
+    expect(entries.slice(-2).map((e) => e.key)).toEqual(['my/boat', 'my/ship']);
+    expect(iconCategories([fromProject]).map((c) => c.id)).toContain('my');
+  });
+});

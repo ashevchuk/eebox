@@ -1,4 +1,5 @@
 import genericIecText from '../libraries/generic-iec.json?raw';
+import { crispText } from './view/crispText';
 import { createPanel } from './layout/panel';
 import type { ModuleRef } from './layout/placement';
 import {
@@ -130,7 +131,7 @@ const statusEl = byId<HTMLElement>('status');
 const undoButton = byId<HTMLButtonElement>('undo');
 const redoButton = byId<HTMLButtonElement>('redo');
 const deleteButton = byId<HTMLButtonElement>('delete-selection');
-const ctx = canvas.getContext('2d')!;
+const ctx = crispText(canvas.getContext('2d')!);
 
 const bundledLibraryId = GENERIC_LIBRARY_ID;
 const storage: LibraryStorage =
@@ -1467,7 +1468,15 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
 const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit), (current, forDevice) =>
-  pickIcon({ current, forDevice, entries: () => iconEntries(session.ownIcons), categories: () => iconCategories(session.ownIcons), importFiles: importIconFiles, deleteIcon: deleteOwnIcon }),
+  pickIcon({
+    current,
+    forDevice,
+    entries: () => iconEntries(session.ownIcons, session.projectIcons),
+    categories: () => iconCategories([...session.ownIcons, ...session.projectIcons]),
+    importFiles: importIconFiles,
+    deleteIcon: deleteOwnIcon,
+    canDelete: (key) => session.ownIcons.some((icon) => iconKey(OWN_ICON_SOURCE, icon.id) === key),
+  }),
 );
 
 // Commit a typed value before a click elsewhere changes the selection under it.
@@ -1873,7 +1882,7 @@ async function importIconFiles(files: File[]): Promise<string> {
       continue;
     }
     const name = normalizeLabel(file.name.replace(/\.svg$/i, '').replace(/[_]+/g, ' ').slice(0, 60));
-    const result = iconFromSvg(await file.text(), freeIconId(icons, file.name), name.ok && name.label ? name.label : 'Icon', OWN_ICON_CATEGORY, MAX_ART_SHAPES);
+    const result = iconFromSvg(await file.text(), freeIconId([...icons, ...session.projectIcons], file.name), name.ok && name.label ? name.label : 'Icon', OWN_ICON_CATEGORY, MAX_ART_SHAPES);
     if (!result.ok) {
       refused.push(`${file.name}: ${result.message}`);
       continue;

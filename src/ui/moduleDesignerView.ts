@@ -1,4 +1,5 @@
 import { formatUnits } from '../layout/units';
+import { crispText } from '../view/crispText';
 import { stableStringify } from '../library/equality';
 import { CONDUCTORS, DIN_MODULE_HEIGHT_MM, TERMINAL_SIDES, TRIP_CURVES, type Conductor, type Library, type ModuleDef, type TerminalSide, type TripCurve } from '../library/types';
 import { validateLibrary } from '../library/validate';
@@ -548,7 +549,8 @@ export class ModuleDesignerView {
 
   /** Draws the module with the very renderer of the panel, on a rail of its own. */
   private drawRailPreview(): void {
-    const ctx = this.railCanvas.getContext('2d');
+    const raw = this.railCanvas.getContext('2d');
+    const ctx = raw && crispText(raw);
     if (!ctx) return;
     const { panel, resolve } = railPreviewScene(this.module, this.shownWidth);
     const rail = railRect(panel, 0);

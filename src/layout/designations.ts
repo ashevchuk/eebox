@@ -80,8 +80,11 @@ function highestNumber(panel: Panel, prefix: string): number {
 }
 
 /** The designation the next device of this kind would get, if it has a code. */
+/** The letters a device's designation starts with: those of its module, else those of its kind. */
+export const refCodeOf = (def: ModuleDef | undefined): string | undefined => (def ? (def.refCode ?? REF_PREFIX[def.kind]) : undefined);
+
 export function nextRef(panel: Panel, def: ModuleDef | undefined): string | undefined {
-  const prefix = def ? REF_PREFIX[def.kind] : undefined;
+  const prefix = refCodeOf(def);
   return prefix === undefined ? undefined : `${prefix}${highestNumber(panel, prefix) + 1}`;
 }
 
@@ -95,8 +98,7 @@ export function numberDevices(panel: Panel, resolve: (ref: ModuleRef) => ModuleD
   const given = new Map<string, string>();
   for (const placement of readingOrder(panel)) {
     if (placement.ref !== undefined) continue;
-    const def = resolve(placement.module);
-    const prefix = def ? REF_PREFIX[def.kind] : undefined;
+    const prefix = refCodeOf(resolve(placement.module));
     if (prefix === undefined) continue;
     const number = (next.get(prefix) ?? highestNumber(panel, prefix)) + 1;
     next.set(prefix, number);
@@ -132,4 +134,4 @@ export function findRefFindings(panel: Panel, resolve: (ref: ModuleRef) => Modul
 }
 
 /** A device, as the designations and the legend count them: a kind that has a letter code. */
-export const isDevice = (def: ModuleDef | undefined): boolean => def !== undefined && REF_PREFIX[def.kind] !== undefined;
+export const isDevice = (def: ModuleDef | undefined): boolean => refCodeOf(def) !== undefined;

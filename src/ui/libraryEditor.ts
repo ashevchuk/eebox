@@ -21,7 +21,7 @@ import {
 import { evenPositions, sidePositions } from '../library/terminalLayouts';
 import { DIN_MODULE_HEIGHT_MM, MOUNTINGS, SCHEMA_VERSION, type Mounting } from '../library/types';
 import { mmFromUnits, roundUnits, unitsFromMm } from '../layout/units';
-import { validateLibrary, type ValidationError } from '../library/validate';
+import { REF_CODE_PATTERN, validateLibrary, type ValidationError } from '../library/validate';
 import type { InspectorAction, InspectorField, InspectorView } from './inspector';
 
 export type EditorTarget =
@@ -150,6 +150,7 @@ function moduleView(module: ModuleDef): InspectorView {
     text('id', 'Id', module.id),
     text('name', 'Name', module.name),
     text('shortName', 'Short name', module.shortName ?? '', 'drawn on the face instead of the name'),
+    text('refCode', 'Designation code', module.refCode ?? '', 'letters that start its designation, such as HL; empty takes the code of its kind'),
     select('kind', 'Kind', module.kind, MODULE_KINDS),
     number('widthUnits', 'Width', module.widthUnits, 'units of 17.5 mm; a fraction is fine'),
     number('widthMm', 'Width, mm', mmFromUnits(module.widthUnits), 'the real width of the device; this and the line above are one setting'),
@@ -349,6 +350,11 @@ function editModule(state: EditorState, id: string, key: string, raw: string): E
       return apply((m) => ({ ...m, name: raw.trim() }));
     case 'shortName':
       return apply((m) => withOptional(m, 'shortName', optionalText(raw)));
+    case 'refCode': {
+      const code = raw.trim().toUpperCase();
+      if (code !== '' && !REF_CODE_PATTERN.test(code)) return fail('A designation code is 1 to 4 Latin letters, such as HL.');
+      return apply((m) => withOptional(m, 'refCode', code === '' ? undefined : code));
+    }
     case 'kind':
       return apply((m) => withKind(m, raw as ModuleKind));
     case 'widthUnits':

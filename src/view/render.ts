@@ -1,4 +1,6 @@
 import { drawArt } from './art';
+import { NAME_SHIFT_FOR_REF_MM, REF_HEIGHT_MM, refStickerSpot } from './refSticker';
+import { crispText } from './crispText';
 import { FONT_FAMILY } from './font';
 import { drawConductorDot } from './conductorDraw';
 import { pinPoint, terminalLabels } from './terminalLabels';
@@ -145,7 +147,7 @@ const NAME_BOTTOM_MM = 20;
 const NAME_MAX_LINES = 3;
 const NAME_LINE_SPACING_MM = 7.5;
 
-function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts: TextVisibility): void {
+function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts: TextVisibility, withRef: boolean): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(r.x, r.y, r.width, r.height);
@@ -160,8 +162,9 @@ function drawLabel(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, texts
   }
   // A column of terminals takes the whole narrow face, so the name would be written over it.
   if (texts.moduleNames && r.width >= MIN_NAME_WIDTH_MM && !def.sideTerminals) {
-    const room = r.height - NAME_TOP_MM - NAME_BOTTOM_MM;
-    ctx.translate(r.x + r.width / 2, r.y + NAME_TOP_MM + room / 2);
+    const top = NAME_TOP_MM + (withRef ? NAME_SHIFT_FOR_REF_MM : 0);
+    const room = r.height - top - NAME_BOTTOM_MM;
+    ctx.translate(r.x + r.width / 2, r.y + top + room / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.font = `6px ${FONT_FAMILY}`;
     const lines = wrapText((text) => ctx.measureText(text).width, def.shortName ?? def.name, room, Math.min(NAME_MAX_LINES, Math.max(1, Math.floor(r.width / NAME_LINE_SPACING_MM / 1.6))));
@@ -211,24 +214,24 @@ function drawUpwardsLabel(
 
 /** The designation is a sticker above the bottom terminals, below where the name ends; a sticker is yellow on any background. */
 const REF_FONT = `bold 5px ${FONT_FAMILY}`;
-const REF_CENTRE_ABOVE_BOTTOM_MM = 15;
-const REF_HEIGHT_MM = 6;
 const REF_PADDING_MM = 1;
 const REF_COLOURS = { sticker: '#facc15', text: '#111827' };
 
-function drawRef(ctx: CanvasRenderingContext2D, ref: string, r: Rect): void {
+function drawRef(ctx: CanvasRenderingContext2D, ref: string, r: Rect, def: ModuleDef, widthUnits: number): void {
   if (r.width < MIN_NAME_WIDTH_MM) return;
   ctx.save();
   ctx.font = REF_FONT;
   const text = fitText(ctx, ref, r.width - 2 * REF_PADDING_MM - 1);
   const width = ctx.measureText(text).width + 2 * REF_PADDING_MM;
-  const centreY = r.y + r.height - REF_CENTRE_ABOVE_BOTTOM_MM;
+  const spot = refStickerSpot(def, widthUnits, r.width, r.height, width);
+  const centreX = r.x + spot.x;
+  const centreY = r.y + spot.y;
   ctx.fillStyle = REF_COLOURS.sticker;
-  ctx.fillRect(r.x + (r.width - width) / 2, centreY - REF_HEIGHT_MM / 2, width, REF_HEIGHT_MM);
+  ctx.fillRect(centreX - width / 2, centreY - REF_HEIGHT_MM / 2, width, REF_HEIGHT_MM);
   ctx.fillStyle = REF_COLOURS.text;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, r.x + r.width / 2, centreY);
+  ctx.fillText(text, centreX, centreY);
   ctx.restore();
 }
 
@@ -247,7 +250,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, texts: TextVisi
   if (texts.refs) {
     for (const placement of panel.placements) {
       const def = scene.resolve(placement.module);
-      if (placement.ref && def && !def.sideTerminals) drawRef(ctx, placement.ref, placementRect(panel, sizesOf(scene), placement));
+      if (placement.ref && def && !def.sideTerminals) drawRef(ctx, placement.ref, placementRect(panel, sizesOf(scene), placement), def, itemWidth(scene, placement));
     }
   }
   if (texts.terminalLabels) {
@@ -384,23 +387,23 @@ function drawGuides(ctx: CanvasRenderingContext2D, guides: readonly Guide[], fra
   ctx.restore();
 }
 
-function drawModule(ctx: CanvasRenderingContext2D, def: ModuleDef | undefined, r: Rect, widthUnits: number, texts: TextVisibility): void {
+function drawModule(ctx: CanvasRenderingContext2D, def: ModuleDef | undefined, r: Rect, widthUnits: number, texts: TextVisibility, withRef: boolean): void {
   if (!def) {
     fillRect(ctx, r, COLORS.missing);
     return;
   }
-  drawFace(ctx, def, r, widthUnits, true, texts);
+  drawFace(ctx, def, r, widthUnits, true, texts, withRef);
 }
 
 /** The face of a module in a box: body, band, art, outline, and the name and terminals unless `detailed` is off. */
-function drawFace(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, detailed: boolean, texts: TextVisibility = ALL_TEXT): void {
+function drawFace(ctx: CanvasRenderingContext2D, def: ModuleDef, r: Rect, widthUnits: number, detailed: boolean, texts: TextVisibility = ALL_TEXT, withRef = false): void {
   fillRect(ctx, r, COLORS.body);
   fillRect(ctx, { ...r, height: 14 }, LEVER_COLORS[def.kind]);
   if (def.art) drawArt(ctx, def.art, r, def.widthUnits, widthUnits, texts.faceText);
   ctx.strokeStyle = '#6b7280';
   ctx.lineWidth = 0.6;
   ctx.strokeRect(r.x, r.y, r.width, r.height);
-  if (detailed) drawLabel(ctx, def, r, texts);
+  if (detailed) drawLabel(ctx, def, r, texts, withRef);
   drawTerminals(ctx, def, r, widthUnits);
 }
 
@@ -416,7 +419,8 @@ export function drawThumbnail(canvas: HTMLCanvasElement, def: ModuleDef, sizePx:
   canvas.height = Math.round(height * ratio);
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
-  const ctx = canvas.getContext('2d');
+  const raw = canvas.getContext('2d');
+  const ctx = raw && crispText(raw);
   if (!ctx) return;
   ctx.setTransform(scale * ratio, 0, 0, scale * ratio, 0, 0);
   const box = { x: 0, y: 0, width: widthMm, height: heightMm };
@@ -543,7 +547,7 @@ export function render(
   const sizes = sizesOf(scene);
   for (const placement of panel.placements) {
     ctx.globalAlpha = placement.id === movingId('placement') ? 0.35 : 1;
-    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizes, placement), itemWidth(scene, placement), texts);
+    drawModule(ctx, scene.resolve(placement.module), placementRect(panel, sizes, placement), itemWidth(scene, placement), texts, texts.refs && placement.ref !== undefined);
   }
   for (const comb of panel.combs) {
     const def = scene.resolve(comb.module);

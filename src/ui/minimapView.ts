@@ -1,4 +1,5 @@
 import type { Camera } from '../view/Camera';
+import { crispText } from '../view/crispText';
 import { fromMinimap, minimapFit, toMinimap, visibleWorld, type MinimapFit } from '../view/minimap';
 import type { Overview } from './overview';
 
@@ -62,7 +63,8 @@ export class MinimapView {
       this.canvas.width = Math.round(width * dpr);
       this.canvas.height = Math.round(height * dpr);
     }
-    const ctx = this.canvas.getContext('2d');
+    const raw = this.canvas.getContext('2d');
+    const ctx = raw && crispText(raw);
     if (!ctx || width === 0) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);

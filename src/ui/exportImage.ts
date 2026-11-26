@@ -1,4 +1,5 @@
 import type { Bounds } from '../view/Camera';
+import { crispText } from '../view/crispText';
 import { SvgContext } from '../view/svgContext';
 import { DARK_THEME, withTheme, type Theme } from '../view/theme';
 import type { Session } from './session';
@@ -51,7 +52,7 @@ export function renderToPng(view: View, session: Session, theme: Theme = DARK_TH
   const canvas = document.createElement('canvas');
   canvas.width = framing.width;
   canvas.height = framing.height;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = crispText(canvas.getContext('2d')!);
   withTheme(theme, () => drawFramed(view, session, ctx, framing));
   return new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encoding failed'))), 'image/png'),
@@ -61,7 +62,7 @@ export function renderToPng(view: View, session: Session, theme: Theme = DARK_TH
 /** The same drawing as the screen, recorded as vector graphics. */
 export function renderToSvg(view: View, session: Session, theme: Theme = DARK_THEME, idPrefix = '', area?: Bounds): string {
   const framing = framingOf(view, area);
-  const measuring = document.createElement('canvas').getContext('2d')!;
+  const measuring = crispText(document.createElement('canvas').getContext('2d')!);
   const measure = (text: string, font: string) => {
     measuring.font = font;
     return measuring.measureText(text).width;

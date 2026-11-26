@@ -152,6 +152,11 @@ export class Session {
   /** Own icons that came with the open project file; they win, so the file prints as it was made. */
   private iconSnapshot: Record<string, IconDef> = {};
 
+  /** Own icons the open project carries that this browser does not keep; they can be chosen like the stored ones. */
+  get projectIcons(): IconDef[] {
+    return Object.values(this.iconSnapshot).filter((icon) => !this.ownIcons.some((own) => own.id === icon.id));
+  }
+
   readonly resolveIcon = (key: string): IconDef | undefined => {
     if (key.startsWith(`${OWN_ICON_SOURCE}/`)) return this.iconSnapshot[key] ?? this.ownIcons.find((i) => iconKey(OWN_ICON_SOURCE, i.id) === key);
     return genericIcons().get(key);

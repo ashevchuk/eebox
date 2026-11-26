@@ -1,6 +1,6 @@
 import { iconLabel } from '../i18n';
 import type { IconCategory } from '../library/genericIcons';
-import { NO_ICON, OWN_ICON_SOURCE } from '../library/icons';
+import { NO_ICON } from '../library/icons';
 import { shapesToSvg } from '../library/svgExport';
 import { filterIcons, type IconEntry } from './iconCatalog';
 
@@ -15,6 +15,8 @@ export interface IconPickerOptions {
   importFiles: (files: File[]) => Promise<string>;
   /** Removes one of the person's own icons, after asking, and says how it went. */
   deleteIcon: (key: string) => Promise<string>;
+  /** Only an icon kept in this browser can be deleted; one that came with the project cannot. */
+  canDelete: (key: string) => boolean;
 }
 
 const button = (label: string, className = ''): HTMLButtonElement => {
@@ -80,7 +82,7 @@ export function pickIcon(options: IconPickerOptions): Promise<string | null> {
           cell.append(picture, name);
           cell.addEventListener('click', () => choose(key));
           item.append(cell);
-          if (key.startsWith(`${OWN_ICON_SOURCE}/`)) {
+          if (options.canDelete(key)) {
             const remove = button('×', 'icon-delete');
             remove.title = 'Delete this icon';
             remove.addEventListener('click', async () => {

@@ -583,6 +583,7 @@ function metersAndSmallDevices(): DinModule[] {
       id: 'pilot-light-230',
       kind: 'other',
       name: 'Pilot light 230 V',
+      refCode: 'HL',
       widthUnits: 1,
       poles: 2,
       terminals: [top('L', 'L'), top('N', 'N')],
@@ -607,6 +608,7 @@ function metersAndSmallDevices(): DinModule[] {
       id: 'din-socket-16',
       kind: 'other',
       name: 'DIN rail socket 16 A',
+      refCode: 'XS',
       widthUnits: 3,
       poles: 2,
       ratedCurrentA: SWITCHED_LOAD_RATING_A,
@@ -736,7 +738,7 @@ export function genericEnclosures(): Array<{ id: string; name: string; railLengt
   );
 }
 
-export const GENERIC_LIBRARY_VERSION = '20';
+export const GENERIC_LIBRARY_VERSION = '21';
 export const GENERIC_LIBRARY_DESCRIPTION =
   'Generic IEC devices from standard rating series. Widths and the marked inputs of RCDs, surge protectors and power supplies are typical, not taken from any manufacturer; check the datasheet before ordering.';
 

@@ -9,9 +9,9 @@ export interface IconEntry {
 
 export const OWN_ICONS_CATEGORY: IconCategory = { id: OWN_ICON_CATEGORY, name: 'My icons' };
 
-/** The bundled icons in the order of their catalogue, then the person's own. */
-export function iconEntries(own: readonly IconDef[]): IconEntry[] {
-  return [...[...genericIcons()].map(([key, icon]) => ({ key, icon })), ...own.map((icon) => ({ key: iconKey(OWN_ICON_SOURCE, icon.id), icon }))];
+/** The bundled icons in the order of their catalogue, then the person's own, then those the open project brought along. */
+export function iconEntries(own: readonly IconDef[], fromProject: readonly IconDef[] = []): IconEntry[] {
+  return [...[...genericIcons()].map(([key, icon]) => ({ key, icon })), ...[...own, ...fromProject].map((icon) => ({ key: iconKey(OWN_ICON_SOURCE, icon.id), icon }))];
 }
 
 export const iconCategories = (own: readonly IconDef[]): IconCategory[] => [...GENERIC_ICON_CATEGORIES, ...(own.length > 0 ? [OWN_ICONS_CATEGORY] : [])];

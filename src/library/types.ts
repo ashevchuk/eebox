@@ -153,6 +153,8 @@ export interface ModuleDef {
   name: string;
   /** What the face shows in place of `name`, which is too long there; the palette and the parts list keep `name`. */
   shortName?: string;
+  /** The letters that start the designation of a placed copy, such as `HL` for a pilot light; when absent the kind decides. */
+  refCode?: string;
   /** Width in 17.5 mm units. */
   widthUnits: number;
   /** Height of the face in mm; a standard DIN module is 90. */

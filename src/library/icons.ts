@@ -59,11 +59,14 @@ export function iconIdOf(fileName: string): string {
   return (stem === '' ? 'icon' : stem).slice(0, MAX_ICON_ID_LENGTH).replace(/-+$/, '');
 }
 
+/** The importer speaks of the face of a module; an icon is not one. */
+const forAnIcon = (message: string): string => message.replace(/the face has room for/g, 'an icon has room for').replace(/on a face/g, 'in an icon');
+
 export type IconImport = { ok: true; icon: IconDef; notes: string[] } | { ok: false; message: string };
 
 /** An SVG as an icon; what cannot be drawn is left out and said in the notes, as for a module face. */
 export function iconFromSvg(text: string, id: string, name: string, category: string, room: number): IconImport {
   const result = importSvg(text, { widthMm: ICON_WIDTH_MM, leftMm: 0, topMm: 0, anchor: 'left', room });
-  if (!result.ok) return result;
-  return { ok: true, icon: { id, name, category, widthMm: ICON_WIDTH_MM, heightMm: result.heightMm, art: result.shapes }, notes: result.notes };
+  if (!result.ok) return { ok: false, message: forAnIcon(result.message) };
+  return { ok: true, icon: { id, name, category, widthMm: ICON_WIDTH_MM, heightMm: result.heightMm, art: result.shapes }, notes: result.notes.map(forAnIcon) };
 }

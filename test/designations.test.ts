@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { copyItems, pasteItems } from '../src/layout/clipboard';
 import { duplicateRow } from '../src/layout/arrangeModules';
-import { designated, findRefFindings, nextRef, normalizeRef, numberDevices, setPlacementRef } from '../src/layout/designations';
+import { designated, findRefFindings, isDevice, nextRef, normalizeRef, numberDevices, setPlacementRef } from '../src/layout/designations';
+import { MODULE_SPEC, validateObject } from '../src/library/validate';
 import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
 import { wireList } from '../src/electrical/schedule';
 import { bomToCsv, buildBom } from '../src/project/bom';
@@ -168,5 +169,22 @@ describe('numbering a panel loaded with a module on a rail that is gone', () => 
   it('does not throw, and numbers it ahead of the plates', () => {
     const panel = { ...panelOf([place('p1', 'mcb1', 5, 0), place('p2', 'mcb1', 0, 0)]) };
     expect(refs(numberDevices(panel, resolve).panel)).toEqual({ p1: 'QF1', p2: 'QF2' });
+  });
+});
+
+describe('a designation code of the module', () => {
+  it('starts the designation in place of the code of the kind, and makes a device of a module whose kind has none', () => {
+    const lamp = { ...defs.nbar!, id: 'lamp', kind: 'other' as const, refCode: 'HL' };
+    const look = (r: { moduleId: string }) => (r.moduleId === 'lamp' ? lamp : resolve(r as never));
+    const panel = panelOf([place('p1', 'lamp', 0, 0), place('p2', 'lamp', 0, 1), place('p3', 'mcb1', 0, 2)]);
+    expect(refs(numberDevices(panel, look as never).panel)).toEqual({ p1: 'HL1', p2: 'HL2', p3: 'QF1' });
+    expect(isDevice(lamp)).toBe(true);
+    expect(isDevice({ ...lamp, refCode: undefined, kind: 'busbar' })).toBe(false);
+  });
+
+  it('is refused in a library when it is not 1 to 4 capital letters', () => {
+    const errors: { path: string; message: string }[] = [];
+    validateObject({ ...defs.mcb1, refCode: 'hl' }, MODULE_SPEC, 'module', errors);
+    expect(errors.map((e) => e.path)).toEqual(['module.refCode']);
   });
 });
