@@ -423,7 +423,9 @@
       .diff-changed .diff-mark { color: #fbbf24; }
       .projects-earlier { margin: 12px 0 2px; font-size: 13px; }
       .print-dialog fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
-      .print-page { display: flex; gap: 16px; margin-bottom: 12px; }
+      .print-page { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
+      .print-page label { white-space: nowrap; }
+      .print-page input[type='number'] { width: 4.5em; }
       .print-note { color: var(--text-dim); font-size: 12px; }
       .text-options { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px; }
       .text-options-heading { color: var(--text-dim); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
