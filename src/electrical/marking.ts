@@ -13,6 +13,8 @@ export interface DerivedMarking {
   rcd?: string;
   /** Labels of the loads it protects, in the order of the schematic. */
   loads: string[];
+  /** The ids of those loads, in the same order. */
+  loadIds: string[];
   /** The icon of the first of those loads that has one. */
   icon?: string;
 }
@@ -74,7 +76,7 @@ export function deriveMarking(project: Project, resolve: Resolve): Map<string, D
     const rcd = nearestRcd(placement.id);
     const loads = loadsOf(placement.id);
     const icon = loads.find((n) => n.icon !== undefined)?.icon;
-    derived.set(placement.id, { ...(rcd ? { rcd } : {}), loads: loads.map((n) => n.label), ...(icon ? { icon } : {}) });
+    derived.set(placement.id, { ...(rcd ? { rcd } : {}), loads: loads.map((n) => n.label), loadIds: loads.map((n) => n.id), ...(icon ? { icon } : {}) });
   }
   return derived;
 }

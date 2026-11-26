@@ -130,3 +130,6 @@ export function findRefFindings(panel: Panel, resolve: (ref: ModuleRef) => Modul
       placements: items.filter((i) => panel.placements.some((p) => p.id === i.id)).map((i) => i.id),
     }));
 }
+
+/** A device, as the designations and the legend count them: a kind that has a letter code. */
+export const isDevice = (def: ModuleDef | undefined): boolean => def !== undefined && REF_PREFIX[def.kind] !== undefined;

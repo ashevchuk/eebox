@@ -710,7 +710,7 @@ try {
     await browser.waitFor(`document.querySelector('dialog.tables-dialog[open]')`, 'the tables');
     expectTrue(await browser.evaluate(`document.querySelector('dialog.tables-dialog[open]').getBoundingClientRect().width > 600`), 'the tables dialog is squeezed to the width of a small dialog');
     const tabs = await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].map((b) => b.textContent.replace(/ \\(\\d+\\)$/, ''))`);
-    expectEqual(tabs, ['Parts', 'Circuits', 'Wires', 'Ferrules', 'Cut list'], 'the tabs');
+    expectEqual(tabs, ['Parts', 'Circuits', 'Wires', 'Ferrules', 'Cut list', 'Legend'], 'the tabs');
     expectTrue(await browser.evaluate(`document.querySelectorAll('.tables-body tbody tr').length > 3`), 'no parts in the first table');
     await browser.evaluate(`[...document.querySelectorAll('.tables-tabs button')].find((b) => b.textContent.startsWith('Wires')).click()`);
     const firstWire = () => browser.evaluate(`document.querySelector('.tables-body tbody tr td').textContent`);

@@ -1,5 +1,6 @@
 import type { Annotation } from './annotations';
 import type { Duct } from './ducts';
+import type { LegendSettings } from './legend';
 import type { Marking } from './marking';
 import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
@@ -97,6 +98,8 @@ export interface Panel {
   wireSlackMm?: number;
   /** Height of the printed marking strips, in mm; when absent the default of `layout/marking.ts` applies. */
   stripHeightMm?: number;
+  /** How the legend of the panel is printed; when absent the defaults of `layout/legend.ts` apply. */
+  legend?: LegendSettings;
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */

@@ -138,19 +138,36 @@ export function fitText(text: string, widthMm: number, heightMm: number): { line
  * with its number and the colour of its group, and text cells, neighbours of one group with the same
  * text joined into one. Numbers run over the panel in reading order.
  */
+/** What the strip of every module on a rail says: its number, header colour and resolved marking, in reading order. */
+export interface ModuleMarking {
+  placementId: string;
+  number: number;
+  colour: string;
+  textColour: string;
+  marking: ResolvedMarking;
+  derived: DerivedMarking | undefined;
+}
+
+/** The marking of the modules on the rails, the one source of the strips and the legend. */
+export function moduleMarkings(project: Project, resolve: Resolve): ModuleMarking[] {
+  const { panel } = project;
+  const derived = deriveMarking(project, resolve);
+  const groupColours = new Map<string, string>();
+  return readingOrder(panel)
+    .filter(isOnRail)
+    .map((placement, i): ModuleMarking => {
+      const marking = resolveMarking(placement, derived.get(placement.id));
+      const key = marking.groupKey;
+      if (key && !groupColours.has(key)) groupColours.set(key, MARKING_PALETTE[groupColours.size % MARKING_PALETTE.length]!.hex);
+      const colour = marking.colour ?? (key ? groupColours.get(key)! : NEUTRAL_HEAD);
+      return { placementId: placement.id, number: i + 1, colour, textColour: textColourOn(colour), marking, derived: derived.get(placement.id) };
+    });
+}
+
 export function markingStrips(project: Project, resolve: Resolve, maxUnits: number = STRIP_LINE_UNITS): MarkingLayout {
   const { panel } = project;
   const heightMm = panel.stripHeightMm ?? DEFAULT_STRIP_HEIGHT_MM;
-  const derived = deriveMarking(project, resolve);
-  const resolved = new Map(panel.placements.map((p) => [p.id, resolveMarking(p, derived.get(p.id))]));
-
-  const numbers = new Map<string, number>();
-  const groupColours = new Map<string, string>();
-  for (const placement of readingOrder(panel).filter(isOnRail)) {
-    numbers.set(placement.id, numbers.size + 1);
-    const key = resolved.get(placement.id)!.groupKey;
-    if (key && !groupColours.has(key)) groupColours.set(key, MARKING_PALETTE[groupColours.size % MARKING_PALETTE.length]!.hex);
-  }
+  const markings = new Map(moduleMarkings(project, resolve).map((m) => [m.placementId, m]));
 
   const textBox = (widthUnits: number) => ({
     widthMm: widthUnits * MODULE_UNIT_MM - 2 * TEXT_PADDING_MM,
@@ -159,13 +176,12 @@ export function markingStrips(project: Project, resolve: Resolve, maxUnits: numb
 
   const lines = labelStrips(panel, resolve, maxUnits).map((strip): MarkingLine => {
     const heads = strip.cells.map((cell): MarkingHead => {
-      const mark = resolved.get(cell.placementId)!;
-      const colour = mark.colour ?? (mark.groupKey ? groupColours.get(mark.groupKey)! : NEUTRAL_HEAD);
-      return { placementId: cell.placementId, offsetUnits: cell.offsetUnits, widthUnits: cell.widthUnits, number: numbers.get(cell.placementId)!, colour, textColour: textColourOn(colour) };
+      const { number, colour, textColour } = markings.get(cell.placementId)!;
+      return { placementId: cell.placementId, offsetUnits: cell.offsetUnits, widthUnits: cell.widthUnits, number, colour, textColour };
     });
     const groups: Array<{ ids: string[]; offsetUnits: number; widthUnits: number; text: string; key?: string; icon?: string }> = [];
     for (const cell of strip.cells) {
-      const mark = resolved.get(cell.placementId)!;
+      const mark = markings.get(cell.placementId)!.marking;
       const last = groups[groups.length - 1];
       const touches = last !== undefined && Math.abs(last.offsetUnits + last.widthUnits - cell.offsetUnits) < LAYOUT_EPSILON_UNITS;
       if (last && touches && mark.text !== '' && last.text === mark.text && last.key === mark.groupKey && last.icon === mark.icon) {

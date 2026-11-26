@@ -362,6 +362,12 @@
         .mark-ruler-bar { position: relative; height: 3mm; border-bottom: 0.3mm solid #000; }
         .mark-ruler-tick { position: absolute; bottom: 0; height: 3mm; border-left: 0.3mm solid #000; }
         .mark-ruler-caption { font-size: 8pt; margin-top: 1mm; }
+        #print-sheet .legend-table th, #print-sheet .legend-table td { padding: 0.6mm 1.5mm; vertical-align: middle; }
+        #print-sheet .legend-table .legend-number, #print-sheet .legend-table .legend-ref, #print-sheet .legend-table .legend-icon, #print-sheet .legend-table .legend-rating, #print-sheet .legend-table .legend-section { width: 1%; white-space: nowrap; }
+        #print-sheet .legend-table td.legend-number { font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        #print-sheet .legend-icon { display: flex; justify-content: center; }
+        #print-sheet .legend-icon svg { width: auto; height: 100%; max-height: none; display: block; }
+        #print-sheet .legend-icon text { font-family: 'eebox-sans', sans-serif; }
         .marker-grid { display: flex; flex-wrap: wrap; gap: 3mm; }
         .marker { box-sizing: border-box; width: 42mm; height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
         .marker-detail { font-size: 6.5pt; }
@@ -567,6 +573,7 @@
           <button class="menu-item" role="menuitem" id="export-bom">Parts list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wires" title="Every wire with its two ends, conductor, cross-section, length and current">Wire list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-terminals" title="Every terminal of the terminal blocks with where its wires go, top and bottom">Terminal schedule (CSV)</button>
+          <button class="menu-item" role="menuitem" id="export-legend" title="The devices with their numbers, designations, descriptions, groups, ratings and cables">Legend (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-cuts" title="The wires by cross-section with their estimated lengths, the DIN rails and the cable ducts, to cut and buy from">Cut list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-io" title="Every terminal of the controllers with where its wires go, to address the channels from">Inputs and outputs (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wire-labels" title="One label for each end of each wire, for a label printer: semicolon-separated, UTF-8">Wire end labels (CSV)</button>
@@ -576,6 +583,7 @@
           <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the lists">Print…</button>
           <button class="menu-item" role="menuitem" id="print-full-size" title="Print the panel at 1:1 on overlapping A4 sheets to glue together">Print full size…</button>
           <button class="menu-item" role="menuitem" id="print-labels" title="Print labels for the modules at actual size and markers for the cables">Print labels…</button>
+          <button class="menu-item" role="menuitem" id="print-legend" title="Print the list of the devices with their numbers, descriptions, ratings and cables, for the door of the panel">Print legend…</button>
         </div>
       </div>
       <div class="menu panel-only">

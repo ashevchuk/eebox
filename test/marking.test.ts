@@ -68,7 +68,7 @@ describe('what the wiring says about a marking', () => {
 
 describe('the text and group of a cell', () => {
   it('take what was set by hand, else the label, else the loads', () => {
-    const derived = { rcd: 'p1', loads: ['Kitchen sockets', 'Oven'] };
+    const derived = { rcd: 'p1', loads: ['Kitchen sockets', 'Oven'], loadIds: ['n1', 'n2'] };
     const bare = place('p2', 'mcb1', 0, 0);
     expect(resolveMarking(bare, derived)).toEqual({ text: 'Kitchen sockets, Oven', groupKey: 'rcd:p1' });
     expect(resolveMarking({ ...bare, label: 'Kitchen' }, derived).text).toBe('Kitchen');

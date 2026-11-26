@@ -1,6 +1,7 @@
 import { annotationsCheck, type Annotation } from '../layout/annotations';
 import { findRefFindings, isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
 import { markingCheck, MAX_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM } from '../layout/marking';
+import { legendProblem, type LegendSettings } from '../layout/legend';
 import { iconProblem, isIconKey, NO_ICON, OWN_ICON_SOURCE, type IconDef } from '../library/icons';
 import { findMarkingFindings } from './marking';
 import { infoCheck, type ProjectInfo } from '../layout/info';
@@ -211,6 +212,7 @@ const PANEL_SPEC: FieldSpec = {
   clearanceMm: { required: false, check: clearanceCheck },
   wireSlackMm: { required: false, check: wireSlackCheck },
   stripHeightMm: { required: false, check: stripHeightCheck },
+  legend: { required: false, check: legendProblem },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -470,6 +472,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       ...(panelRaw.clearanceMm !== undefined ? { clearanceMm: panelRaw.clearanceMm as number } : {}),
       ...(panelRaw.wireSlackMm !== undefined ? { wireSlackMm: panelRaw.wireSlackMm as number } : {}),
       ...(panelRaw.stripHeightMm !== undefined ? { stripHeightMm: panelRaw.stripHeightMm as number } : {}),
+      ...(panelRaw.legend !== undefined ? { legend: panelRaw.legend as LegendSettings } : {}),
       placements,
       combs,
       shelf,

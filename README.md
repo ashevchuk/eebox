@@ -110,6 +110,8 @@ The module designer (*New module...* in the sidebar, or *Edit module...* in the 
 
   ![Marking strips of the house example, printed at actual size](docs/images/marking-strips.png)
 
+  *Export > Print legend...* prints the list that goes on the door: the devices on the rails (not the bars and terminal blocks) under the numbers and colours of their strips, with their description, rating and cable cross-section, and, when ticked, their designation, icon and group. Neighbours that say the same share a row. The columns, the size of the letters and the paper are kept with the project; the same list is in *Tables* and in *Export > Legend (CSV)*.
+
   ![Choosing an icon for a breaker](docs/images/icon-picker.png)
 - **Object inspector.** Edit the properties of whatever is selected, with validation. Changes that would remove wires ask first.
 - **Loads and cables.** Give a load its power, power factor, cable length and circuit kind to see the current on every wire, from the load up to the source, the voltage drop, and the smallest cable cross-section that carries the current and keeps the drop within the limit. A cable you pick is checked against the breaker and the limit. The cable table and the norms are edited in *File > Cable settings*, a form with the table of currents, the voltage drop limits, the conductor values and the fault loop values, where changed values are outlined and a wrong cell is marked where it is; the settings are exported to and imported from a JSON file; the built-in ones are a reference only, see the limits below.

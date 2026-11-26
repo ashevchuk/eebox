@@ -25,7 +25,7 @@ import { clearAllData } from './project/clearData';
 import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
 import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
 import { openProjectsDialog } from './ui/projectsDialog';
-import { cutTable, ioTable, summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
+import { cutTable, ioTable, legendTable, summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
 import { applyEdit } from './ui/inspector';
 import { openTablesDialog } from './ui/tablesDialog';
 import { drawHint } from './view/hint';
@@ -33,7 +33,7 @@ import { problemEntries, focusOf, focusOfObjects, objectsOfSelection, type Focus
 import { loadFlag, saveFlag } from './project/flagStorage';
 import { arrangeModules, duplicateRow, type ArrangeHow } from './layout/arrangeModules';
 import { MAX_RAILS } from './layout/limits';
-import { LANGUAGES, LANGUAGE_NAMES, startLanguage, t, type Language } from './i18n';
+import { iconLabel, LANGUAGES, LANGUAGE_NAMES, startLanguage, t, type Language } from './i18n';
 import { loadLanguage, saveLanguage } from './i18n/language';
 import { TOUR_DONE_KEY } from './ui/tour';
 import { TourView } from './ui/tourView';
@@ -63,6 +63,10 @@ import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colo
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
+import { openLegendDialog } from './ui/legendDialog';
+import { fillLegendSheet } from './ui/legendSheet';
+import { legendOf, setLegend } from './layout/legend';
+import { legendRows, legendToCsv } from './project/legend';
 import { pickIcon } from './ui/iconPicker';
 import { iconCategories, iconEntries } from './ui/iconCatalog';
 import { freeIconId, loadOwnIcons, MAX_OWN_ICONS, saveOwnIcons } from './project/iconStorage';
@@ -1171,6 +1175,43 @@ function exportTerminals(): void {
   downloadBlob(new Blob(['\uFEFF', terminalScheduleToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-terminals.csv`);
 }
 
+/** The name of an icon in the language of the page, for the legend. */
+const iconNameOf = (key: string): string => {
+  const icon = session.resolveIcon(key);
+  return icon ? iconLabel(icon.name) : key;
+};
+
+async function printLegend(): Promise<void> {
+  const chosen = await openLegendDialog(legendOf(session.project.panel));
+  if (!chosen) return;
+  const kept = setLegend(session.project.panel, chosen);
+  if (!kept.ok) {
+    showStatus(kept.message, true);
+    return;
+  }
+  if (canonicalJson(kept.panel.legend ?? null) !== canonicalJson(session.project.panel.legend ?? null)) session.commit({ ...session.project, panel: kept.panel });
+  const sheet = byId('print-sheet');
+  const pageStyle = document.createElement('style');
+  pageStyle.textContent = `@media print { ${pageRule(chosen)} }`;
+  document.head.append(pageStyle);
+  fillLegendSheet(sheet, session, chosen, iconNameOf);
+  window.addEventListener('afterprint', () => {
+    sheet.replaceChildren();
+    pageStyle.remove();
+  }, { once: true });
+  window.print();
+}
+
+function exportLegend(): void {
+  const rows = legendRows(session.project, session.resolve);
+  if (rows.length === 0) {
+    showStatus('There are no devices on the rails yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', legendToCsv(rows, iconNameOf)], { type: 'text/csv;charset=utf-8' }), `${stem}-legend.csv`);
+}
+
 function exportCuts(): void {
   const rows = cutList(session.project, session.resolve);
   if (rows.length === 0) {
@@ -1488,6 +1529,8 @@ byId('open-example').addEventListener('click', async () => {
 byId('print').addEventListener('click', () => void printProject());
 byId('new-module').addEventListener('click', designNewModule);
 byId('print-labels').addEventListener('click', printLabels);
+byId('print-legend').addEventListener('click', () => void printLegend());
+byId('export-legend').addEventListener('click', exportLegend);
 byId('print-full-size').addEventListener('click', printFullSize);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
@@ -1610,6 +1653,7 @@ const currentTables = () => [
   ...(terminalSchedule(session.project, session.resolve).length > 0 ? [terminalTable(session.project, session.resolve)] : []),
   ...(ioSchedule(session.project, session.resolve).length > 0 ? [ioTable(session.project, session.resolve)] : []),
   ...(cutList(session.project, session.resolve).length > 0 ? [cutTable(session.project, session.resolve)] : []),
+  ...(legendRows(session.project, session.resolve).length > 0 ? [legendTable(session.project, session.resolve, iconNameOf)] : []),
 ];
 
 /** A typed value in a cell is an edit in the inspector of the object the row stands for. */
