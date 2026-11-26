@@ -1,5 +1,6 @@
 import type { Annotation } from './annotations';
 import type { Duct } from './ducts';
+import type { Marking } from './marking';
 import type { ProjectInfo } from './info';
 import { normalizeLabel } from './labels';
 import type { Rail } from './rail';
@@ -17,6 +18,8 @@ interface PlacementCommon {
   label?: string;
   /** Reference designation of the device on the drawings, such as `QF1`. */
   ref?: string;
+  /** What was set by hand on its marking strip; only when something was. */
+  marking?: Marking;
   /** Own width of this copy; only for modules that are resizable in the library. */
   widthUnits?: number;
   /** Labels of single terminals, keyed by terminal id (e.g. `top:N3`). */
@@ -92,6 +95,8 @@ export interface Panel {
   clearanceMm?: number;
   /** Extra length added to each wire for bends and stripped ends, in mm; when absent the default of `layout/wireLength.ts` applies. */
   wireSlackMm?: number;
+  /** Height of the printed marking strips, in mm; when absent the default of `layout/marking.ts` applies. */
+  stripHeightMm?: number;
   placements: Placement[];
   combs: CombPlacement[];
   /** Modules that are off the rails for now; not part of the bill of materials. */
@@ -130,6 +135,7 @@ export type PlacementError =
   | { kind: 'unknown-placement' }
   | { kind: 'invalid-label' }
   | { kind: 'invalid-ref' }
+  | { kind: 'invalid-marking' }
   | { kind: 'not-resizable' }
   | { kind: 'invalid-state' }
   | { kind: 'width-out-of-range' };

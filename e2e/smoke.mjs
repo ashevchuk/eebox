@@ -274,7 +274,7 @@ try {
 
   await step('the label sheet has a cell for every module and two markers for every cable', async () => {
     await browser.evaluate(`document.getElementById('print-labels').click()`);
-    await browser.waitFor(`document.querySelectorAll('#print-sheet .strip-cell').length === 11`, 'eleven label cells');
+    await browser.waitFor(`document.querySelectorAll('#print-sheet .mark-head').length === 11`, 'eleven label cells');
     expectTrue(await browser.evaluate(`document.querySelectorAll('#print-sheet .marker').length >= 6`), 'cable markers are missing');
   });
 

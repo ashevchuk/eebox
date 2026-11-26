@@ -335,8 +335,15 @@
         .label-heading { margin: 0 0 4mm; font-size: 12pt; }
         .strip-line { margin-bottom: 5mm; break-inside: avoid; }
         .strip-rail { font-size: 8pt; margin-bottom: 1mm; }
-        .strip-rail-cells { position: relative; height: 14mm; }
-        .strip-cell { position: absolute; top: 0; height: 14mm; box-sizing: border-box; padding: 0.6mm; border: 0.3mm dashed #000; font-size: 6.5pt; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .mark-strip { position: relative; }
+        .mark-head, .mark-text { position: absolute; box-sizing: border-box; border: 0.2mm dashed #000; overflow: hidden; text-align: center; }
+        .mark-head { display: flex; align-items: center; justify-content: center; font-size: 3mm; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .mark-text { color: #000; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .mark-text-line { white-space: nowrap; }
+        .mark-ruler { margin-bottom: 5mm; break-inside: avoid; }
+        .mark-ruler-bar { position: relative; height: 3mm; border-bottom: 0.3mm solid #000; }
+        .mark-ruler-tick { position: absolute; bottom: 0; height: 3mm; border-left: 0.3mm solid #000; }
+        .mark-ruler-caption { font-size: 8pt; margin-top: 1mm; }
         .marker-grid { display: flex; flex-wrap: wrap; gap: 3mm; }
         .marker { box-sizing: border-box; width: 42mm; height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
         .marker-detail { font-size: 6.5pt; }

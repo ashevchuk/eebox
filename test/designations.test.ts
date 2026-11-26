@@ -163,3 +163,10 @@ describe('designations in the lists', () => {
     expect(designated({}, 'Kitchen')).toBe('Kitchen');
   });
 });
+
+describe('numbering a panel loaded with a module on a rail that is gone', () => {
+  it('does not throw, and numbers it ahead of the plates', () => {
+    const panel = { ...panelOf([place('p1', 'mcb1', 5, 0), place('p2', 'mcb1', 0, 0)]) };
+    expect(refs(numberDevices(panel, resolve).panel)).toEqual({ p1: 'QF1', p2: 'QF2' });
+  });
+});

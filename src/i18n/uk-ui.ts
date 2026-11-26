@@ -259,6 +259,7 @@ export const UI: Dictionary = {
   'Select three or more nodes first.': `Спершу виберіть три й більше вузлів.`,
   // footers of the sheets
   'Module labels, actual size': `Етикетки модулів, натуральна величина`,
+  '100 mm: measure it after printing. Print at 100 %, not fitted to the page.': `100 мм: виміряйте після друку. Друкуйте в масштабі 100 %, без припасування до сторінки.`,
   'Cable markers': `Маркери кабелів`,
   'Nothing to label yet.': `Ще нічого маркувати.`,
   // examples

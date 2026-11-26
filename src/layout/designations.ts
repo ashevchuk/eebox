@@ -59,10 +59,11 @@ export function withoutRef<T extends { ref?: string }>(item: T): T {
 }
 
 /** Plate by plate; on a plate the rows from the top and each from the left, then the loose devices from the top left. */
-function readingOrder(panel: Panel): Placement[] {
+export function readingOrder(panel: Panel): Placement[] {
   const plateIndex = (plate: string) => panel.plates.findIndex((p) => p.id === plate);
   const key = (p: Placement): number[] =>
-    isOnRail(p) ? [plateIndex(panel.rails[p.rail]!.plate), 0, p.rail, p.slot] : [plateIndex(p.plate), 1, p.y, p.x];
+    // A loaded file may still hold a module on a rail that is gone; it is reported, so here it only must not throw.
+    isOnRail(p) ? [plateIndex(panel.rails[p.rail]?.plate ?? ''), 0, p.rail, p.slot] : [plateIndex(p.plate), 1, p.y, p.x];
   return [...panel.placements].sort((a, b) => {
     const [ka, kb] = [key(a), key(b)];
     const i = ka.findIndex((v, n) => v !== kb[n]);

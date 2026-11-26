@@ -1,5 +1,7 @@
 import { annotationsCheck, type Annotation } from '../layout/annotations';
 import { findRefFindings, isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
+import { markingCheck, MAX_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM } from '../layout/marking';
+import { findMarkingFindings } from './marking';
 import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
@@ -165,6 +167,8 @@ const PROJECT_SPEC: FieldSpec = {
   panel: { required: true, check: objectCheck },
   schematic: { required: true, check: objectCheck },
 };
+const stripHeightCheck = (v: unknown) =>
+  typeof v === 'number' && v >= MIN_STRIP_HEIGHT_MM && v <= MAX_STRIP_HEIGHT_MM ? null : `must be ${MIN_STRIP_HEIGHT_MM} to ${MAX_STRIP_HEIGHT_MM} mm`;
 const PANEL_SPEC: FieldSpec = {
   title: { required: false, check: labelCheck },
   info: { required: false, check: infoCheck },
@@ -173,6 +177,7 @@ const PANEL_SPEC: FieldSpec = {
   ducts: { required: false, check: arrayCheck },
   clearanceMm: { required: false, check: clearanceCheck },
   wireSlackMm: { required: false, check: wireSlackCheck },
+  stripHeightMm: { required: false, check: stripHeightCheck },
   placements: { required: true, check: arrayCheck },
   combs: { required: true, check: arrayCheck },
   shelf: { required: true, check: arrayCheck },
@@ -200,6 +205,7 @@ const SHELF_ITEM_SPEC: FieldSpec = {
   module: { required: true, check: moduleRefCheck },
   label: { required: false, check: labelCheck },
   ref: { required: false, check: refCheck },
+  marking: { required: false, check: markingCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
@@ -215,6 +221,7 @@ const PLACEMENT_SPEC: FieldSpec = {
   plate: { required: false, check: identifier },
   label: { required: false, check: labelCheck },
   ref: { required: false, check: refCheck },
+  marking: { required: false, check: markingCheck },
   widthUnits: { required: false, check: unitsCheck },
   terminalLabels: { required: false, check: terminalLabelsCheck },
   state: { required: false, check: oneOf(STATES) },
@@ -364,7 +371,7 @@ export function projectWarnings(
   });
   const nets = findConnectionProblems(project, resolve).map((p) => p.message);
   const placed = findPlacementFindings(project, lookupsOf(resolve).sizes, resolve).map((f) => f.message);
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed, ...findDuctFillFindings(project, resolve).map((f) => f.message), ...findRefFindings(project.panel, resolve).map((f) => f.message)];
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed, ...findDuctFillFindings(project, resolve).map((f) => f.message), ...findRefFindings(project.panel, resolve).map((f) => f.message), ...findMarkingFindings(project, resolve).map((f) => f.message)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {
@@ -426,6 +433,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
       ...(panelRaw.ducts !== undefined ? { ducts } : {}),
       ...(panelRaw.clearanceMm !== undefined ? { clearanceMm: panelRaw.clearanceMm as number } : {}),
       ...(panelRaw.wireSlackMm !== undefined ? { wireSlackMm: panelRaw.wireSlackMm as number } : {}),
+      ...(panelRaw.stripHeightMm !== undefined ? { stripHeightMm: panelRaw.stripHeightMm as number } : {}),
       placements,
       combs,
       shelf,

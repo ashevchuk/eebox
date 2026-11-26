@@ -1,6 +1,9 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { changeDuct, ductsOf, setDuctDepth, setDuctLabel, type Duct } from '../layout/ducts';
-import { MAX_REF_LENGTH, nextRef, setPlacementRef } from '../layout/designations';
+import { designated, MAX_REF_LENGTH, nextRef, setPlacementRef } from '../layout/designations';
+import { DEFAULT_STRIP_HEIGHT_MM, MARKING_PALETTE, MAX_MARKING_TEXT_LENGTH, MAX_MARKING_TEXT_LINES, MAX_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM, setMarking, setStripHeight } from '../layout/marking';
+import { deriveMarking } from '../electrical/marking';
+import { resolveMarking } from '../project/marking';
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
@@ -226,6 +229,27 @@ const plateField = (panel: Panel, plateId: string): InspectorField[] =>
 /** How a duct is named in the list of the ducts a wire may run in: its label or id, and the id that tells equal labels apart. */
 const ductName = (duct: Duct): string => `${duct.label ?? 'Duct'} (${duct.id})`;
 const ductIdNamed = (panel: Panel, name: string): string | undefined => ductsOf(panel).find((d) => ductName(d) === name)?.id;
+
+const AUTOMATIC_COLOUR = 'automatic';
+
+/** The strip text, colour and group of a module, each showing what it would be without a hand-set value. */
+function markingFields(ctx: InspectContext, placement: Placement): InspectorField[] {
+  const derived = deriveMarking(ctx.project, ctx.resolve).get(placement.id);
+  const fallback = resolveMarking({ ...placement, marking: {} }, derived);
+  const rcd = derived?.rcd === undefined ? undefined : ctx.project.panel.placements.find((p) => p.id === derived.rcd);
+  const rcdName = rcd ? designated(rcd, rcd.label ?? ctx.resolve(rcd.module)?.name ?? rcd.id) : undefined;
+  const own = placement.marking ?? {};
+  const named = MARKING_PALETTE.find((c) => c.hex === own.colour)?.name;
+  const colourOptions = [AUTOMATIC_COLOUR, ...MARKING_PALETTE.map((c) => c.name), ...(own.colour && !named ? [own.colour] : [])];
+  return [
+    { key: 'markingText', label: 'Strip text', kind: 'longtext', value: own.text ?? '', max: MAX_MARKING_TEXT_LENGTH, ...(fallback.text ? { placeholder: fallback.text } : {}), hint: 'on its marking strip; empty takes the label or the loads it feeds' },
+    { key: 'markingColour', label: 'Strip colour', kind: 'select', value: named ?? own.colour ?? AUTOMATIC_COLOUR, options: colourOptions },
+    text('markingGroup', 'Strip group', own.group ?? '', rcdName),
+  ];
+}
+
+/** A colour as the select names it, as stored: a palette name, a hex value, or nothing for automatic. */
+const colourValue = (picked: string): string => (picked === AUTOMATIC_COLOUR ? '' : (MARKING_PALETTE.find((c) => c.name === picked)?.hex ?? picked));
 
 /** The fill of a duct whose depth is known, as lines for its inspector. */
 function ductFillFields(ctx: InspectContext, duct: Duct): InspectorField[] {
@@ -498,6 +522,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           readonly('size', 'Size', `longest row ${longest} units`),
           decimal('clearance', 'Clearance', panel.clearanceMm ?? 0, 0, MAX_CLEARANCE_MM, 'mm kept clear around devices on the plate and ducts; 0 checks nothing'),
           decimal('wireSlack', 'Wire slack', panel.wireSlackMm ?? DEFAULT_WIRE_SLACK_MM, 0, MAX_WIRE_SLACK_MM, 'mm added to the length of each wire for bends and stripped ends'),
+          decimal('stripHeight', 'Marking strip height', panel.stripHeightMm ?? DEFAULT_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM, MAX_STRIP_HEIGHT_MM, 'mm, the height of the window for labels under the modules'),
           readonly(
             'contents',
             'Contents',
@@ -522,6 +547,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
           text('ref', 'Designation', placement.ref ?? '', nextRef(project.panel, def)),
+          ...(isOnRail(placement) ? markingFields(ctx, placement) : []),
           ...positionFields(placement, def, project, width, ctx.lengthUnit ?? 'units'),
           ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
@@ -677,6 +703,7 @@ const ERROR_TEXT: Record<string, string> = {
   'invalid-state': 'That position is not one this device has.',
   'width-out-of-range': 'The width is outside what the library allows.',
   'invalid-label': LABEL_MESSAGE,
+  'invalid-marking': `A strip text is up to ${MAX_MARKING_TEXT_LENGTH} characters in up to ${MAX_MARKING_TEXT_LINES} lines; a group is a label of up to 60 characters.`,
   'invalid-ref': `A designation is 1 to ${MAX_REF_LENGTH} letters, digits or . - + = : _ /, such as QF1.`,
   'modules-do-not-fit': 'Modules on this row would not fit.',
   'rail-not-empty': 'Move the modules off the rows you remove first.',
@@ -815,6 +842,12 @@ export function applyEdit(
         const result = setClearance(panel, mm);
         return result.ok ? withPanel(result.panel) : fail(`Clearance is 0 to ${MAX_CLEARANCE_MM} mm.`);
       }
+      if (key === 'stripHeight') {
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = setStripHeight(panel, mm);
+        return result.ok ? withPanel(result.panel) : fail(`The marking strip is ${MIN_STRIP_HEIGHT_MM} to ${MAX_STRIP_HEIGHT_MM} mm high.`);
+      }
       if (key === 'wireSlack') {
         const mm = numberOf(raw);
         if (mm === null) return fail(NOT_A_DECIMAL);
@@ -837,6 +870,11 @@ export function applyEdit(
       }
       if (key === 'ref') {
         const result = setPlacementRef(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key === 'markingText' || key === 'markingColour' || key === 'markingGroup') {
+        const field = key === 'markingText' ? 'text' : key === 'markingColour' ? 'colour' : 'group';
+        const result = setMarking(panel, placement.id, field, field === 'colour' ? colourValue(text) : text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if (key.startsWith('flag:')) {

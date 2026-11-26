@@ -156,6 +156,8 @@ export const DYNAMIC: Dictionary = {
   '{a} % of the {b} % allowed': `{a} % із допустимих {b} %`,
   '{a} is {b} % full of wires; keep it under {c} %.': `{a} заповнений проводами на {b} %, тримайте нижче {c} %.`,
   'Designation {a} is given to {b}': `Позначення {a} мають кілька апаратів: {b}`,
+  'Strip text of {a} does not fit; shorten it or make the strip taller': `Текст смуги {a} не вміщається; скоротіть його або збільште висоту смуги`,
+  'The marking strip is {a} to {b} mm high.': `Висота смуги маркування: від {a} до {b} мм.`,
   'Positions are 0 to {a} mm and sizes {b} to {c} mm.': `Положення — від 0 до {a} мм, розміри — від {b} до {c} мм.`,
   'That duct cannot be made there.': `Тут цей канал зробити не можна.`,
   'Cable ducts': `Кабель-канали`,
