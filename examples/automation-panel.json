@@ -49,7 +49,8 @@
           },
           "rail": 0,
           "slot": 0,
-          "label": "Main switch"
+          "label": "Main switch",
+          "ref": "QS1"
         },
         {
           "id": "p2",
@@ -59,7 +60,8 @@
           },
           "rail": 0,
           "slot": 4,
-          "label": "RCD 300 mA"
+          "label": "RCD 300 mA",
+          "ref": "QD1"
         },
         {
           "id": "p3",
@@ -69,7 +71,8 @@
           },
           "rail": 0,
           "slot": 8,
-          "label": "Pump 1"
+          "label": "Pump 1",
+          "ref": "QF1"
         },
         {
           "id": "p4",
@@ -79,7 +82,8 @@
           },
           "rail": 0,
           "slot": 11,
-          "label": "Pump 2"
+          "label": "Pump 2",
+          "ref": "QF2"
         },
         {
           "id": "p5",
@@ -89,7 +93,8 @@
           },
           "rail": 0,
           "slot": 14,
-          "label": "Control"
+          "label": "Control",
+          "ref": "QF3"
         },
         {
           "id": "p6",
@@ -99,7 +104,8 @@
           },
           "rail": 0,
           "slot": 15,
-          "label": "PSU 24 V"
+          "label": "PSU 24 V",
+          "ref": "G1"
         },
         {
           "id": "p7",
@@ -129,7 +135,8 @@
           },
           "rail": 1,
           "slot": 5,
-          "label": "AI"
+          "label": "AI",
+          "ref": "A1"
         },
         {
           "id": "p10",
@@ -139,7 +146,8 @@
           },
           "rail": 1,
           "slot": 10,
-          "label": "PLC"
+          "label": "PLC",
+          "ref": "A2"
         },
         {
           "id": "p11",
@@ -150,7 +158,8 @@
           "plate": "plate1",
           "x": 40,
           "y": 280,
-          "label": "Soft starter 1"
+          "label": "Soft starter 1",
+          "ref": "A3"
         },
         {
           "id": "p12",
@@ -161,7 +170,8 @@
           "plate": "plate1",
           "x": 200,
           "y": 280,
-          "label": "Soft starter 2"
+          "label": "Soft starter 2",
+          "ref": "A4"
         },
         {
           "id": "p13",
@@ -172,7 +182,8 @@
           "plate": "plate1",
           "x": 360,
           "y": 280,
-          "label": "Meter"
+          "label": "Meter",
+          "ref": "PI1"
         },
         {
           "id": "p14",
@@ -182,7 +193,8 @@
           },
           "rail": 2,
           "slot": 1,
-          "label": "Run 1"
+          "label": "Run 1",
+          "ref": "A5"
         },
         {
           "id": "p15",
@@ -192,7 +204,8 @@
           },
           "rail": 2,
           "slot": 3,
-          "label": "Run 2"
+          "label": "Run 2",
+          "ref": "A6"
         },
         {
           "id": "p16",
@@ -202,7 +215,8 @@
           },
           "rail": 2,
           "slot": 5,
-          "label": "Fault"
+          "label": "Fault",
+          "ref": "A7"
         }
       ],
       "combs": [],

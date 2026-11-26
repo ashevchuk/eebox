@@ -7,7 +7,7 @@
         {
           "id": "plate1",
           "name": "Back plate",
-          "widthMm": 420.0,
+          "widthMm": 420,
           "heightMm": 220
         }
       ],
@@ -28,7 +28,8 @@
           },
           "rail": 0,
           "slot": 0,
-          "label": "ATS"
+          "label": "ATS",
+          "ref": "K1"
         },
         {
           "id": "p2",
@@ -38,7 +39,8 @@
           },
           "rail": 0,
           "slot": 4,
-          "label": "KM1 mains"
+          "label": "KM1 mains",
+          "ref": "KM1"
         },
         {
           "id": "p3",
@@ -48,7 +50,8 @@
           },
           "rail": 0,
           "slot": 7,
-          "label": "KM2 generator"
+          "label": "KM2 generator",
+          "ref": "KM2"
         },
         {
           "id": "p4",
@@ -58,7 +61,8 @@
           },
           "rail": 0,
           "slot": 10,
-          "label": "RCD"
+          "label": "RCD",
+          "ref": "QD1"
         }
       ],
       "combs": [],
