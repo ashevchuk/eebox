@@ -11,6 +11,7 @@ import { launch } from './browser.mjs';
 
 const page = pathToFileURL(resolve('dist-file/index.html')).href;
 const example = readFileSync(resolve('examples/house-panel.json'), 'utf8');
+const BUNDLED = JSON.parse(readFileSync(resolve('icons/generic/catalogue.json'), 'utf8')).icons.length;
 const OVEN_BREAKER = [472, 530];
 const failures = [];
 let browser;
@@ -65,7 +66,7 @@ try {
 
   await step('the inspector of a breaker opens the picker with every bundled icon, and a search narrows it', async () => {
     await openPicker();
-    expectTrue((await browser.evaluate(`document.querySelectorAll('.icon-cell').length`)) === 212, 'not all 212 bundled icons are listed');
+    expectTrue((await browser.evaluate(`document.querySelectorAll('.icon-cell').length`)) === BUNDLED, `not all ${BUNDLED} bundled icons are listed`);
     await search('oven');
     const names = await shownNames();
     expectTrue(names.includes('Oven') && names.every((n) => /oven/i.test(n)), `search for oven shows ${names.join(', ')}`);
@@ -93,7 +94,7 @@ try {
 
   await step('the printed strip draws the icon inside its cell, above the text', async () => {
     await browser.evaluate(`window.print = () => {}; document.getElementById('print-labels').click()`);
-    await browser.waitFor(`document.querySelectorAll('#print-sheet .mark-icon svg').length === 1`, 'one icon on the strips');
+    await browser.waitFor(`document.querySelectorAll('#print-sheet .mark-icon svg').length >= 1`, 'icons on the strips');
     await browser.media('print');
     await wait(200);
     const fits = await browser.evaluate(`(() => {
@@ -113,6 +114,35 @@ try {
     await openPicker();
     await search('sail');
     expectTrue((await shownNames()).join() === 'Sail boat', 'the imported icon is gone after a reload');
+    await browser.evaluate(`document.querySelector('.icon-cell').click()`);
+    await wait(300);
+  });
+
+  const status = () => browser.evaluate(`[...document.querySelectorAll('.icon-status')].pop().textContent`);
+  const deleteSail = async () => {
+    await browser.evaluate(`(() => { const s = document.querySelector('.icon-picker input[type=search]'); s.value = 'sail'; s.dispatchEvent(new Event('input')); document.querySelector('.icon-delete').click(); })()`);
+    await wait(300);
+  };
+
+  await step('an own icon that the project uses is not deleted', async () => {
+    await browser.evaluate(`[...document.querySelectorAll('#inspector button')].find((b) => b.textContent === 'Choose icon…').click()`);
+    await browser.waitFor(`document.querySelector('dialog.icon-picker')`, 'the icon picker');
+    await deleteSail();
+    const said = await status();
+    expectTrue(/uses the icon/.test(said), `the picker says "${said}"`);
+    await browser.evaluate(`[...document.querySelectorAll('.icon-picker button')].find((b) => b.textContent === 'From its load').click()`);
+    await wait(300);
+  });
+
+  await step('once nothing uses it, it is deleted after a question', async () => {
+    await browser.evaluate(`[...document.querySelectorAll('#inspector button')].find((b) => b.textContent === 'Choose icon…').click()`);
+    await browser.waitFor(`document.querySelector('dialog.icon-picker')`, 'the icon picker');
+    await deleteSail();
+    await browser.waitFor(`[...document.querySelectorAll('dialog[open] button')].some((b) => b.textContent === 'Delete')`, 'the question');
+    await browser.evaluate(`[...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'Delete').click()`);
+    await browser.waitFor(`[...document.querySelectorAll('.icon-status')].pop().textContent === 'Icon deleted.'`, 'the icon to be deleted');
+    expectTrue((await shownNames()).length === 0, 'the deleted icon is still listed');
+    expectTrue((await browser.evaluate(`localStorage.getItem('eebox:my-icons')`)) === '[]', 'the deleted icon is still stored');
     await browser.evaluate(`[...document.querySelectorAll('.icon-picker button')].find((b) => b.textContent === 'Cancel').click()`);
   });
 

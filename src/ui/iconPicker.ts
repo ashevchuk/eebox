@@ -1,6 +1,6 @@
 import { iconLabel } from '../i18n';
 import type { IconCategory } from '../library/genericIcons';
-import { NO_ICON } from '../library/icons';
+import { NO_ICON, OWN_ICON_SOURCE } from '../library/icons';
 import { shapesToSvg } from '../library/svgExport';
 import { filterIcons, type IconEntry } from './iconCatalog';
 
@@ -13,6 +13,8 @@ export interface IconPickerOptions {
   categories: () => IconCategory[];
   /** Adds SVG files to the person's own icons and says how it went. */
   importFiles: (files: File[]) => Promise<string>;
+  /** Removes one of the person's own icons, after asking, and says how it went. */
+  deleteIcon: (key: string) => Promise<string>;
 }
 
 const button = (label: string, className = ''): HTMLButtonElement => {
@@ -65,6 +67,8 @@ export function pickIcon(options: IconPickerOptions): Promise<string | null> {
       const shown = filterIcons(options.entries(), search.value, category.value, iconLabel);
       grid.replaceChildren(
         ...shown.map(({ key, icon }) => {
+          const item = document.createElement('div');
+          item.className = 'icon-item';
           const cell = button('', key === options.current ? 'icon-cell chosen' : 'icon-cell');
           cell.title = iconLabel(icon.name);
           const picture = document.createElement('span');
@@ -75,7 +79,18 @@ export function pickIcon(options: IconPickerOptions): Promise<string | null> {
           name.textContent = iconLabel(icon.name);
           cell.append(picture, name);
           cell.addEventListener('click', () => choose(key));
-          return cell;
+          item.append(cell);
+          if (key.startsWith(`${OWN_ICON_SOURCE}/`)) {
+            const remove = button('×', 'icon-delete');
+            remove.title = 'Delete this icon';
+            remove.addEventListener('click', async () => {
+              status.textContent = await options.deleteIcon(key);
+              fillCategories();
+              fillGrid();
+            });
+            item.append(remove);
+          }
+          return item;
         }),
       );
       empty.textContent = shown.length === 0 ? 'No icon matches.' : '';

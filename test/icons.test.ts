@@ -8,7 +8,7 @@ import { iconFromSvg, iconIdOf, iconProblem, isIconChoice, isIconKey, type IconD
 import { importSvg } from '../src/library/svgImport';
 import { setMarking } from '../src/layout/marking';
 import type { Project } from '../src/project';
-import { buildProjectFile, parseProjectJson } from '../src/project/file';
+import { buildProjectFile, iconKeysUsed, parseProjectJson } from '../src/project/file';
 import { freeIconId, loadOwnIcons, parseIconList, saveOwnIcons } from '../src/project/iconStorage';
 import { markingStrips } from '../src/project/marking';
 import { emptySchematic, setNodeIcon } from '../src/schematic/model';
@@ -237,5 +237,15 @@ describe('the Ukrainian names of the bundled icons', () => {
 
   it('stay out of the page dictionary, so a circuit labelled Kitchen or Oven keeps its label', () => {
     for (const name of ['Kitchen', 'Oven', 'Garage', 'Sauna', 'Boiler, gas']) expect(UKRAINIAN[name], name).toBeUndefined();
+  });
+});
+
+describe('the icons a project uses', () => {
+  it('are those of the markings, on the rails and on the shelf, and of the loads, without none', () => {
+    const project = withLoadIcon('generic/oven');
+    const marked = setMarking(project.panel, 'p2', 'icon', 'my/boat');
+    const refused = marked.ok ? setMarking(marked.panel, 'p1', 'icon', 'none') : marked;
+    if (!refused.ok) throw new Error('mark');
+    expect(iconKeysUsed({ ...project, panel: refused.panel }).sort()).toEqual(['generic/oven', 'my/boat']);
   });
 });

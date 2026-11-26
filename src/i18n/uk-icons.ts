@@ -30,6 +30,7 @@ export const ICONS: Dictionary = {
   "Earthing (circle)": "Заземлення (коло)",
   "Computer": "Комп’ютер",
   "EV charger": "Зарядка електромобіля",
+  "Lamp": "Лампа",
   "LED strip": "Світлодіодна стрічка",
   "Modular socket": "Модульна розетка",
   "Shower": "Душ",

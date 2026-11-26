@@ -48,7 +48,7 @@ import { SearchView } from './ui/searchView';
 import { checkState, shouldPulse, type CheckState } from './ui/checkState';
 import { ProblemsView } from './ui/problemsView';
 import type { Finding } from './electrical/problems';
-import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
+import { iconKeysUsed, moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { planModuleSwap, planModuleUpdate } from './project/sync';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
@@ -66,7 +66,7 @@ import { confirmDialog } from './ui/dialog';
 import { pickIcon } from './ui/iconPicker';
 import { iconCategories, iconEntries } from './ui/iconCatalog';
 import { freeIconId, loadOwnIcons, MAX_OWN_ICONS, saveOwnIcons } from './project/iconStorage';
-import { iconFromSvg, OWN_ICON_CATEGORY } from './library/icons';
+import { iconFromSvg, iconKey, OWN_ICON_CATEGORY, OWN_ICON_SOURCE } from './library/icons';
 import { MAX_ART_SHAPES } from './library/art';
 import { normalizeLabel } from './layout/labels';
 import { InspectorView } from './ui/inspectorView';
@@ -1426,7 +1426,7 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
 const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit), (current, forDevice) =>
-  pickIcon({ current, forDevice, entries: () => iconEntries(session.ownIcons), categories: () => iconCategories(session.ownIcons), importFiles: importIconFiles }),
+  pickIcon({ current, forDevice, entries: () => iconEntries(session.ownIcons), categories: () => iconCategories(session.ownIcons), importFiles: importIconFiles, deleteIcon: deleteOwnIcon }),
 );
 
 // Commit a typed value before a click elsewhere changes the selection under it.
@@ -1844,6 +1844,18 @@ async function importIconFiles(files: File[]): Promise<string> {
     session.changed();
   }
   return [`${added} icon${added === 1 ? '' : 's'} imported.`, withNotes > 0 ? `${withNotes} with parts left out that cannot be drawn.` : '', ...refused].filter(Boolean).join('\n');
+}
+
+/** Takes one of the person's own icons away, unless the project on the screen uses it. */
+async function deleteOwnIcon(key: string): Promise<string> {
+  if (iconKeysUsed(session.project).includes(key)) return 'This project uses the icon; give those modules and loads another one first.';
+  const icon = session.resolveIcon(key);
+  if (!icon || !(await confirmDialog(`Delete the icon "${icon.name}" from My icons?`, 'Delete'))) return '';
+  const icons = session.ownIcons.filter((i) => iconKey(OWN_ICON_SOURCE, i.id) !== key);
+  if (autosaveStore && !saveOwnIcons(autosaveStore, icons)) return 'The browser refused to keep the icons.';
+  session.ownIcons = icons;
+  session.changed();
+  return 'Icon deleted.';
 }
 
 function applyStoredSettings(store: KeyValueStore): void {

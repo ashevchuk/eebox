@@ -111,6 +111,11 @@
       "category": "outdoor"
     },
     {
+      "id": "lamp",
+      "name": "Lamp",
+      "category": "lighting"
+    },
+    {
       "id": "led-strip",
       "name": "LED strip",
       "category": "lighting"
