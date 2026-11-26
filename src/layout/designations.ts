@@ -1,4 +1,5 @@
 import type { ModuleDef, ModuleKind } from '../library/types';
+import type { Finding } from '../electrical/problems';
 import { isOnRail, type ModuleRef, type Panel, type Placement, type PlacementResult } from './placement';
 
 export const MAX_REF_LENGTH = 16;
@@ -105,4 +106,26 @@ export function numberDevices(panel: Panel, resolve: (ref: ModuleRef) => ModuleD
     return ref === undefined ? p : { ...p, ref };
   });
   return { panel: given.size > 0 ? { ...panel, placements } : panel, numbered: given.size };
+}
+
+/** How a device is named in lists and on the schematic: its designation first, when it has one. */
+export function designated(item: { ref?: string }, name: string): string {
+  return item.ref === undefined ? name : `${item.ref} ${name}`;
+}
+
+/** Two devices with one designation make the drawings ambiguous; a module on the shelf counts, as it may come back. */
+export function findRefFindings(panel: Panel, resolve: (ref: ModuleRef) => ModuleDef | undefined): Finding[] {
+  const byRef = new Map<string, Array<{ id: string; ref?: string; label?: string; module: ModuleRef }>>();
+  for (const item of [...panel.placements, ...panel.shelf]) {
+    if (item.ref !== undefined) byRef.set(item.ref, [...(byRef.get(item.ref) ?? []), item]);
+  }
+  return [...byRef]
+    .filter(([, items]) => items.length > 1)
+    .map(([ref, items]) => ({
+      message: `Designation ${ref} is given to ${items.map((i) => `${i.label ?? resolve(i.module)?.name ?? i.module.moduleId} [${i.id}]`).join(', ')}`,
+      severity: 'advice' as const,
+      wires: [],
+      nodes: [],
+      placements: items.filter((i) => panel.placements.some((p) => p.id === i.id)).map((i) => i.id),
+    }));
 }

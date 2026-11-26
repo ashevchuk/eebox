@@ -12,6 +12,8 @@ export interface BomRow {
   quantity: number;
   /** Custom labels of the placed items, in panel order. */
   labels: string[];
+  /** Designations of the placed items, in natural order (QF2 before QF10). */
+  refs: string[];
 }
 
 /** What a row costs, when its module has a price: one copy times the quantity. */
@@ -52,6 +54,7 @@ const HEADER = [
   'Residual current (mA)',
   'Width (units)',
   'Quantity',
+  'Designations',
   'Labels',
   'Width (mm)',
   'Unit price',
@@ -59,19 +62,24 @@ const HEADER = [
   'Line total',
 ];
 
+const NATURAL = new Intl.Collator('en', { numeric: true });
+
 export function buildBom(panel: Panel, resolve: (ref: ModuleRef) => ModuleDef | undefined): BomRow[] {
   const rows = new Map<string, BomRow>();
-  for (const { module, label, widthUnits: override } of [...panel.placements, ...panel.combs]) {
+  for (const item of [...panel.placements, ...panel.combs]) {
+    const { module, label, widthUnits: override } = item;
     const def = resolve(module);
     const widthUnits = override ?? def?.widthUnits;
     const key = `${moduleKey(module)}|${widthUnits}`;
     const row =
       rows.get(key) ??
-      { libraryId: module.libraryId, moduleId: module.moduleId, def, widthUnits, quantity: 0, labels: [] };
+      { libraryId: module.libraryId, moduleId: module.moduleId, def, widthUnits, quantity: 0, labels: [], refs: [] };
     row.quantity += 1;
     if (label) row.labels.push(label);
+    if ('ref' in item && item.ref) row.refs.push(item.ref);
     rows.set(key, row);
   }
+  for (const row of rows.values()) row.refs.sort(NATURAL.compare);
   return [...rows.values()].sort(
     (a, b) =>
       a.libraryId.localeCompare(b.libraryId) ||
@@ -89,7 +97,7 @@ export function cell(value: string | number | undefined): string {
 }
 
 export function bomToCsv(rows: BomRow[]): string {
-  const lines = rows.map(({ libraryId, moduleId, def, widthUnits, quantity, labels }) =>
+  const lines = rows.map(({ libraryId, moduleId, def, widthUnits, quantity, labels, refs }) =>
     [
       libraryId,
       moduleId,
@@ -103,11 +111,12 @@ export function bomToCsv(rows: BomRow[]): string {
       def?.residualCurrentMa,
       widthUnits,
       quantity,
+      refs.join('; ') || undefined,
       labels.join('; ') || undefined,
       widthUnits === undefined ? undefined : mmFromUnits(widthUnits),
       def?.price,
       def?.currency,
-      lineTotal({ libraryId, moduleId, def, widthUnits, quantity, labels }),
+      lineTotal({ libraryId, moduleId, def, widthUnits, quantity, labels, refs }),
     ]
       .map(cell)
       .join(','),

@@ -155,6 +155,7 @@ export const DYNAMIC: Dictionary = {
   'A depth is {a} to {b} mm, or 0 to leave it out.': `Глибина — від {a} до {b} мм, або 0, щоб не вказувати.`,
   '{a} % of the {b} % allowed': `{a} % із допустимих {b} %`,
   '{a} is {b} % full of wires; keep it under {c} %.': `{a} заповнений проводами на {b} %, тримайте нижче {c} %.`,
+  'Designation {a} is given to {b}': `Позначення {a} мають кілька апаратів: {b}`,
   'Positions are 0 to {a} mm and sizes {b} to {c} mm.': `Положення — від 0 до {a} мм, розміри — від {b} до {c} мм.`,
   'That duct cannot be made there.': `Тут цей канал зробити не можна.`,
   'Cable ducts': `Кабель-канали`,
@@ -316,6 +317,7 @@ export const DYNAMIC: Dictionary = {
   // tables and the like
   Quantity: `Кількість`,
   Labels: `Назви`,
+  Designations: `Позначення`,
   Load: `Навантаження`,
   'Power, W': `Потужність, Вт`,
   'Breaker, A': `Автомат, А`,

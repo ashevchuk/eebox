@@ -1,5 +1,5 @@
 import { annotationsCheck, type Annotation } from '../layout/annotations';
-import { isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
+import { findRefFindings, isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
 import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
 import { nodeTerminalsLookup } from '../electrical/nodeTerminals';
@@ -364,7 +364,7 @@ export function projectWarnings(
   });
   const nets = findConnectionProblems(project, resolve).map((p) => p.message);
   const placed = findPlacementFindings(project, lookupsOf(resolve).sizes, resolve).map((f) => f.message);
-  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed, ...findDuctFillFindings(project, resolve).map((f) => f.message)];
+  return [...panel, ...combs, ...widths, ...schematic, ...nets, ...findRuleWarnings(project, resolve, settings), ...findGlue(project, resolve).map((f) => f.message), ...placed, ...findDuctFillFindings(project, resolve).map((f) => f.message), ...findRefFindings(project.panel, resolve).map((f) => f.message)];
 }
 
 export function parseProjectFile(raw: unknown): ProjectParseResult {

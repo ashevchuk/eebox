@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { copyItems, pasteItems } from '../src/layout/clipboard';
 import { duplicateRow } from '../src/layout/arrangeModules';
-import { nextRef, normalizeRef, numberDevices, setPlacementRef } from '../src/layout/designations';
+import { designated, findRefFindings, nextRef, normalizeRef, numberDevices, setPlacementRef } from '../src/layout/designations';
+import { nodeTerminalsLookup } from '../src/electrical/nodeTerminals';
+import { wireList } from '../src/electrical/schedule';
+import { bomToCsv, buildBom } from '../src/project/bom';
 import { DEFAULT_PLATE_ID } from '../src/layout/plates';
 import type { FreePlacement, Panel, Placement } from '../src/layout/placement';
 import { takeOff } from '../src/layout/shelf';
-import { buildProjectFile, parseProjectJson } from '../src/project/file';
-import { emptySchematic } from '../src/schematic/model';
+import { buildProjectFile, parseProjectJson, projectWarnings } from '../src/project/file';
+import { connect, emptySchematic, syncModuleNodes } from '../src/schematic/model';
 import { applyEdit, inspect, type InspectContext } from '../src/ui/inspector';
 import { defs, panelOf, place, ref as moduleRef, resolve, widthOf } from './fixtures';
 
@@ -115,5 +118,48 @@ describe('designation in the inspector', () => {
     expect(edited.ok && edited.project.panel.placements[0]?.ref).toBe('QF2');
     const refused = applyEdit(ctx(panel), 'ref', 'QF 2');
     expect(!refused.ok && refused.message).toContain('designation');
+  });
+});
+
+describe('one designation on two devices', () => {
+  it('is advice that names them and marks the placed ones, the shelf included in the count', () => {
+    const shelved = takeOff(panelOf([withRef({ ...place('p1', 'mcb1', 0, 0), label: 'Kitchen' }, 'QF3'), withRef(place('p2', 'mcb1', 0, 1), 'QF3'), withRef(place('p3', 'mcb1', 0, 2), 'QF4')]), 'p2');
+    if (!shelved.ok) throw new Error('take off');
+    expect(findRefFindings(shelved.panel, resolve)).toEqual([
+      { message: 'Designation QF3 is given to Kitchen [p1], MCB 1P [p2]', severity: 'advice', wires: [], nodes: [], placements: ['p1'] },
+    ]);
+  });
+
+  it('is reported when the project is checked', () => {
+    const panel = panelOf([withRef(place('p1', 'mcb1', 0, 0), 'QF1'), withRef(place('p2', 'mcb1', 0, 1), 'QF1')]);
+    expect(projectWarnings({ panel, schematic: emptySchematic() }, resolve)).toContain('Designation QF1 is given to MCB 1P [p1], MCB 1P [p2]');
+  });
+
+  it('is not reported for designations that differ', () => {
+    expect(findRefFindings(panelOf([withRef(place('p1', 'mcb1', 0, 0), 'QF1'), withRef(place('p2', 'mcb1', 0, 1), 'QF2')]), resolve)).toEqual([]);
+  });
+});
+
+describe('designations in the lists', () => {
+  it('fill their own column of the parts list in natural order', () => {
+    const panel = panelOf([withRef(place('p1', 'mcb1', 0, 0), 'QF10'), place('p2', 'mcb1', 0, 1), withRef(place('p3', 'mcb1', 0, 2), 'QF2')]);
+    const [row] = buildBom(panel, resolve);
+    expect(row?.refs).toEqual(['QF2', 'QF10']);
+    expect(bomToCsv([row!]).split('\r\n')[1]).toContain(',3,QF2; QF10,,');
+  });
+
+  it('come first in the name of a wire end', () => {
+    const panel = panelOf([withRef({ ...place('p1', 'mcb1', 0, 0), label: 'Kitchen' }, 'QF1'), place('p2', 'mcb1', 0, 1)]);
+    let schematic = syncModuleNodes(emptySchematic(), panel, (r) => r.moduleId);
+    const wired = connect(schematic, nodeTerminalsLookup(panel, resolve), { node: 'n1', terminal: 'bottom:L' }, { node: 'n2', terminal: 'top:L' });
+    if (!wired.ok) throw new Error(wired.error.kind);
+    schematic = wired.schematic;
+    const [wire] = wireList({ panel, schematic }, resolve);
+    expect(wire).toMatchObject({ from: 'QF1 Kitchen L (bottom)', to: 'mcb1 L (top)' });
+  });
+
+  it('name a device by its designation and name, or by its name alone', () => {
+    expect(designated({ ref: 'QF1' }, 'Kitchen')).toBe('QF1 Kitchen');
+    expect(designated({}, 'Kitchen')).toBe('Kitchen');
   });
 });

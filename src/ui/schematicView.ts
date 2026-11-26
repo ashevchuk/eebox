@@ -3,6 +3,7 @@ import { energy, type Energy } from '../electrical/energy';
 import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
 import { t } from '../i18n';
+import { designated } from '../layout/designations';
 import { withNoteBounds } from '../layout/annotations';
 import { drawAnnotations } from '../view/annotationDraw';
 import { chainNodes, feedFrom, type AutowireResult } from '../schematic/autowire';
@@ -880,8 +881,10 @@ export class SchematicView implements View {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = orphan
-      ? `${shelved?.label ?? node.label} (${t(shelved ? 'on the shelf' : 'missing')})`
-      : (placement?.label ?? node.label);
+      ? `${shelved ? designated(shelved, shelved.label ?? node.label) : node.label} (${t(shelved ? 'on the shelf' : 'missing')})`
+      : placement
+        ? designated(placement, placement.label ?? node.label)
+        : node.label;
     let fontSize = 12;
     ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     while (fontSize > MIN_LABEL_FONT && ctx.measureText(label).width > r.width - 16) {
