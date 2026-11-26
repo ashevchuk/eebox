@@ -1,6 +1,7 @@
 import { annotationsCheck, type Annotation } from '../layout/annotations';
 import { findRefFindings, isStoredRef, MAX_REF_LENGTH } from '../layout/designations';
 import { markingCheck, MAX_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM } from '../layout/marking';
+import { iconProblem, isIconKey, NO_ICON, OWN_ICON_SOURCE, type IconDef } from '../library/icons';
 import { findMarkingFindings } from './marking';
 import { infoCheck, type ProjectInfo } from '../layout/info';
 import { findConnectionProblems, findGlue } from '../electrical/problems';
@@ -73,6 +74,8 @@ export interface ProjectFile {
   project: Project;
   /** Definitions of the placed modules at save time, keyed by `libraryId/moduleId`. */
   modules: Record<string, ModuleDef>;
+  /** The person's own icons the markings use, by icon key, so the file prints the same elsewhere; only when there are some. */
+  icons?: Record<string, IconDef>;
 }
 
 export type ProjectParseResult =
@@ -84,13 +87,42 @@ export const moduleKey = (ref: ModuleRef): string => `${ref.libraryId}/${ref.mod
 export function buildProjectFile(
   project: Project,
   resolve: (ref: ModuleRef) => ModuleDef | undefined,
+  resolveIcon: (key: string) => IconDef | undefined = () => undefined,
 ): ProjectFile {
   const modules: Record<string, ModuleDef> = {};
   for (const { module } of [...project.panel.placements, ...project.panel.combs]) {
     const def = resolve(module);
     if (def) modules[moduleKey(module)] = def;
   }
-  return { format: PROJECT_FORMAT, version: PROJECT_VERSION, generator: GENERATOR, project, modules };
+  const icons: Record<string, IconDef> = {};
+  for (const key of iconKeysUsed(project)) {
+    const icon = key.startsWith(`${OWN_ICON_SOURCE}/`) ? resolveIcon(key) : undefined;
+    if (icon) icons[key] = icon;
+  }
+  return { format: PROJECT_FORMAT, version: PROJECT_VERSION, generator: GENERATOR, project, modules, ...(Object.keys(icons).length > 0 ? { icons } : {}) };
+}
+
+/** Every icon key a marking or a load names. */
+export function iconKeysUsed(project: Project): string[] {
+  const keys = [...project.panel.placements, ...project.panel.shelf].flatMap((p) => (p.marking?.icon && p.marking.icon !== NO_ICON ? [p.marking.icon] : []));
+  for (const node of project.schematic.nodes) if (node.icon) keys.push(node.icon);
+  return [...new Set(keys)];
+}
+
+function validateIcons(raw: unknown, errors: ValidationError[]): Record<string, IconDef> | undefined {
+  if (raw === undefined) return undefined;
+  const icons: Record<string, IconDef> = {};
+  if (!isRecord(raw)) {
+    errors.push({ path: 'icons', message: 'must be an object' });
+    return icons;
+  }
+  for (const [key, value] of Object.entries(raw)) {
+    const problem = iconProblem(value);
+    if (problem) errors.push({ path: `icons["${key}"]`, message: problem });
+    else if (!isIconKey(key) || !key.startsWith(`${OWN_ICON_SOURCE}/`) || key !== `${OWN_ICON_SOURCE}/${(value as IconDef).id}`) errors.push({ path: `icons["${key}"]`, message: 'key must be "my/<id>" matching the icon id' });
+    else icons[key] = value as IconDef;
+  }
+  return icons;
 }
 
 const objectCheck = (v: unknown) => (isRecord(v) ? null : 'must be an object');
@@ -162,6 +194,7 @@ const ROOT_SPEC: FieldSpec = {
   generator: { required: false, check: generatorCheck },
   project: { required: true, check: objectCheck },
   modules: { required: true, check: objectCheck },
+  icons: { required: false, check: objectCheck },
 };
 const PROJECT_SPEC: FieldSpec = {
   panel: { required: true, check: objectCheck },
@@ -262,6 +295,7 @@ const NODE_SPEC: FieldSpec = {
   load: { required: false, check: objectCheck },
   off: { required: false, check: (v) => (v === true ? null : 'must be true when present') },
   earthing: { required: false, check: oneOf(EARTHING_SYSTEM_IDS) },
+  icon: { required: false, check: (v) => (isIconKey(v) ? null : 'must be an icon key such as generic/oven') },
   shortCircuitKA: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_SHORT_CIRCUIT_KA ? null : `must be above 0 and at most ${MAX_SHORT_CIRCUIT_KA}`) },
   loopImpedanceMOhm: { required: false, check: (v) => (typeof v === 'number' && v > 0 && v <= MAX_LOOP_IMPEDANCE_MOHM ? null : `must be above 0 and at most ${MAX_LOOP_IMPEDANCE_MOHM}`) },
 };
@@ -295,6 +329,7 @@ function checkNodeShape(node: Record<string, unknown>, path: string, errors: Val
   }
   if (node.off !== undefined && node.kind !== 'source') errors.push({ path: `${path}.off`, message: 'is only allowed on a source node' });
   if (node.earthing !== undefined && node.kind !== 'source') errors.push({ path: `${path}.earthing`, message: 'is only allowed on a source node' });
+  if (node.icon !== undefined && node.kind !== 'load') errors.push({ path: `${path}.icon`, message: 'is only allowed on a load node' });
   for (const key of ['shortCircuitKA', 'loopImpedanceMOhm']) {
     if (node[key] !== undefined && node.kind !== 'source') errors.push({ path: `${path}.${key}`, message: 'is only allowed on a source node' });
   }
@@ -402,6 +437,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   );
   const wires = validateList<Wire>(schematicRaw?.wires, WIRE_SPEC, 'project.schematic.wires', errors);
   const modules = validateModules(root?.modules, errors);
+  const icons = validateIcons(root?.icons, errors);
   const rails = validateEntries<Rail>(panelRaw?.rails, RAIL_SPEC, 'project.panel.rails', errors);
   if (panelRaw && Array.isArray(panelRaw.rails) && panelRaw.rails.length > MAX_RAILS) {
     errors.push({ path: 'project.panel.rails', message: `must list at most ${MAX_RAILS} rails` });
@@ -442,7 +478,7 @@ export function parseProjectFile(raw: unknown): ProjectParseResult {
   };
   return {
     ok: true,
-    file: { format: PROJECT_FORMAT, version: PROJECT_VERSION, ...(root.generator !== undefined ? { generator: root.generator as string } : {}), project: parsed, modules },
+    file: { format: PROJECT_FORMAT, version: PROJECT_VERSION, ...(root.generator !== undefined ? { generator: root.generator as string } : {}), project: parsed, modules, ...(icons ? { icons } : {}) },
     warnings: projectWarnings(parsed, (ref) => modules[moduleKey(ref)]),
   };
 }

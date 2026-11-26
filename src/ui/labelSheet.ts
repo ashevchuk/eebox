@@ -2,6 +2,8 @@ import { MODULE_UNIT_MM } from '../library/types';
 import { cableMarkers } from '../project/labels';
 import { HEAD_MM, LINE_HEIGHT, markingStrips, TEXT_PADDING_MM, type MarkingLine } from '../project/marking';
 import { FONT_FAMILY } from '../view/font';
+import type { IconDef } from '../library/icons';
+import { shapesToSvg } from '../library/svgExport';
 import type { Session } from './session';
 
 /** A printer that fits the page to the paper shrinks the strips; the ruler shows it. */
@@ -36,7 +38,7 @@ function ruler(): HTMLElement {
   return box;
 }
 
-function strip(line: MarkingLine, heightMm: number): HTMLElement {
+function strip(line: MarkingLine, heightMm: number, resolveIcon: (key: string) => IconDef | undefined): HTMLElement {
   const lengthUnits = Math.max(...[...line.heads, ...line.texts].map((c) => c.offsetUnits + c.widthUnits));
   const box = element('div', 'mark-strip');
   box.style.width = `${lengthUnits * MODULE_UNIT_MM}mm`;
@@ -53,6 +55,14 @@ function strip(line: MarkingLine, heightMm: number): HTMLElement {
     cell.style.padding = `${TEXT_PADDING_MM}mm`;
     cell.style.fontSize = `${text.fontMm}mm`;
     cell.style.lineHeight = String(LINE_HEIGHT);
+    const icon = text.icon === undefined ? undefined : resolveIcon(text.icon);
+    if (icon) {
+      const picture = element('div', 'mark-icon');
+      picture.style.height = `${text.iconMm}mm`;
+      // The shapes passed the art validator (colours, path grammar, numbers) and their text is escaped, so the markup holds nothing else.
+      picture.innerHTML = shapesToSvg(icon.art, icon.widthMm, icon.heightMm);
+      cell.append(picture);
+    }
     cell.append(...text.lines.map((l) => element('div', 'mark-text-line', l)));
     box.append(cell);
   }
@@ -71,7 +81,7 @@ export function fillLabelSheet(sheet: HTMLElement, session: Session): void {
     for (const line of marking.lines) {
       const row = element('div', 'strip-line');
       if (line.railLabel) row.append(element('div', 'strip-rail', line.railLabel));
-      row.append(strip(line, marking.heightMm));
+      row.append(strip(line, marking.heightMm, session.resolveIcon));
       parts.push(row);
     }
   }

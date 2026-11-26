@@ -12,6 +12,8 @@ import { findFindings, type Finding } from '../electrical/problems';
 import { findDuctFillFindings } from '../electrical/ductFill';
 import { findRefFindings } from '../layout/designations';
 import { findMarkingFindings } from '../project/marking';
+import { genericIcons } from '../library/genericIcons';
+import { iconKey, OWN_ICON_SOURCE, type IconDef } from '../library/icons';
 import { findPlacementFindings } from '../layout/placementFindings';
 import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
@@ -145,6 +147,16 @@ export class Session {
   readonly libraryResolve = (ref: ModuleRef): ModuleDef | undefined =>
     this.libraries.find((l) => l.id === ref.libraryId)?.modules.find((m) => m.id === ref.moduleId);
 
+  /** The person's own icons, as stored in this browser. */
+  ownIcons: IconDef[] = [];
+  /** Own icons that came with the open project file; they win, so the file prints as it was made. */
+  private iconSnapshot: Record<string, IconDef> = {};
+
+  readonly resolveIcon = (key: string): IconDef | undefined => {
+    if (key.startsWith(`${OWN_ICON_SOURCE}/`)) return this.iconSnapshot[key] ?? this.ownIcons.find((i) => iconKey(OWN_ICON_SOURCE, i.id) === key);
+    return genericIcons().get(key);
+  };
+
   readonly resolve = (ref: ModuleRef): ModuleDef | undefined =>
     this.snapshot[moduleKey(ref)] ?? this.libraryResolve(ref);
 
@@ -204,15 +216,17 @@ export class Session {
   }
 
   reset(project: Project): void {
+    this.iconSnapshot = {};
     this.replace(project, {});
   }
 
   load(file: ProjectFile): void {
+    this.iconSnapshot = file.icons ?? {};
     this.replace(file.project, file.modules);
   }
 
   toFile(): ProjectFile {
-    return buildProjectFile(this.project, this.resolve);
+    return buildProjectFile(this.project, this.resolve, this.resolveIcon);
   }
 
   undo(): void {

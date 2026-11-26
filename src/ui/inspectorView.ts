@@ -1,8 +1,10 @@
 import { FieldsView } from './fieldsView';
 import type { ModuleRef } from '../layout/placement';
-import { applyAction, applyEdit, EDIT_MODULE_ACTION, LENGTH_UNIT_FIELD, inspect, type InspectContext } from './inspector';
+import { applyAction, applyEdit, CHOOSE_ICON_ACTION, EDIT_MODULE_ACTION, LENGTH_UNIT_FIELD, inspect, type InspectContext } from './inspector';
 import type { LengthUnit } from '../project/lengthUnitStorage';
 import type { Session } from './session';
+import { iconLabel } from '../i18n';
+import type { IconDef } from '../library/icons';
 
 /** Shows what `inspect` describes for the selection and sends every edit through `applyEdit`. */
 export class InspectorView {
@@ -16,6 +18,8 @@ export class InspectorView {
     private readonly onEditModule: (module: ModuleRef, placementId: string) => void = () => {},
     /** Called when the unit of lengths is picked, so the choice can be kept. */
     private readonly onLengthUnit: (unit: LengthUnit) => void = () => {},
+    /** Opens the icon picker; resolves with what to store, '' to clear, or null when nothing was chosen. */
+    private readonly chooseIcon: (current: string | undefined, forDevice: boolean) => Promise<string | null> = async () => null,
   ) {
     this.fields = new FieldsView(container, {
       onEdit: (key, raw) => void this.edit(key, raw),
@@ -25,6 +29,12 @@ export class InspectorView {
     this.refresh(false);
   }
 
+  /** An icon with its name in the language of the page, for the inspector to show. */
+  private readonly namedIcon = (key: string): IconDef | undefined => {
+    const icon = this.session.resolveIcon(key);
+    return icon && { ...icon, name: iconLabel(icon.name) };
+  };
+
   /** True while one of its fields has the focus. */
   owns(element: Element | null): boolean {
     return this.fields.owns(element);
@@ -32,7 +42,7 @@ export class InspectorView {
 
   private context(): InspectContext {
     const { project, selection, mode, resolve, snapshot, libraryResolve, cableSettings } = this.session;
-    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings, findings: this.session.findings, lengthUnit: this.session.lengthUnit, plate: this.session.plateId };
+    return { project, selection, mode, resolve, snapshot, fromLibraries: libraryResolve, cableSettings, findings: this.session.findings, lengthUnit: this.session.lengthUnit, plate: this.session.plateId, resolveIcon: this.namedIcon };
   }
 
   /** `force` also rewrites the field being typed in, to revert an edit that was refused. */
@@ -42,6 +52,15 @@ export class InspectorView {
 
   /** Does an action of the inspector, as its button does; the context menu offers the same ones. */
   async runAction(key: string): Promise<void> {
+    if (key === CHOOSE_ICON_ACTION) {
+      const { project, selection } = this.session;
+      const node = project.schematic.nodes.find((n) => n.id === selection.nodeId);
+      const placementId = selection.placementId ?? node?.placementId;
+      const placement = project.panel.placements.find((p) => p.id === placementId);
+      const chosen = placement ? await this.chooseIcon(placement.marking?.icon, true) : node?.kind === 'load' ? await this.chooseIcon(node.icon, false) : null;
+      if (chosen !== null) await this.edit(placement ? 'markingIcon' : 'icon', chosen);
+      return;
+    }
     if (key === EDIT_MODULE_ACTION) {
       const { project, selection } = this.session;
       const placementId = selection.placementId ?? project.schematic.nodes.find((n) => n.id === selection.nodeId)?.placementId;

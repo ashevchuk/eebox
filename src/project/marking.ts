@@ -3,6 +3,7 @@ import type { Resolve } from '../electrical/context';
 import type { Finding } from '../electrical/problems';
 import { readingOrder } from '../layout/designations';
 import { DEFAULT_STRIP_HEIGHT_MM, MARKING_PALETTE } from '../layout/marking';
+import { NO_ICON } from '../library/icons';
 import { isOnRail, type Placement } from '../layout/placement';
 import { LAYOUT_EPSILON_UNITS } from '../layout/units';
 import { MODULE_UNIT_MM } from '../library/types';
@@ -22,6 +23,9 @@ export const LINE_HEIGHT = 1.15;
  */
 const LETTER_WIDTH = 0.58;
 const NEUTRAL_HEAD = '#d0d0d0';
+/** An icon takes this share of the text area above a text, and no more than `MAX_ICON_MM`. */
+const ICON_SHARE = 0.5;
+const MAX_ICON_MM = 10;
 
 export interface MarkingHead {
   placementId: string;
@@ -36,6 +40,9 @@ export interface MarkingText {
   placementIds: string[];
   offsetUnits: number;
   widthUnits: number;
+  /** An icon key, drawn above the text in a box of `iconMm` high. */
+  icon?: string;
+  iconMm: number;
   lines: string[];
   fontMm: number;
   /** The text did not fit even at the smallest size and was shortened. */
@@ -60,13 +67,15 @@ export interface ResolvedMarking {
   /** Modules of one group share a colour; absent for modules outside any group. */
   groupKey?: string;
   colour?: string;
+  icon?: string;
 }
 
 export function resolveMarking(placement: Placement, derived: DerivedMarking | undefined): ResolvedMarking {
   const own = placement.marking;
   const text = own?.text ?? placement.label ?? derived?.loads.join(', ') ?? '';
   const groupKey = own?.group !== undefined ? `group:${own.group}` : derived?.rcd !== undefined ? `rcd:${derived.rcd}` : undefined;
-  return { text, ...(groupKey ? { groupKey } : {}), ...(own?.colour ? { colour: own.colour } : {}) };
+  const icon = own?.icon ?? derived?.icon;
+  return { text, ...(groupKey ? { groupKey } : {}), ...(own?.colour ? { colour: own.colour } : {}), ...(icon && icon !== NO_ICON ? { icon } : {}) };
 }
 
 /** Black or white, whichever reads better on the colour (relative luminance, as WCAG defines it). */
@@ -154,21 +163,29 @@ export function markingStrips(project: Project, resolve: Resolve, maxUnits: numb
       const colour = mark.colour ?? (mark.groupKey ? groupColours.get(mark.groupKey)! : NEUTRAL_HEAD);
       return { placementId: cell.placementId, offsetUnits: cell.offsetUnits, widthUnits: cell.widthUnits, number: numbers.get(cell.placementId)!, colour, textColour: textColourOn(colour) };
     });
-    const groups: Array<{ ids: string[]; offsetUnits: number; widthUnits: number; text: string; key?: string }> = [];
+    const groups: Array<{ ids: string[]; offsetUnits: number; widthUnits: number; text: string; key?: string; icon?: string }> = [];
     for (const cell of strip.cells) {
       const mark = resolved.get(cell.placementId)!;
       const last = groups[groups.length - 1];
       const touches = last !== undefined && Math.abs(last.offsetUnits + last.widthUnits - cell.offsetUnits) < LAYOUT_EPSILON_UNITS;
-      if (last && touches && mark.text !== '' && last.text === mark.text && last.key === mark.groupKey) {
+      if (last && touches && mark.text !== '' && last.text === mark.text && last.key === mark.groupKey && last.icon === mark.icon) {
         last.ids.push(cell.placementId);
         last.widthUnits = cell.offsetUnits + cell.widthUnits - last.offsetUnits;
         continue;
       }
-      groups.push({ ids: [cell.placementId], offsetUnits: cell.offsetUnits, widthUnits: cell.widthUnits, text: mark.text, ...(mark.groupKey ? { key: mark.groupKey } : {}) });
+      groups.push({ ids: [cell.placementId], offsetUnits: cell.offsetUnits, widthUnits: cell.widthUnits, text: mark.text, ...(mark.groupKey ? { key: mark.groupKey } : {}), ...(mark.icon ? { icon: mark.icon } : {}) });
     }
     const texts = groups.map((group): MarkingText => {
       const box = textBox(group.widthUnits);
-      return { placementIds: group.ids, offsetUnits: group.offsetUnits, widthUnits: group.widthUnits, ...fitText(group.text, box.widthMm, box.heightMm) };
+      const iconMm = group.icon === undefined ? 0 : group.text === '' ? box.heightMm : Math.min(MAX_ICON_MM, box.heightMm * ICON_SHARE);
+      return {
+        placementIds: group.ids,
+        offsetUnits: group.offsetUnits,
+        widthUnits: group.widthUnits,
+        ...(group.icon ? { icon: group.icon } : {}),
+        iconMm,
+        ...fitText(group.text, box.widthMm, box.heightMm - iconMm),
+      };
     });
     return { rail: strip.rail, ...(strip.railLabel ? { railLabel: strip.railLabel } : {}), heads, texts };
   });

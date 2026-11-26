@@ -2,8 +2,16 @@ import { Catalogue } from './catalogue';
 import { translateDocument } from './dom';
 import { LANGUAGE_NAMES, LANGUAGES, type Language } from './language';
 import { UKRAINIAN } from './uk';
+import { ICONS } from './uk-icons';
 
 let active: Catalogue | null = null;
+let iconNames: Record<string, unknown> | null = null;
+
+/** The name of an icon or of an icon category in the language of the page. */
+export function iconLabel(name: string): string {
+  const translated = iconNames?.[name];
+  return typeof translated === 'string' ? translated : name;
+}
 
 /** A phrase in the language of the page; the phrase itself in English, and for what has no translation. */
 export function t(text: string): string {
@@ -15,6 +23,7 @@ export function startLanguage(language: Language): void {
   document.documentElement.lang = language;
   if (language === 'en') return;
   active = new Catalogue(UKRAINIAN);
+  iconNames = ICONS;
   translateDocument(active);
 }
 

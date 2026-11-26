@@ -102,6 +102,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-section': 'That cross-section is not in the table.',
   'invalid-route': 'That route cannot be used.',
   'invalid-earthing': 'That is not an earthing system.',
+  'invalid-icon': 'That is not an icon.',
 };
 const COLORS = {
   selection: '#f5c518',

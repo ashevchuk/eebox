@@ -1,4 +1,5 @@
 import type { Project } from '../project';
+import type { SchematicNode } from '../schematic/model';
 import { familyOf } from '../library/types';
 import { netContextOf, type Resolve } from './context';
 import { directionOf } from './direction';
@@ -12,6 +13,8 @@ export interface DerivedMarking {
   rcd?: string;
   /** Labels of the loads it protects, in the order of the schematic. */
   loads: string[];
+  /** The icon of the first of those loads that has one. */
+  icon?: string;
 }
 
 /**
@@ -44,7 +47,7 @@ export function deriveMarking(project: Project, resolve: Resolve): Map<string, D
     return undefined;
   }
 
-  function loadsOf(start: string): string[] {
+  function loadsOf(start: string): SchematicNode[] {
     const seen = new Set([start]);
     const queue = [start];
     const found = new Set<string>();
@@ -63,13 +66,15 @@ export function deriveMarking(project: Project, resolve: Resolve): Map<string, D
         }
       }
     }
-    return project.schematic.nodes.filter((n) => found.has(n.id)).map((n) => n.label);
+    return project.schematic.nodes.filter((n) => found.has(n.id));
   }
 
   const derived = new Map<string, DerivedMarking>();
   for (const placement of project.panel.placements) {
     const rcd = nearestRcd(placement.id);
-    derived.set(placement.id, { ...(rcd ? { rcd } : {}), loads: loadsOf(placement.id) });
+    const loads = loadsOf(placement.id);
+    const icon = loads.find((n) => n.icon !== undefined)?.icon;
+    derived.set(placement.id, { ...(rcd ? { rcd } : {}), loads: loads.map((n) => n.label), ...(icon ? { icon } : {}) });
   }
   return derived;
 }

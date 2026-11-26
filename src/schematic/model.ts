@@ -1,3 +1,4 @@
+import { isIconKey } from '../library/icons';
 import type { Annotation } from '../layout/annotations';
 import { CROSS_SECTIONS_MM2 } from '../electrical/cables';
 import { isEarthingSystem, type EarthingSystemId } from '../electrical/earthing';
@@ -26,6 +27,8 @@ export interface SchematicNode {
   off?: boolean;
   /** How the supply is earthed, which the earthing checks read; only on source nodes. */
   earthing?: EarthingSystemId;
+  /** The icon of the marking strip of the devices that feed it, as an icon key; only on load nodes. */
+  icon?: string;
   /** Prospective short-circuit current at the source, in kA; only on source nodes. */
   shortCircuitKA?: number;
   /** Phase-to-neutral loop impedance at the source, in milliohms; only on source nodes. */
@@ -89,6 +92,7 @@ export type SchematicError =
   | { kind: 'invalid-label' }
   | { kind: 'not-a-free-node' }
   | { kind: 'not-a-load' }
+  | { kind: 'invalid-icon' }
   | { kind: 'not-a-source' }
   | { kind: 'invalid-load' }
   | { kind: 'invalid-section' }
@@ -392,6 +396,17 @@ export function setNodeLoad(schematic: Schematic, id: string, load: LoadSpec | u
   if (load && loadSpecProblem(load) !== null) return failure('invalid-load');
   const { load: _previous, ...rest } = node;
   const updated: SchematicNode = load ? { ...rest, load } : rest;
+  return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
+}
+
+/** Sets the icon a load gives to the marking of the devices that feed it, or clears it with `undefined`. */
+export function setNodeIcon(schematic: Schematic, id: string, icon: string | undefined): SchematicResult {
+  const node = schematic.nodes.find((n) => n.id === id);
+  if (!node) return failure('unknown-node');
+  if (node.kind !== 'load') return failure('not-a-load');
+  if (icon !== undefined && !isIconKey(icon)) return failure('invalid-icon');
+  const { icon: _previous, ...rest } = node;
+  const updated: SchematicNode = icon ? { ...rest, icon } : rest;
   return { ok: true, schematic: { ...schematic, nodes: schematic.nodes.map((n) => (n.id === id ? updated : n)) } };
 }
 

@@ -174,7 +174,10 @@ describe('a marking set by hand', () => {
     expect(parseProjectJson(file({ ...place('p1', 'mcb1', 0, 0), marking: { colour: 'red' } })).ok).toBe(false);
     expect(parseProjectJson(file(place('p1', 'mcb1', 0, 0), 50)).ok).toBe(false);
     expect(markingCheck({})).toContain('at least one');
-    expect(markingCheck({ icon: 'x' })).toContain('unknown');
+    expect(markingCheck({ shape: 'x' })).toContain('unknown');
+    expect(markingCheck({ icon: 'generic/oven' })).toBeNull();
+    expect(markingCheck({ icon: 'none' })).toBeNull();
+    expect(markingCheck({ icon: 'elsewhere/oven' })).toContain('icon');
   });
 
   it('keeps the strip height within its bounds', () => {

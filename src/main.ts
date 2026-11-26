@@ -63,6 +63,12 @@ import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colo
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
+import { pickIcon } from './ui/iconPicker';
+import { iconCategories, iconEntries } from './ui/iconCatalog';
+import { freeIconId, loadOwnIcons, MAX_OWN_ICONS, saveOwnIcons } from './project/iconStorage';
+import { iconFromSvg, OWN_ICON_CATEGORY } from './library/icons';
+import { MAX_ART_SHAPES } from './library/art';
+import { normalizeLabel } from './layout/labels';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, duplicateModule, newLibrary, removeModule, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
@@ -1419,7 +1425,9 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
-const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit));
+const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit), (current, forDevice) =>
+  pickIcon({ current, forDevice, entries: () => iconEntries(session.ownIcons), categories: () => iconCategories(session.ownIcons), importFiles: importIconFiles }),
+);
 
 // Commit a typed value before a click elsewhere changes the selection under it.
 window.addEventListener(
@@ -1810,7 +1818,38 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
 }
 
 /** Takes the settings kept in the browser into use; also after a backup has put new ones there. */
+/** Adds SVG files to the person's own icons and says how many came in, which were refused and what was left out of them. */
+async function importIconFiles(files: File[]): Promise<string> {
+  const icons = [...session.ownIcons];
+  const refused: string[] = [];
+  let withNotes = 0;
+  for (const file of files) {
+    if (icons.length >= MAX_OWN_ICONS) {
+      refused.push(`${file.name}: there are already ${MAX_OWN_ICONS} icons`);
+      continue;
+    }
+    const name = normalizeLabel(file.name.replace(/\.svg$/i, '').replace(/[_]+/g, ' ').slice(0, 60));
+    const result = iconFromSvg(await file.text(), freeIconId(icons, file.name), name.ok && name.label ? name.label : 'Icon', OWN_ICON_CATEGORY, MAX_ART_SHAPES);
+    if (!result.ok) {
+      refused.push(`${file.name}: ${result.message}`);
+      continue;
+    }
+    if (result.notes.length > 0) withNotes++;
+    icons.push(result.icon);
+  }
+  const added = icons.length - session.ownIcons.length;
+  if (added > 0) {
+    if (autosaveStore && !saveOwnIcons(autosaveStore, icons)) return 'The browser refused to keep the icons.';
+    session.ownIcons = icons;
+    session.changed();
+  }
+  return [`${added} icon${added === 1 ? '' : 's'} imported.`, withNotes > 0 ? `${withNotes} with parts left out that cannot be drawn.` : '', ...refused].filter(Boolean).join('\n');
+}
+
 function applyStoredSettings(store: KeyValueStore): void {
+  const ownIcons = loadOwnIcons(store);
+  session.ownIcons = ownIcons.icons;
+  if (ownIcons.problem) showStatus(ownIcons.problem, true);
   const { settings, problem } = loadCableSettings(store);
   session.cableSettings = settings;
   if (problem) showStatus(problem, true);

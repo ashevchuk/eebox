@@ -1,3 +1,4 @@
+import { isIconChoice } from '../library/icons';
 import { isStoredLabel, normalizeLabel } from './labels';
 import type { Panel, PlacementResult } from './placement';
 
@@ -9,9 +10,11 @@ export interface Marking {
   colour?: string;
   /** Modules with the same group share a colour and, side by side with the same text, one cell. */
   group?: string;
+  /** An icon key, or `none` for no icon although the load it feeds has one. */
+  icon?: string;
 }
 
-export const MARKING_KEYS = ['text', 'colour', 'group'] as const;
+export const MARKING_KEYS = ['text', 'colour', 'group', 'icon'] as const;
 export type MarkingKey = (typeof MARKING_KEYS)[number];
 
 export const MAX_MARKING_TEXT_LENGTH = 80;
@@ -64,6 +67,11 @@ function normalize(key: MarkingKey, raw: string): { ok: true; value: string | un
     if (colour === '') return { ok: true, value: undefined };
     return isMarkingColour(colour) ? { ok: true, value: colour } : { ok: false };
   }
+  if (key === 'icon') {
+    const icon = raw.trim();
+    if (icon === '') return { ok: true, value: undefined };
+    return isIconChoice(icon) ? { ok: true, value: icon } : { ok: false };
+  }
   const label = normalizeLabel(raw);
   return label.ok ? { ok: true, value: label.label } : { ok: false };
 }
@@ -92,11 +100,12 @@ export function setStripHeight(panel: Panel, mm: number): { ok: true; panel: Pan
 export function markingCheck(value: unknown): string | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'must be an object';
   const entries = Object.entries(value);
-  if (entries.length === 0) return 'must set at least one of text, colour and group';
+  if (entries.length === 0) return 'must set at least one of text, colour, group and icon';
   for (const [key, v] of entries) {
     if (key === 'text' && !isMarkingText(v)) return `text must be 1 to ${MAX_MARKING_TEXT_LENGTH} characters in at most ${MAX_MARKING_TEXT_LINES} trimmed lines`;
     if (key === 'colour' && !isMarkingColour(v)) return 'colour must be #rrggbb in lower case';
     if (key === 'group' && !isStoredLabel(v)) return 'group must be a label of 1 to 60 characters';
+    if (key === 'icon' && !isIconChoice(v)) return 'icon must be an icon key such as generic/oven, or none';
     if (!(MARKING_KEYS as readonly string[]).includes(key)) return `has an unknown field "${key}"`;
   }
   return null;
