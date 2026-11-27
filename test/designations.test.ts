@@ -163,6 +163,12 @@ describe('designations in the lists', () => {
     expect(designated({ ref: 'QF1' }, 'Kitchen')).toBe('QF1 Kitchen');
     expect(designated({}, 'Kitchen')).toBe('Kitchen');
   });
+
+  it('do not say the designation twice when the name already begins with it', () => {
+    expect(designated({ ref: 'KM1' }, 'KM1 mains')).toBe('KM1 mains');
+    expect(designated({ ref: 'KM1' }, 'KM1')).toBe('KM1');
+    expect(designated({ ref: 'KM1' }, 'KM12 pump')).toBe('KM1 KM12 pump');
+  });
 });
 
 describe('numbering a panel loaded with a module on a rail that is gone', () => {

@@ -137,8 +137,13 @@ export function distanceToPath(p: Point, path: Point[]): number {
 
 /** The point halfway along the route, where a wire's label is drawn. */
 export function pathMidpoint(path: Point[]): Point {
+  return pathPointAt(path, 0.5);
+}
+
+/** The point at `fraction` (0 to 1) of the length of a path. */
+export function pathPointAt(path: Point[], fraction: number): Point {
   const lengths = path.slice(1).map((p, i) => Math.hypot(p.x - path[i]!.x, p.y - path[i]!.y));
-  let remaining = lengths.reduce((sum, l) => sum + l, 0) / 2;
+  let remaining = lengths.reduce((sum, l) => sum + l, 0) * fraction;
   for (let i = 0; i < lengths.length; i++) {
     const length = lengths[i]!;
     if (remaining <= length || i === lengths.length - 1) {

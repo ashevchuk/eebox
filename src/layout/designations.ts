@@ -111,9 +111,10 @@ export function numberDevices(panel: Panel, resolve: (ref: ModuleRef) => ModuleD
   return { panel: given.size > 0 ? { ...panel, placements } : panel, numbered: given.size };
 }
 
-/** How a device is named in lists and on the schematic: its designation first, when it has one. */
+/** How a device is named in lists and on the schematic: its designation first, when it has one and the name does not begin with it already. */
 export function designated(item: { ref?: string }, name: string): string {
-  return item.ref === undefined ? name : `${item.ref} ${name}`;
+  const { ref } = item;
+  return ref === undefined || name === ref || name.startsWith(`${ref} `) ? name : `${ref} ${name}`;
 }
 
 /** Two devices with one designation make the drawings ambiguous; a module on the shelf counts, as it may come back. */
