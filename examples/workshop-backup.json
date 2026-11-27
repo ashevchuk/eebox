@@ -7,7 +7,7 @@
         {
           "id": "plate1",
           "name": "Back plate",
-          "widthMm": 630.0,
+          "widthMm": 630,
           "heightMm": 370
         }
       ],
@@ -36,7 +36,8 @@
           },
           "rail": 0,
           "slot": 0,
-          "label": "Mains / generator"
+          "label": "Mains / generator",
+          "ref": "QS1"
         },
         {
           "id": "p2",
@@ -46,7 +47,8 @@
           },
           "rail": 0,
           "slot": 7,
-          "label": "RCD 30 mA"
+          "label": "RCD 30 mA",
+          "ref": "QD1"
         },
         {
           "id": "p3",
@@ -76,7 +78,8 @@
           },
           "rail": 1,
           "slot": 0,
-          "label": "Lathe"
+          "label": "Lathe",
+          "ref": "QF1"
         },
         {
           "id": "p6",
@@ -86,7 +89,8 @@
           },
           "rail": 1,
           "slot": 3,
-          "label": "Lights"
+          "label": "Lights",
+          "ref": "QF2"
         }
       ],
       "combs": [

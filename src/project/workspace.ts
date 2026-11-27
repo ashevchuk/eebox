@@ -27,6 +27,7 @@ export const SETTING_KEYS = [
   'eebox:tour-done',
   'eebox:width-sidebar',
   'eebox:width-inspector',
+  'eebox:my-icons',
 ] as const;
 
 /** Everything a user has made in this browser, in one file. */

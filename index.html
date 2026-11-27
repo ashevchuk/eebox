@@ -305,6 +305,21 @@
         border-radius: 6px;
       }
       .app-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+      .app-dialog.icon-picker { width: min(760px, 96vw); max-width: 96vw; }
+      .icon-filters { display: flex; gap: 8px; margin-bottom: 8px; }
+      .icon-filters input { flex: 1; min-width: 0; }
+      .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: min(52vh, 480px); overflow-y: auto; }
+      .icon-item { position: relative; display: flex; }
+      .icon-item .icon-cell { flex: 1; }
+      .icon-delete { position: absolute; top: 2px; right: 2px; padding: 0 5px; line-height: 1.3; font-size: 12px; }
+      .icon-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; background: #f4f4f5; color: #111; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+      .icon-cell:hover, .icon-cell:focus-visible { border-color: var(--accent); }
+      .icon-cell.chosen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+      .icon-picture { width: 48px; height: 36px; }
+      .icon-picture svg { width: 100%; height: 100%; display: block; }
+      .icon-picture text { font-family: 'eebox-sans', sans-serif; }
+      .icon-name { font-size: 11px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
+      .icon-status { min-height: 1.4em; margin-top: 6px; color: var(--text-dim); white-space: pre-line; }
       #print-sheet { display: none; }
       @media print {
         @page { size: A4 landscape; margin: 10mm; }
@@ -335,8 +350,25 @@
         .label-heading { margin: 0 0 4mm; font-size: 12pt; }
         .strip-line { margin-bottom: 5mm; break-inside: avoid; }
         .strip-rail { font-size: 8pt; margin-bottom: 1mm; }
-        .strip-rail-cells { position: relative; height: 14mm; }
-        .strip-cell { position: absolute; top: 0; height: 14mm; box-sizing: border-box; padding: 0.6mm; border: 0.3mm dashed #000; font-size: 6.5pt; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .mark-strip { position: relative; }
+        .mark-head, .mark-text { position: absolute; box-sizing: border-box; border: 0.2mm dashed #000; overflow: hidden; text-align: center; }
+        .mark-head { display: flex; align-items: center; justify-content: center; font-size: 3mm; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .mark-text { color: #000; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .mark-text-line { white-space: nowrap; }
+        .mark-icon { width: 100%; flex: none; }
+        #print-sheet .mark-icon svg { width: 100%; height: 100%; max-height: none; display: block; }
+        .mark-icon text { font-family: 'eebox-sans', sans-serif; }
+        .mark-ruler { margin-bottom: 5mm; break-inside: avoid; }
+        .mark-ruler-bar { position: relative; height: 3mm; border-bottom: 0.3mm solid #000; }
+        .mark-ruler-tick { position: absolute; bottom: 0; height: 3mm; border-left: 0.3mm solid #000; }
+        .mark-ruler-caption { font-size: 8pt; margin-top: 1mm; }
+        #print-sheet .legend-table th, #print-sheet .legend-table td { padding: 0.6mm 1.5mm; vertical-align: middle; }
+        #print-sheet .legend-table .legend-number, #print-sheet .legend-table .legend-ref, #print-sheet .legend-table .legend-icon, #print-sheet .legend-table .legend-rating, #print-sheet .legend-table .legend-section { width: 1%; white-space: nowrap; }
+        #print-sheet .legend-table td.legend-text { white-space: pre-line; }
+        #print-sheet .legend-table td.legend-number { font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        #print-sheet .legend-icon { display: flex; justify-content: center; }
+        #print-sheet .legend-icon svg { width: auto; height: 100%; max-height: none; display: block; }
+        #print-sheet .legend-icon text { font-family: 'eebox-sans', sans-serif; }
         .marker-grid { display: flex; flex-wrap: wrap; gap: 3mm; }
         .marker { box-sizing: border-box; width: 42mm; height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
         .marker-detail { font-size: 6.5pt; }
@@ -392,7 +424,9 @@
       .diff-changed .diff-mark { color: #fbbf24; }
       .projects-earlier { margin: 12px 0 2px; font-size: 13px; }
       .print-dialog fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
-      .print-page { display: flex; gap: 16px; margin-bottom: 12px; }
+      .print-page { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
+      .print-page label { white-space: nowrap; }
+      .print-page input[type='number'] { width: 4.5em; }
       .print-note { color: var(--text-dim); font-size: 12px; }
       .text-options { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px; }
       .text-options-heading { color: var(--text-dim); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
@@ -542,6 +576,7 @@
           <button class="menu-item" role="menuitem" id="export-bom">Parts list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wires" title="Every wire with its two ends, conductor, cross-section, length and current">Wire list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-terminals" title="Every terminal of the terminal blocks with where its wires go, top and bottom">Terminal schedule (CSV)</button>
+          <button class="menu-item" role="menuitem" id="export-legend" title="The devices with their numbers, designations, descriptions, groups, ratings and cables">Legend (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-cuts" title="The wires by cross-section with their estimated lengths, the DIN rails and the cable ducts, to cut and buy from">Cut list (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-io" title="Every terminal of the controllers with where its wires go, to address the channels from">Inputs and outputs (CSV)</button>
           <button class="menu-item" role="menuitem" id="export-wire-labels" title="One label for each end of each wire, for a label printer: semicolon-separated, UTF-8">Wire end labels (CSV)</button>
@@ -551,6 +586,7 @@
           <button class="menu-item" role="menuitem" id="print" title="Print the panel, the schematic and the lists">Print…</button>
           <button class="menu-item" role="menuitem" id="print-full-size" title="Print the panel at 1:1 on overlapping A4 sheets to glue together">Print full size…</button>
           <button class="menu-item" role="menuitem" id="print-labels" title="Print labels for the modules at actual size and markers for the cables">Print labels…</button>
+          <button class="menu-item" role="menuitem" id="print-legend" title="Print the list of the devices with their numbers, descriptions, ratings and cables, for the door of the panel">Print legend…</button>
         </div>
       </div>
       <div class="menu panel-only">
@@ -563,6 +599,8 @@
           <button class="menu-item" role="menuitem" id="row-end" title="Put the selected modules edge to edge at the end of their rails">To the end of the row</button>
           <hr />
           <button class="menu-item" role="menuitem" id="duplicate-row" title="A copy of the selected row with its modules, combs and label, right below it">Duplicate row</button>
+          <hr />
+          <button class="menu-item" role="menuitem" id="number-devices" title="Give the devices that have no designation one such as QF1, by their kind, row by row; designations that are there stay">Number the devices</button>
         </div>
       </div>
       <div class="menu schematic-only">

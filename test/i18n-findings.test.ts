@@ -51,6 +51,8 @@ const OTHER = [
   'placement p1: out-of-rail',
   'comb c1: not-a-comb',
   'duct d1 (d1) stands on MCB (p1).',
+  'Designation QF3 is given to Kitchen [p2], MCB 1P [p5]',
+  'Strip text of Kitchen [p2], Oven [p5] does not fit; shorten it or make the strip taller',
 ];
 
 describe('the Ukrainian text of the findings of Check', () => {

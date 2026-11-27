@@ -1,3 +1,4 @@
+import { designated } from '../layout/designations';
 import { wireRuns } from '../layout/wireLength';
 import type { Project } from '../project';
 import { cell } from '../project/bom';
@@ -136,7 +137,8 @@ function endNamer(project: Project, resolve: Resolve): (ref: { node: string; ter
     const placement = node.kind === 'module' ? panel.placements.find((p) => p.id === node.placementId) : undefined;
     const name = placement?.terminalLabels?.[ref.terminal] ?? terminal?.name ?? ref.terminal;
     const side = ref.terminal.split(':')[0];
-    return { text: `${placement?.label ?? node.label} ${name} (${side})`, ...(terminal ? { conductor: terminal.conductor } : {}) };
+    const device = placement ? designated(placement, placement.label ?? node.label) : node.label;
+    return { text: `${device} ${name} (${side})`, ...(terminal ? { conductor: terminal.conductor } : {}) };
   };
 }
 

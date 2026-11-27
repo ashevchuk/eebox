@@ -62,3 +62,8 @@ export function artToSvg(def: ModuleDef): string {
     '',
   ].join('\n');
 }
+
+/** Shapes in a box of the given size as an SVG that fills its element, for a thumbnail or a printed icon. */
+export function shapesToSvg(art: readonly ArtShape[], widthMm: number, heightMm: number): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(widthMm)} ${num(heightMm)}" preserveAspectRatio="xMidYMid meet">${art.map(element).join('')}</svg>`;
+}

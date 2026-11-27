@@ -186,9 +186,9 @@ describe('bill of materials', () => {
   it('writes a header and one CRLF line per row', () => {
     const lines = bomToCsv(buildBom(sampleProject().panel, resolve)).split('\r\n');
     expect(lines[0]).toBe(
-      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity,Labels,Width (mm),Unit price,Currency,Line total',
+      'Library,Module,SKU,Name,Kind,Poles,Rated current (A),Curve,Breaking capacity (kA),Residual current (mA),Width (units),Quantity,Designations,Labels,Width (mm),Unit price,Currency,Line total',
     );
-    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2,,17.5,,,');
+    expect(lines[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,2,,,17.5,,,');
     expect(lines[3]).toBe('');
   });
 
@@ -412,13 +412,13 @@ describe('labels in the bill of materials', () => {
       ],
     };
     const csv = bomToCsv(buildBom(panel, resolve)).split('\r\n');
-    expect(csv[0]!.includes(',Quantity,Labels,')).toBe(true);
-    expect(csv[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,3,Kitchen; Hall,17.5,,,');
+    expect(csv[0]!.includes(',Quantity,Designations,Labels,')).toBe(true);
+    expect(csv[1]).toBe('lib,c16,SKU-1,MCB 1P C16,breaker,1,16,C,,,1,3,,Kitchen; Hall,17.5,,,');
   });
 
   it('leaves the column empty without labels and neutralises formulas in labels', () => {
     const bare = { ...createPanel([12]), placements: [{ id: 'p1', module: ref('c16'), rail: 0, slot: 0 }] };
-    expect(bomToCsv(buildBom(bare, resolve)).split('\r\n')[1]!.endsWith(',1,1,,17.5,,,')).toBe(true);
+    expect(bomToCsv(buildBom(bare, resolve)).split('\r\n')[1]!.endsWith(',1,1,,,17.5,,,')).toBe(true);
     const evil = { ...bare, placements: [{ ...bare.placements[0]!, label: '=HYPERLINK("x")' }] };
     expect(bomToCsv(buildBom(evil, resolve))).toContain(`"'=HYPERLINK(""x"")"`);
   });
@@ -444,11 +444,11 @@ describe('prices in the bill of materials', () => {
   it('writes the unit price, the currency and the line total after the other columns', () => {
     const lines = bomToCsv(rowsOf(['a', 'a', 'a'])).split('\r\n');
     expect(lines[0]!.endsWith(',Width (mm),Unit price,Currency,Line total')).toBe(true);
-    expect(lines[1]!.endsWith(',3,,17.5,1.25,EUR,3.75')).toBe(true);
+    expect(lines[1]!.endsWith(',3,,,17.5,1.25,EUR,3.75')).toBe(true);
   });
 
   it('leaves the price columns empty for a module that has no price', () => {
-    expect(bomToCsv(rowsOf(['d'])).split('\r\n')[1]!.endsWith(',1,,17.5,,,')).toBe(true);
+    expect(bomToCsv(rowsOf(['d'])).split('\r\n')[1]!.endsWith(',1,,,17.5,,,')).toBe(true);
   });
 
   it('adds the lines of a currency and keeps the currencies apart', () => {

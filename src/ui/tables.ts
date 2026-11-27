@@ -6,6 +6,8 @@ import type { Project } from '../project';
 import { bomTotals, buildBom, lineTotal } from '../project/bom';
 import { circuitSummaries, CHECK_IDS, type CheckStatus } from '../electrical/summary';
 import type { Selection } from './session';
+import { LEGEND_COLUMNS } from '../layout/legend';
+import { LEGEND_HEADINGS, legendCell, legendRows } from '../project/legend';
 
 export interface Column {
   label: string;
@@ -18,7 +20,7 @@ export interface Column {
 export type Cell = string | number;
 
 export interface Table {
-  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals' | 'io' | 'cuts';
+  id: 'parts' | 'circuits' | 'wires' | 'ferrules' | 'checks' | 'terminals' | 'io' | 'cuts' | 'legend';
   title: string;
   columns: Column[];
   rows: Cell[][];
@@ -50,6 +52,7 @@ export function tablesOf(project: Project, resolve: Resolve, settings?: CableSet
       { label: 'Rating, A', numeric: true },
       { label: 'Width, units', numeric: true },
       { label: 'Quantity', numeric: true },
+      { label: 'Designations' },
       { label: 'Labels' },
       { label: 'Price', numeric: true },
       { label: 'Line total', numeric: true },
@@ -60,6 +63,7 @@ export function tablesOf(project: Project, resolve: Resolve, settings?: CableSet
       blank(row.def?.ratedCurrentA),
       blank(row.widthUnits),
       row.quantity,
+      row.refs.join(', '),
       row.labels.join(', '),
       blank(row.def?.price),
       blank(lineTotal(row)),
@@ -158,6 +162,19 @@ export function terminalTable(project: Project, resolve: Resolve): Table {
     rows: rows.map(terminalCells),
     note: rows.length === 0 ? undefined : `${rows.length} terminal${rows.length === 1 ? '' : 's'}. A terminal that is not wired on a side shows nothing there.`,
     empty: 'Place a terminal block and wire it to see where its terminals go.',
+  };
+}
+
+/** The legend of the panel with every column; shown like the terminal table, outside `tablesOf`. */
+export function legendTable(project: Project, resolve: Resolve, iconName: (key: string) => string): Table {
+  const rows = legendRows(project, resolve);
+  const columns = LEGEND_COLUMNS.filter((c) => c !== 'icon');
+  return {
+    id: 'legend',
+    title: 'Legend',
+    columns: columns.map((c) => ({ label: LEGEND_HEADINGS[c], ...(c === 'section' ? { numeric: true } : {}) })),
+    rows: rows.map((row) => columns.map((c) => legendCell(row, c, iconName))),
+    empty: 'Place devices on the rails to see the legend.',
   };
 }
 

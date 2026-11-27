@@ -10,6 +10,10 @@ import { buildProjectFile, moduleKey, type ProjectFile } from '../project/file';
 import { emptySchematic } from '../schematic/model';
 import { findFindings, type Finding } from '../electrical/problems';
 import { findDuctFillFindings } from '../electrical/ductFill';
+import { findRefFindings } from '../layout/designations';
+import { findMarkingFindings } from '../project/marking';
+import { genericIcons } from '../library/genericIcons';
+import { iconKey, OWN_ICON_SOURCE, type IconDef } from '../library/icons';
 import { findPlacementFindings } from '../layout/placementFindings';
 import { groupSelection, selectedIds, selectedWires, wireGroupSelection } from './selection';
 import type { RulerLine } from '../view/ruler';
@@ -113,7 +117,7 @@ export class Session {
     const revision = this.revision;
     const cache = this.findingCache;
     if (!cache || cache.revision !== revision || cache.libraries !== this.libraries || cache.settings !== this.cableSettings) {
-      this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: [...findFindings(this.project, this.resolve, this.cableSettings), ...findPlacementFindings(this.project, this.sizes, this.resolve), ...findDuctFillFindings(this.project, this.resolve)] };
+      this.findingCache = { revision, libraries: this.libraries, settings: this.cableSettings, list: [...findFindings(this.project, this.resolve, this.cableSettings), ...findPlacementFindings(this.project, this.sizes, this.resolve), ...findDuctFillFindings(this.project, this.resolve), ...findRefFindings(this.project.panel, this.resolve), ...findMarkingFindings(this.project, this.resolve)] };
     }
     return this.findingCache!.list;
   }
@@ -142,6 +146,21 @@ export class Session {
   /** The definition in the libraries only, ignoring what the project stored. */
   readonly libraryResolve = (ref: ModuleRef): ModuleDef | undefined =>
     this.libraries.find((l) => l.id === ref.libraryId)?.modules.find((m) => m.id === ref.moduleId);
+
+  /** The person's own icons, as stored in this browser. */
+  ownIcons: IconDef[] = [];
+  /** Own icons that came with the open project file; they win, so the file prints as it was made. */
+  private iconSnapshot: Record<string, IconDef> = {};
+
+  /** Own icons the open project carries that this browser does not keep; they can be chosen like the stored ones. */
+  get projectIcons(): IconDef[] {
+    return Object.values(this.iconSnapshot).filter((icon) => !this.ownIcons.some((own) => own.id === icon.id));
+  }
+
+  readonly resolveIcon = (key: string): IconDef | undefined => {
+    if (key.startsWith(`${OWN_ICON_SOURCE}/`)) return this.iconSnapshot[key] ?? this.ownIcons.find((i) => iconKey(OWN_ICON_SOURCE, i.id) === key);
+    return genericIcons().get(key);
+  };
 
   readonly resolve = (ref: ModuleRef): ModuleDef | undefined =>
     this.snapshot[moduleKey(ref)] ?? this.libraryResolve(ref);
@@ -202,15 +221,17 @@ export class Session {
   }
 
   reset(project: Project): void {
+    this.iconSnapshot = {};
     this.replace(project, {});
   }
 
   load(file: ProjectFile): void {
+    this.iconSnapshot = file.icons ?? {};
     this.replace(file.project, file.modules);
   }
 
   toFile(): ProjectFile {
-    return buildProjectFile(this.project, this.resolve);
+    return buildProjectFile(this.project, this.resolve, this.resolveIcon);
   }
 
   undo(): void {

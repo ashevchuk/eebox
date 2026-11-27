@@ -1,5 +1,10 @@
 import { moveComb, setCombLabel, setCombWidth } from '../layout/combs';
 import { changeDuct, ductsOf, setDuctDepth, setDuctLabel, type Duct } from '../layout/ducts';
+import { designated, MAX_REF_LENGTH, nextRef, setPlacementRef } from '../layout/designations';
+import { DEFAULT_STRIP_HEIGHT_MM, MARKING_PALETTE, MAX_MARKING_TEXT_LENGTH, MAX_MARKING_TEXT_LINES, MAX_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM, setMarking, setStripHeight } from '../layout/marking';
+import { deriveMarking } from '../electrical/marking';
+import { resolveMarking } from '../project/marking';
+import { NO_ICON, type IconDef } from '../library/icons';
 import { moveFreePlacement } from '../layout/free';
 import { fitPlate, fittedPlateSize } from '../view/plateFit';
 import { moveRailToPlate, moveToPlate, plateById, railOfRowNumber, removePlate, renamePlate, resizePlate, rowNumber, rowsOnPlateOf, setRailCountOnPlate } from '../layout/plates';
@@ -75,6 +80,7 @@ import {
   moveNode,
   renameNode,
   setNodeConductors,
+  setNodeIcon,
   setNodeLoad,
   setSourceEarthing,
   setSourceOff,
@@ -137,6 +143,8 @@ export interface InspectContext {
   findings?: Finding[];
   /** The plate on view, whose notes are the notes of the panel; the first one when absent. */
   plate?: string;
+  /** Icons by key, to name the icon of a marking or a load. */
+  resolveIcon?: (key: string) => IconDef | undefined;
 }
 
 export type EditResult =
@@ -226,6 +234,30 @@ const plateField = (panel: Panel, plateId: string): InspectorField[] =>
 const ductName = (duct: Duct): string => `${duct.label ?? 'Duct'} (${duct.id})`;
 const ductIdNamed = (panel: Panel, name: string): string | undefined => ductsOf(panel).find((d) => ductName(d) === name)?.id;
 
+const AUTOMATIC_COLOUR = 'automatic';
+
+const iconName = (ctx: InspectContext, key: string): string => ctx.resolveIcon?.(key)?.name ?? `${key} (missing)`;
+
+/** The strip text, colour and group of a module, each showing what it would be without a hand-set value. */
+function markingFields(ctx: InspectContext, placement: Placement): InspectorField[] {
+  const derived = deriveMarking(ctx.project, ctx.resolve).get(placement.id);
+  const fallback = resolveMarking({ ...placement, marking: {} }, derived);
+  const rcd = derived?.rcd === undefined ? undefined : ctx.project.panel.placements.find((p) => p.id === derived.rcd);
+  const rcdName = rcd ? designated(rcd, rcd.label ?? ctx.resolve(rcd.module)?.name ?? rcd.id) : undefined;
+  const own = placement.marking ?? {};
+  const named = MARKING_PALETTE.find((c) => c.hex === own.colour)?.name;
+  const colourOptions = [AUTOMATIC_COLOUR, ...MARKING_PALETTE.map((c) => c.name), ...(own.colour && !named ? [own.colour] : [])];
+  return [
+    { key: 'markingText', label: 'Strip text', kind: 'longtext', value: own.text ?? '', max: MAX_MARKING_TEXT_LENGTH, ...(fallback.text ? { placeholder: fallback.text } : {}), hint: 'on its marking strip; empty takes the label or the loads it feeds' },
+    { key: 'markingColour', label: 'Strip colour', kind: 'select', value: named ?? own.colour ?? AUTOMATIC_COLOUR, options: colourOptions },
+    text('markingGroup', 'Strip group', own.group ?? '', rcdName),
+    readonly('markingIconName', 'Strip icon', own.icon === NO_ICON ? 'none' : own.icon ? iconName(ctx, own.icon) : derived?.icon ? `${iconName(ctx, derived.icon)} (from its load)` : 'none'),
+  ];
+}
+
+/** A colour as the select names it, as stored: a palette name, a hex value, or nothing for automatic. */
+const colourValue = (picked: string): string => (picked === AUTOMATIC_COLOUR ? '' : (MARKING_PALETTE.find((c) => c.name === picked)?.hex ?? picked));
+
 /** The fill of a duct whose depth is known, as lines for its inspector. */
 function ductFillFields(ctx: InspectContext, duct: Duct): InspectorField[] {
   const fill = ductFills(ctx.project, ctx.resolve).find((f) => f.ductId === duct.id);
@@ -246,8 +278,8 @@ const ductFieldOfWire = (panel: Panel, wire: Wire): InspectorField[] =>
 const plateIdNamed = (panel: Panel, name: string): string | undefined => panel.plates.find((p) => p.name === name)?.id;
 
 const NO_EARTHING = 'not stated';
-const readonly = (key: string, label: string, value: string | number): InspectorField => ({
-  key, label, kind: 'readonly', value,
+const readonly = (key: string, label: string, value: string | number, hint?: string): InspectorField => ({
+  key, label, kind: 'readonly', value, ...(hint ? { hint } : {}),
 });
 
 /** One line for every fault that this item takes part in, so a red mark on the drawing has a reason. */
@@ -443,6 +475,9 @@ const TAKE_OFF: InspectorAction = { key: 'takeOff', label: 'Take off the rail' }
 const TAKE_OFF_PLATE: InspectorAction = { key: 'takeOff', label: 'Take off the plate' };
 export const EDIT_MODULE_ACTION = 'editModule';
 const EDIT_MODULE: InspectorAction = { key: EDIT_MODULE_ACTION, label: 'Edit module…' };
+/** Like `editModule`, only a label for the view, which opens the icon picker and edits `markingIcon` or `icon` with the choice. */
+export const CHOOSE_ICON_ACTION = 'chooseIcon';
+const CHOOSE_ICON: InspectorAction = { key: CHOOSE_ICON_ACTION, label: 'Choose icon…' };
 
 const ALIGN_LABELS: Record<Alignment, string> = {
   left: 'Align left edges',
@@ -497,6 +532,7 @@ export function inspect(ctx: InspectContext): InspectorView {
           readonly('size', 'Size', `longest row ${longest} units`),
           decimal('clearance', 'Clearance', panel.clearanceMm ?? 0, 0, MAX_CLEARANCE_MM, 'mm kept clear around devices on the plate and ducts; 0 checks nothing'),
           decimal('wireSlack', 'Wire slack', panel.wireSlackMm ?? DEFAULT_WIRE_SLACK_MM, 0, MAX_WIRE_SLACK_MM, 'mm added to the length of each wire for bends and stripped ends'),
+          decimal('stripHeight', 'Marking strip height', panel.stripHeightMm ?? DEFAULT_STRIP_HEIGHT_MM, MIN_STRIP_HEIGHT_MM, MAX_STRIP_HEIGHT_MM, 'mm, the height of the window for labels under the modules'),
           readonly(
             'contents',
             'Contents',
@@ -515,11 +551,13 @@ export function inspect(ctx: InspectContext): InspectorView {
         : [];
       return {
         title: node ? 'Module node' : 'Module',
-        actions: def ? [EDIT_MODULE, isFree(placement) ? TAKE_OFF_PLATE : TAKE_OFF] : [isFree(placement) ? TAKE_OFF_PLATE : TAKE_OFF],
+        actions: [...(def ? [EDIT_MODULE] : []), ...(isOnRail(placement) ? [CHOOSE_ICON] : []), isFree(placement) ? TAKE_OFF_PLATE : TAKE_OFF],
         fields: [
           ...faultFields(ctx.findings, (p) => p.placements.includes(placement.id)),
           readonly('module', 'Module', def?.name ?? `${placement.module.moduleId} (missing)`),
           text('label', 'Label', placement.label ?? '', def?.name),
+          text('ref', 'Designation', placement.ref ?? '', nextRef(project.panel, def)),
+          ...(isOnRail(placement) ? markingFields(ctx, placement) : []),
           ...positionFields(placement, def, project, width, ctx.lengthUnit ?? 'units'),
           ...powerFields(placement, def, energy(project, resolve)),
           ...nodeFields,
@@ -648,7 +686,7 @@ export function inspect(ctx: InspectContext): InspectorView {
       const { node } = target;
       return {
         title: node.kind === 'source' ? 'Source' : node.kind === 'load' ? 'Load' : 'Module node',
-        actions: [],
+        actions: node.kind === 'load' ? [CHOOSE_ICON] : [],
         fields: [
           ...faultFields(ctx.findings, (p) => p.nodes.includes(node.id)),
           text('label', 'Label', node.label),
@@ -656,6 +694,7 @@ export function inspect(ctx: InspectContext): InspectorView {
             ? [{ key: 'conductors', label: 'Conductors', kind: 'choices' as const, value: [...node.conductors], options: CONDUCTORS }]
             : [readonly('status', 'Status', 'Its module is not on the panel')]),
           ...loadFields(ctx.project, ctx.resolve, node, ctx.cableSettings),
+          ...(node.kind === 'load' ? [readonly('icon', 'Icon', node.icon ? iconName(ctx, node.icon) : 'none', 'given to the marking of the devices that feed it')] : []),
           integer('nodeX', 'X', node.x, -100000, 100000),
           integer('nodeY', 'Y', node.y, -100000, 100000),
           readonly('id', 'Id', node.id),
@@ -675,6 +714,8 @@ const ERROR_TEXT: Record<string, string> = {
   'invalid-state': 'That position is not one this device has.',
   'width-out-of-range': 'The width is outside what the library allows.',
   'invalid-label': LABEL_MESSAGE,
+  'invalid-marking': `A strip text is up to ${MAX_MARKING_TEXT_LENGTH} characters in up to ${MAX_MARKING_TEXT_LINES} lines; a group is a label of up to 60 characters.`,
+  'invalid-ref': `A designation is 1 to ${MAX_REF_LENGTH} letters, digits or . - + = : _ /, such as QF1.`,
   'modules-do-not-fit': 'Modules on this row would not fit.',
   'rail-not-empty': 'Move the modules off the rows you remove first.',
   'invalid-conductors': 'A conductor can be ticked once, and at least one is needed.',
@@ -683,6 +724,7 @@ const ERROR_TEXT: Record<string, string> = {
   'invalid-load': 'The load data is out of range.',
   'invalid-section': 'That cross-section is not in the table.',
   'invalid-earthing': 'That is not an earthing system.',
+  'invalid-icon': 'That is not an icon.',
 };
 
 function describeError(error: { kind: string; with?: string } | string): string {
@@ -812,6 +854,12 @@ export function applyEdit(
         const result = setClearance(panel, mm);
         return result.ok ? withPanel(result.panel) : fail(`Clearance is 0 to ${MAX_CLEARANCE_MM} mm.`);
       }
+      if (key === 'stripHeight') {
+        const mm = numberOf(raw);
+        if (mm === null) return fail(NOT_A_DECIMAL);
+        const result = setStripHeight(panel, mm);
+        return result.ok ? withPanel(result.panel) : fail(`The marking strip is ${MIN_STRIP_HEIGHT_MM} to ${MAX_STRIP_HEIGHT_MM} mm high.`);
+      }
       if (key === 'wireSlack') {
         const mm = numberOf(raw);
         if (mm === null) return fail(NOT_A_DECIMAL);
@@ -830,6 +878,15 @@ export function applyEdit(
       const { placement, node } = target;
       if (key === 'label') {
         const result = setPlacementLabel(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key === 'ref') {
+        const result = setPlacementRef(panel, placement.id, text);
+        return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
+      }
+      if (key === 'markingText' || key === 'markingColour' || key === 'markingGroup' || key === 'markingIcon') {
+        const field = key === 'markingText' ? 'text' : key === 'markingColour' ? 'colour' : key === 'markingGroup' ? 'group' : 'icon';
+        const result = setMarking(panel, placement.id, field, field === 'colour' ? colourValue(text) : text);
         return result.ok ? withPanel(result.panel) : fail(describeError(result.error));
       }
       if (key.startsWith('flag:')) {
@@ -1004,6 +1061,10 @@ export function applyEdit(
         return result.ok ? withSchematic(result.schematic) : fail(text.trim() === '' ? 'This item needs a label.' : LABEL_MESSAGE);
       }
       if (key === 'nodeX' || key === 'nodeY') return moveNodeTo(node);
+      if (key === 'icon' && node.kind === 'load') {
+        const result = setNodeIcon(schematic, node.id, text.trim() === '' ? undefined : text.trim());
+        return result.ok ? withSchematic(result.schematic) : fail(describeError(result.error));
+      }
       if ((key === 'shortCircuitKA' || key === 'loopImpedanceMOhm') && node.kind === 'source') {
         const value = text.trim() === '' ? undefined : Number(text);
         if (value !== undefined && !Number.isFinite(value)) return fail(NOT_A_DECIMAL);
@@ -1055,6 +1116,7 @@ export function applyEdit(
 
 /** Runs an inspector action; returns the project to commit and what should be selected afterwards. */
 export function applyAction(ctx: InspectContext, key: string, options: { confirmed?: boolean } = {}): EditResult {
+  if (key === CHOOSE_ICON_ACTION) return fail('An icon is chosen in the icon picker.');
   const target = targetOf(ctx);
   if (key === 'routeAutomatically' && (target.kind === 'wire' || target.kind === 'wires')) {
     let schematic = ctx.project.schematic;

@@ -1,0 +1,1119 @@
+{
+  "categories": [
+    {
+      "id": "power",
+      "name": "Power and protection"
+    },
+    {
+      "id": "lighting",
+      "name": "Lighting and switches"
+    },
+    {
+      "id": "sockets",
+      "name": "Sockets"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    },
+    {
+      "id": "bathroom",
+      "name": "Bathroom and spa"
+    },
+    {
+      "id": "water",
+      "name": "Water and pumps"
+    },
+    {
+      "id": "climate",
+      "name": "Heating and climate"
+    },
+    {
+      "id": "home",
+      "name": "Appliances and home"
+    },
+    {
+      "id": "lowvoltage",
+      "name": "Network, media and sensors"
+    },
+    {
+      "id": "outdoor",
+      "name": "Buildings and outdoor"
+    },
+    {
+      "id": "warnings",
+      "name": "Warnings and people"
+    },
+    {
+      "id": "marks",
+      "name": "Numbers and marks"
+    }
+  ],
+  "icons": [
+    {
+      "id": "rj45-wifi",
+      "name": "Network outlet, Wi-Fi",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "generator",
+      "name": "Generator",
+      "category": "power"
+    },
+    {
+      "id": "bypass",
+      "name": "Bypass",
+      "category": "power"
+    },
+    {
+      "id": "voltage-regulator",
+      "name": "Voltage regulator",
+      "category": "power"
+    },
+    {
+      "id": "pump-group",
+      "name": "Pump group",
+      "category": "water"
+    },
+    {
+      "id": "ups",
+      "name": "UPS",
+      "category": "power"
+    },
+    {
+      "id": "socket-outdoor",
+      "name": "Outdoor socket IP44",
+      "category": "sockets"
+    },
+    {
+      "id": "ac-outdoor-unit",
+      "name": "Air conditioner, outdoor unit",
+      "category": "climate"
+    },
+    {
+      "id": "freezer",
+      "name": "Freezer",
+      "category": "kitchen"
+    },
+    {
+      "id": "earthing-circle",
+      "name": "Earthing (circle)",
+      "category": "power"
+    },
+    {
+      "id": "computer",
+      "name": "Computer",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "ev-charger",
+      "name": "EV charger",
+      "category": "outdoor"
+    },
+    {
+      "id": "lamp",
+      "name": "Lamp",
+      "category": "lighting"
+    },
+    {
+      "id": "led-strip",
+      "name": "LED strip",
+      "category": "lighting"
+    },
+    {
+      "id": "socket-modular",
+      "name": "Modular socket",
+      "category": "sockets"
+    },
+    {
+      "id": "shower",
+      "name": "Shower",
+      "category": "bathroom"
+    },
+    {
+      "id": "coffee-maker",
+      "name": "Coffee maker",
+      "category": "kitchen"
+    },
+    {
+      "id": "cooking-pot",
+      "name": "Electric cooking pot",
+      "category": "kitchen"
+    },
+    {
+      "id": "server",
+      "name": "Server",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "vacuum-sealer",
+      "name": "Vacuum sealer",
+      "category": "kitchen"
+    },
+    {
+      "id": "arc-fault-protection",
+      "name": "Arc fault protection",
+      "category": "power"
+    },
+    {
+      "id": "surge-protection",
+      "name": "Surge protection",
+      "category": "power"
+    },
+    {
+      "id": "underfloor-heating",
+      "name": "Underfloor heating",
+      "category": "climate"
+    },
+    {
+      "id": "gas-ignition",
+      "name": "Electric ignition",
+      "category": "kitchen"
+    },
+    {
+      "id": "twilight-switch",
+      "name": "Twilight switch",
+      "category": "lighting"
+    },
+    {
+      "id": "heating",
+      "name": "Heating",
+      "category": "climate"
+    },
+    {
+      "id": "heating-cable",
+      "name": "Heating cable",
+      "category": "climate"
+    },
+    {
+      "id": "spotlight",
+      "name": "Spotlight",
+      "category": "lighting"
+    },
+    {
+      "id": "thermostat",
+      "name": "Thermostat",
+      "category": "climate"
+    },
+    {
+      "id": "heating-controller",
+      "name": "Heating controller",
+      "category": "climate"
+    },
+    {
+      "id": "pipe-heating",
+      "name": "Pipe heating cable",
+      "category": "climate"
+    },
+    {
+      "id": "lawn-sprinkler",
+      "name": "Lawn sprinkler",
+      "category": "outdoor"
+    },
+    {
+      "id": "gas-detector",
+      "name": "Gas detector (CH4, CO)",
+      "category": "warnings"
+    },
+    {
+      "id": "kettle",
+      "name": "Electric kettle",
+      "category": "kitchen"
+    },
+    {
+      "id": "towel-dryer",
+      "name": "Towel dryer",
+      "category": "bathroom"
+    },
+    {
+      "id": "projector",
+      "name": "Projector",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "dc-source",
+      "name": "DC source",
+      "category": "power"
+    },
+    {
+      "id": "aquarium",
+      "name": "Aquarium",
+      "category": "home"
+    },
+    {
+      "id": "arrow-right",
+      "name": "Arrow right",
+      "category": "marks"
+    },
+    {
+      "id": "arrow-left",
+      "name": "Arrow left",
+      "category": "marks"
+    },
+    {
+      "id": "arrow-both",
+      "name": "Arrow both ways",
+      "category": "marks"
+    },
+    {
+      "id": "switchboard",
+      "name": "Switchboard",
+      "category": "power"
+    },
+    {
+      "id": "times-2",
+      "name": "Times 2",
+      "category": "marks"
+    },
+    {
+      "id": "times-3",
+      "name": "Times 3",
+      "category": "marks"
+    },
+    {
+      "id": "times-4",
+      "name": "Times 4",
+      "category": "marks"
+    },
+    {
+      "id": "times-5",
+      "name": "Times 5",
+      "category": "marks"
+    },
+    {
+      "id": "times-6",
+      "name": "Times 6",
+      "category": "marks"
+    },
+    {
+      "id": "circled-1",
+      "name": "Circled 1",
+      "category": "marks"
+    },
+    {
+      "id": "circled-2",
+      "name": "Circled 2",
+      "category": "marks"
+    },
+    {
+      "id": "circled-3",
+      "name": "Circled 3",
+      "category": "marks"
+    },
+    {
+      "id": "circled-4",
+      "name": "Circled 4",
+      "category": "marks"
+    },
+    {
+      "id": "circled-5",
+      "name": "Circled 5",
+      "category": "marks"
+    },
+    {
+      "id": "circled-6",
+      "name": "Circled 6",
+      "category": "marks"
+    },
+    {
+      "id": "circled-7",
+      "name": "Circled 7",
+      "category": "marks"
+    },
+    {
+      "id": "circled-8",
+      "name": "Circled 8",
+      "category": "marks"
+    },
+    {
+      "id": "circled-9",
+      "name": "Circled 9",
+      "category": "marks"
+    },
+    {
+      "id": "ac-split",
+      "name": "Air conditioner, split system",
+      "category": "climate"
+    },
+    {
+      "id": "roof-heating",
+      "name": "Roof heating",
+      "category": "climate"
+    },
+    {
+      "id": "solar-inverter",
+      "name": "Solar inverter",
+      "category": "power"
+    },
+    {
+      "id": "skirting-heating",
+      "name": "Skirting heating",
+      "category": "climate"
+    },
+    {
+      "id": "pet-feeder",
+      "name": "Automatic pet feeder",
+      "category": "home"
+    },
+    {
+      "id": "jacuzzi",
+      "name": "Jacuzzi",
+      "category": "bathroom"
+    },
+    {
+      "id": "bath",
+      "name": "Bath",
+      "category": "bathroom"
+    },
+    {
+      "id": "home-theater",
+      "name": "Home theater",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "audio-system",
+      "name": "Audio system",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "sockets-2-gang",
+      "name": "Sockets, 2-gang",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-3-gang",
+      "name": "Sockets, 3-gang",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-4-gang",
+      "name": "Sockets, 4-gang",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-modular-5",
+      "name": "Modular sockets, 5",
+      "category": "sockets"
+    },
+    {
+      "id": "socket-type-f",
+      "name": "Socket, type F",
+      "category": "sockets"
+    },
+    {
+      "id": "socket",
+      "name": "Socket",
+      "category": "sockets"
+    },
+    {
+      "id": "socket-type-b",
+      "name": "Socket, type B",
+      "category": "sockets"
+    },
+    {
+      "id": "socket-type-n",
+      "name": "Socket, type N",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-type-f-double",
+      "name": "Double socket, type F",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-type-b-double",
+      "name": "Double socket, type B",
+      "category": "sockets"
+    },
+    {
+      "id": "toilet-wall-hung",
+      "name": "Wall-hung toilet",
+      "category": "bathroom"
+    },
+    {
+      "id": "toilet",
+      "name": "Toilet",
+      "category": "bathroom"
+    },
+    {
+      "id": "sockets-5",
+      "name": "Sockets, 5",
+      "category": "sockets"
+    },
+    {
+      "id": "number-1",
+      "name": "Number 1",
+      "category": "marks"
+    },
+    {
+      "id": "number-2",
+      "name": "Number 2",
+      "category": "marks"
+    },
+    {
+      "id": "number-3",
+      "name": "Number 3",
+      "category": "marks"
+    },
+    {
+      "id": "number-4",
+      "name": "Number 4",
+      "category": "marks"
+    },
+    {
+      "id": "number-5",
+      "name": "Number 5",
+      "category": "marks"
+    },
+    {
+      "id": "number-6",
+      "name": "Number 6",
+      "category": "marks"
+    },
+    {
+      "id": "number-7",
+      "name": "Number 7",
+      "category": "marks"
+    },
+    {
+      "id": "number-8",
+      "name": "Number 8",
+      "category": "marks"
+    },
+    {
+      "id": "number-9",
+      "name": "Number 9",
+      "category": "marks"
+    },
+    {
+      "id": "fire-protection",
+      "name": "Fire protection",
+      "category": "power"
+    },
+    {
+      "id": "switch",
+      "name": "Switch",
+      "category": "lighting"
+    },
+    {
+      "id": "photo-relay",
+      "name": "Photo relay",
+      "category": "lighting"
+    },
+    {
+      "id": "boiler-automatic",
+      "name": "Boiler, automatic",
+      "category": "climate"
+    },
+    {
+      "id": "boiler-electric",
+      "name": "Boiler, electric",
+      "category": "climate"
+    },
+    {
+      "id": "boiler-gas",
+      "name": "Boiler, gas",
+      "category": "climate"
+    },
+    {
+      "id": "water-heater",
+      "name": "Water heater",
+      "category": "water"
+    },
+    {
+      "id": "water-filter",
+      "name": "Water filter system",
+      "category": "water"
+    },
+    {
+      "id": "pump-self-priming",
+      "name": "Self-priming pump",
+      "category": "water"
+    },
+    {
+      "id": "pump-submersible",
+      "name": "Submersible pump",
+      "category": "water"
+    },
+    {
+      "id": "septic-tank",
+      "name": "Septic tank",
+      "category": "water"
+    },
+    {
+      "id": "wine-cabinet",
+      "name": "Wine cabinet",
+      "category": "kitchen"
+    },
+    {
+      "id": "gate-opener",
+      "name": "Swing gate opener",
+      "category": "outdoor"
+    },
+    {
+      "id": "fridge-freezer",
+      "name": "Fridge freezer",
+      "category": "kitchen"
+    },
+    {
+      "id": "hob",
+      "name": "Hob",
+      "category": "kitchen"
+    },
+    {
+      "id": "oven",
+      "name": "Oven",
+      "category": "kitchen"
+    },
+    {
+      "id": "dishwasher",
+      "name": "Dishwasher",
+      "category": "kitchen"
+    },
+    {
+      "id": "waste-disposer",
+      "name": "Waste disposer",
+      "category": "kitchen"
+    },
+    {
+      "id": "washing-machine",
+      "name": "Washing machine",
+      "category": "home"
+    },
+    {
+      "id": "tumble-dryer",
+      "name": "Tumble dryer",
+      "category": "home"
+    },
+    {
+      "id": "roller-shutter",
+      "name": "Roller shutter",
+      "category": "home"
+    },
+    {
+      "id": "humidifier",
+      "name": "Humidifier",
+      "category": "climate"
+    },
+    {
+      "id": "fountain",
+      "name": "Fountain",
+      "category": "outdoor"
+    },
+    {
+      "id": "hammam",
+      "name": "Hammam steam generator",
+      "category": "bathroom"
+    },
+    {
+      "id": "sauna-stove",
+      "name": "Sauna stove",
+      "category": "bathroom"
+    },
+    {
+      "id": "doorbell",
+      "name": "Doorbell",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "intercom",
+      "name": "Intercom",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "router-wifi",
+      "name": "Wi-Fi router",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "voltage-regulator-display",
+      "name": "Voltage regulator (display)",
+      "category": "power"
+    },
+    {
+      "id": "fridge",
+      "name": "Fridge",
+      "category": "kitchen"
+    },
+    {
+      "id": "leak-protection",
+      "name": "Water leak protection",
+      "category": "water"
+    },
+    {
+      "id": "distribution-board",
+      "name": "Distribution board",
+      "category": "power"
+    },
+    {
+      "id": "hood-and-ignition",
+      "name": "Cooker hood and ignition",
+      "category": "kitchen"
+    },
+    {
+      "id": "water-cooler",
+      "name": "Water cooler",
+      "category": "kitchen"
+    },
+    {
+      "id": "master-switch",
+      "name": "Master switch",
+      "category": "lighting"
+    },
+    {
+      "id": "switch-2-pole",
+      "name": "Switch, 2-pole",
+      "category": "lighting"
+    },
+    {
+      "id": "clothes-steamer",
+      "name": "Clothes steamer",
+      "category": "home"
+    },
+    {
+      "id": "leak-protection-valve",
+      "name": "Water leak protection (valve)",
+      "category": "water"
+    },
+    {
+      "id": "house",
+      "name": "House",
+      "category": "outdoor"
+    },
+    {
+      "id": "cabin",
+      "name": "Cabin",
+      "category": "outdoor"
+    },
+    {
+      "id": "barn",
+      "name": "Barn",
+      "category": "outdoor"
+    },
+    {
+      "id": "garage",
+      "name": "Garage",
+      "category": "outdoor"
+    },
+    {
+      "id": "spa",
+      "name": "Spa",
+      "category": "bathroom"
+    },
+    {
+      "id": "bbq",
+      "name": "Barbecue",
+      "category": "outdoor"
+    },
+    {
+      "id": "presence-sensor",
+      "name": "Presence sensor",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "sauna",
+      "name": "Sauna",
+      "category": "bathroom"
+    },
+    {
+      "id": "rcd-person",
+      "name": "RCD (person)",
+      "category": "power"
+    },
+    {
+      "id": "rcd-person-left",
+      "name": "RCD (person, left)",
+      "category": "power"
+    },
+    {
+      "id": "rcd-person-socket",
+      "name": "RCD (person and socket)",
+      "category": "power"
+    },
+    {
+      "id": "selective-protection",
+      "name": "Selective protection",
+      "category": "power"
+    },
+    {
+      "id": "shoe-dryer",
+      "name": "Shoe dryer",
+      "category": "home"
+    },
+    {
+      "id": "router-lan",
+      "name": "Network router",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "leaving-power-off",
+      "name": "Power off when leaving",
+      "category": "marks"
+    },
+    {
+      "id": "shower-cabin",
+      "name": "Shower cabin",
+      "category": "bathroom"
+    },
+    {
+      "id": "girl",
+      "name": "Girl",
+      "category": "warnings"
+    },
+    {
+      "id": "boy",
+      "name": "Boy",
+      "category": "warnings"
+    },
+    {
+      "id": "shock-protection",
+      "name": "Shock protection",
+      "category": "power"
+    },
+    {
+      "id": "protective-disconnect",
+      "name": "Protective disconnection",
+      "category": "power"
+    },
+    {
+      "id": "protective-disconnect-left",
+      "name": "Protective disconnection (left)",
+      "category": "power"
+    },
+    {
+      "id": "danger-hand",
+      "name": "Danger (hand)",
+      "category": "warnings"
+    },
+    {
+      "id": "aqua-filter",
+      "name": "Water filter",
+      "category": "water"
+    },
+    {
+      "id": "hygienic-shower",
+      "name": "Hygienic shower",
+      "category": "bathroom"
+    },
+    {
+      "id": "bidet",
+      "name": "Bidet",
+      "category": "bathroom"
+    },
+    {
+      "id": "washbasin",
+      "name": "Washbasin",
+      "category": "bathroom"
+    },
+    {
+      "id": "kitchen-tap",
+      "name": "Kitchen tap",
+      "category": "kitchen"
+    },
+    {
+      "id": "high-voltage-filled",
+      "name": "High voltage (filled)",
+      "category": "warnings"
+    },
+    {
+      "id": "high-voltage-bolt",
+      "name": "High voltage (bolt)",
+      "category": "warnings"
+    },
+    {
+      "id": "high-voltage",
+      "name": "High voltage",
+      "category": "warnings"
+    },
+    {
+      "id": "attention-filled",
+      "name": "Attention (filled)",
+      "category": "warnings"
+    },
+    {
+      "id": "attention",
+      "name": "Attention",
+      "category": "warnings"
+    },
+    {
+      "id": "pe",
+      "name": "Protective earth",
+      "category": "power"
+    },
+    {
+      "id": "danger-skull",
+      "name": "Danger (skull)",
+      "category": "warnings"
+    },
+    {
+      "id": "high-voltage-bolt-bold",
+      "name": "High voltage (bold bolt)",
+      "category": "warnings"
+    },
+    {
+      "id": "earthing",
+      "name": "Earthing",
+      "category": "power"
+    },
+    {
+      "id": "ac-voltage",
+      "name": "AC voltage",
+      "category": "power"
+    },
+    {
+      "id": "hood-and-oven",
+      "name": "Cooker hood and oven",
+      "category": "kitchen"
+    },
+    {
+      "id": "bathroom",
+      "name": "Bathroom",
+      "category": "bathroom"
+    },
+    {
+      "id": "rock-hand",
+      "name": "Rock hand",
+      "category": "warnings"
+    },
+    {
+      "id": "phase-l1",
+      "name": "Phase L1",
+      "category": "marks"
+    },
+    {
+      "id": "phase-l2",
+      "name": "Phase L2",
+      "category": "marks"
+    },
+    {
+      "id": "phase-l3",
+      "name": "Phase L3",
+      "category": "marks"
+    },
+    {
+      "id": "socket-type-g",
+      "name": "Socket, type G",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-type-g-double",
+      "name": "Double socket, type G",
+      "category": "sockets"
+    },
+    {
+      "id": "outdoor-kitchen",
+      "name": "Outdoor kitchen",
+      "category": "outdoor"
+    },
+    {
+      "id": "building",
+      "name": "Building",
+      "category": "outdoor"
+    },
+    {
+      "id": "fist",
+      "name": "Fist",
+      "category": "warnings"
+    },
+    {
+      "id": "curtain-drive",
+      "name": "Curtain drive",
+      "category": "home"
+    },
+    {
+      "id": "sockets-down",
+      "name": "Sockets below",
+      "category": "sockets"
+    },
+    {
+      "id": "fan-coil",
+      "name": "Fan coil",
+      "category": "climate"
+    },
+    {
+      "id": "sockets-apron-label",
+      "name": "Sockets, apron (label)",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-apron",
+      "name": "Sockets, apron",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-windowsill",
+      "name": "Sockets, windowsill",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-worktop",
+      "name": "Sockets, worktop",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-left",
+      "name": "Sockets to the left",
+      "category": "sockets"
+    },
+    {
+      "id": "sockets-right",
+      "name": "Sockets to the right",
+      "category": "sockets"
+    },
+    {
+      "id": "robot-vacuum",
+      "name": "Robot vacuum cleaner",
+      "category": "home"
+    },
+    {
+      "id": "arrow-up",
+      "name": "Arrow up",
+      "category": "marks"
+    },
+    {
+      "id": "arrow-down",
+      "name": "Arrow down",
+      "category": "marks"
+    },
+    {
+      "id": "drive-unit",
+      "name": "Drive unit",
+      "category": "home"
+    },
+    {
+      "id": "surge-protection-storm",
+      "name": "Surge protection (storm)",
+      "category": "power"
+    },
+    {
+      "id": "wifi",
+      "name": "Wi-Fi",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "microwave-and-oven",
+      "name": "Microwave and oven",
+      "category": "kitchen"
+    },
+    {
+      "id": "lighting-and-sockets",
+      "name": "Lighting and sockets",
+      "category": "lighting"
+    },
+    {
+      "id": "position-up",
+      "name": "Upper position",
+      "category": "marks"
+    },
+    {
+      "id": "position-down",
+      "name": "Lower position",
+      "category": "marks"
+    },
+    {
+      "id": "microwave-and-dishwasher",
+      "name": "Microwave and dishwasher",
+      "category": "kitchen"
+    },
+    {
+      "id": "freezer-cabinet",
+      "name": "Freezer cabinet",
+      "category": "kitchen"
+    },
+    {
+      "id": "mirror-light",
+      "name": "Mirror light",
+      "category": "lighting"
+    },
+    {
+      "id": "underfloor-heating-panel",
+      "name": "Underfloor heating (panel)",
+      "category": "climate"
+    },
+    {
+      "id": "hood-and-microwave",
+      "name": "Cooker hood and microwave",
+      "category": "kitchen"
+    },
+    {
+      "id": "sound",
+      "name": "Sound",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "neutral",
+      "name": "Neutral",
+      "category": "marks"
+    },
+    {
+      "id": "socket-type-e",
+      "name": "Socket, type E",
+      "category": "sockets"
+    },
+    {
+      "id": "leak-sensor",
+      "name": "Leak sensor",
+      "category": "water"
+    },
+    {
+      "id": "rcd-text",
+      "name": "RCD (text)",
+      "category": "power"
+    },
+    {
+      "id": "lift",
+      "name": "Lift",
+      "category": "home"
+    },
+    {
+      "id": "track-light",
+      "name": "Track light",
+      "category": "lighting"
+    },
+    {
+      "id": "zigbee",
+      "name": "Zigbee",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse",
+      "category": "outdoor"
+    },
+    {
+      "id": "motion-sensor",
+      "name": "Motion sensor",
+      "category": "lowvoltage"
+    },
+    {
+      "id": "drying-cabinet",
+      "name": "Drying cabinet",
+      "category": "home"
+    },
+    {
+      "id": "greenhouse-sockets",
+      "name": "Greenhouse sockets",
+      "category": "outdoor"
+    },
+    {
+      "id": "pool",
+      "name": "Pool",
+      "category": "outdoor"
+    },
+    {
+      "id": "ev-charger-battery",
+      "name": "EV charger (battery)",
+      "category": "outdoor"
+    },
+    {
+      "id": "boiler-tank",
+      "name": "Storage water heater",
+      "category": "water"
+    },
+    {
+      "id": "wall-heating",
+      "name": "Wall heating",
+      "category": "climate"
+    }
+  ]
+}

@@ -7,7 +7,7 @@
         {
           "id": "plate1",
           "name": "Back plate",
-          "widthMm": 420.0,
+          "widthMm": 420,
           "heightMm": 370
         }
       ],
@@ -36,7 +36,8 @@
           },
           "rail": 0,
           "slot": 0,
-          "label": "Main switch"
+          "label": "Main switch",
+          "ref": "QS1"
         },
         {
           "id": "p2",
@@ -56,7 +57,8 @@
           },
           "rail": 1,
           "slot": 0,
-          "label": "Lights"
+          "label": "Lights",
+          "ref": "QFD1"
         },
         {
           "id": "p4",
@@ -66,7 +68,8 @@
           },
           "rail": 1,
           "slot": 3,
-          "label": "Sockets"
+          "label": "Sockets",
+          "ref": "QFD2"
         },
         {
           "id": "p5",
@@ -76,7 +79,8 @@
           },
           "rail": 1,
           "slot": 6,
-          "label": "Boiler"
+          "label": "Boiler",
+          "ref": "QFD3"
         }
       ],
       "combs": [],

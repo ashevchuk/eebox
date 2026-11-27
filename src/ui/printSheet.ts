@@ -8,7 +8,7 @@ import { renderToSvg } from './exportImage';
 import type { Session } from './session';
 import type { View } from './view';
 
-const BOM_COLUMNS = ['Qty', 'Module', 'SKU', 'Kind', 'Poles', 'Rating', 'Width', 'Labels'] as const;
+const BOM_COLUMNS = ['Qty', 'Module', 'SKU', 'Kind', 'Poles', 'Rating', 'Width', 'Designations', 'Labels'] as const;
 
 /** One BOM row as the printed table shows it, in the order of `BOM_COLUMNS`. */
 export function bomCells(row: BomRow): string[] {
@@ -29,6 +29,7 @@ export function bomCells(row: BomRow): string[] {
     def ? String(def.poles) : '',
     rating,
     row.widthUnits === undefined ? '' : `${row.widthUnits} u`,
+    row.refs.join(', '),
     row.labels.join(', '),
   ];
 }

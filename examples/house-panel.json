@@ -7,7 +7,7 @@
         {
           "id": "plate1",
           "name": "Back plate",
-          "widthMm": 420.0,
+          "widthMm": 420,
           "heightMm": 370
         }
       ],
@@ -36,7 +36,8 @@
           },
           "rail": 0,
           "slot": 0,
-          "label": "Main switch"
+          "label": "Main switch",
+          "ref": "QS1"
         },
         {
           "id": "p2",
@@ -46,7 +47,8 @@
           },
           "rail": 0,
           "slot": 4,
-          "label": "RCD 30 mA"
+          "label": "RCD 30 mA",
+          "ref": "QD1"
         },
         {
           "id": "p3",
@@ -76,7 +78,8 @@
           },
           "rail": 1,
           "slot": 0,
-          "label": "Oven"
+          "label": "Oven",
+          "ref": "QF1"
         },
         {
           "id": "p6",
@@ -86,7 +89,8 @@
           },
           "rail": 1,
           "slot": 3,
-          "label": "Kitchen"
+          "label": "Kitchen",
+          "ref": "QF2"
         },
         {
           "id": "p7",
@@ -96,7 +100,8 @@
           },
           "rail": 1,
           "slot": 4,
-          "label": "Living room"
+          "label": "Living room",
+          "ref": "QF3"
         },
         {
           "id": "p8",
@@ -106,7 +111,8 @@
           },
           "rail": 1,
           "slot": 5,
-          "label": "Garden"
+          "label": "Garden",
+          "ref": "QF4"
         },
         {
           "id": "p9",
@@ -116,7 +122,8 @@
           },
           "rail": 1,
           "slot": 6,
-          "label": "Hall light"
+          "label": "Hall light",
+          "ref": "QF5"
         },
         {
           "id": "p10",
@@ -126,7 +133,8 @@
           },
           "rail": 1,
           "slot": 7,
-          "label": "Rooms light"
+          "label": "Rooms light",
+          "ref": "QF6"
         },
         {
           "id": "p11",
@@ -136,7 +144,8 @@
           },
           "rail": 1,
           "slot": 8,
-          "label": "Outdoor light"
+          "label": "Outdoor light",
+          "ref": "QF7"
         }
       ],
       "combs": [
@@ -271,7 +280,8 @@
           "load": {
             "powerW": 3000,
             "crossSectionMm2": 2.5
-          }
+          },
+          "icon": "generic/socket-type-f"
         },
         {
           "kind": "load",
@@ -287,7 +297,8 @@
           "load": {
             "powerW": 300,
             "crossSectionMm2": 1.5
-          }
+          },
+          "icon": "generic/lamp"
         },
         {
           "kind": "load",
@@ -305,7 +316,8 @@
           "load": {
             "powerW": 6900,
             "crossSectionMm2": 6
-          }
+          },
+          "icon": "generic/oven"
         }
       ],
       "wires": [

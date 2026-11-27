@@ -446,3 +446,15 @@ describe('what the validator says about a draft', () => {
   });
 });
 
+
+describe('the designation code of a module', () => {
+  it('is typed in capitals or not, kept in capitals, cleared when empty, and refused when it is not 1 to 4 letters', () => {
+    const id = sample().modules[0]!.id;
+    const target: EditorTarget = { kind: 'module', id };
+    const set = edit(state(sample(), target), 'refCode', ' hl ');
+    expect(moduleOf(set.draft, id).refCode).toBe('HL');
+    const cleared = edit(state(set.draft, target), 'refCode', '');
+    expect(moduleOf(cleared.draft, id)).not.toHaveProperty('refCode');
+    for (const bad of ['H1', 'ABCDE', '\u0419']) expect(refused(applyEditorEdit(state(sample(), target), 'refCode', bad)), bad).toContain('1 to 4 Latin letters');
+  });
+});

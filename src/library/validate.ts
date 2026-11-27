@@ -113,11 +113,15 @@ const shortNameCheck: FieldCheck = (v) =>
     ? null
     : `must be 1 to ${MAX_SHORT_NAME_LENGTH} characters on one line, without surrounding spaces`;
 
+export const REF_CODE_PATTERN = /^[A-Z]{1,4}$/;
+const refCodeCheck: FieldCheck = (v) => (typeof v === 'string' && REF_CODE_PATTERN.test(v) ? null : 'must be 1 to 4 capital Latin letters, such as HL');
+
 export const MODULE_SPEC: FieldSpec = {
   id: { required: true, check: identifier },
   kind: { required: true, check: oneOf(MODULE_KINDS) },
   name: { required: true, check: nonEmptyString },
   shortName: { required: false, check: shortNameCheck },
+  refCode: { required: false, check: refCodeCheck },
   widthUnits: { required: true, check: widthCheck },
   heightMm: { required: true, check: heightCheck },
   mounting: { required: true, check: oneOf(MOUNTINGS) },

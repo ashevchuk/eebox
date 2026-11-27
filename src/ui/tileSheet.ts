@@ -1,4 +1,5 @@
 import { TILE_HEIGHT_MM, TILE_OVERLAP_MM, TILE_WIDTH_MM, sheetsWithContent, tileLayout } from '../project/tiles';
+import { crispText } from '../view/crispText';
 import { FONT_FAMILY } from '../view/font';
 import { printArea } from '../view/geometry';
 import { labelBox, terminalLabels } from '../view/terminalLabels';
@@ -48,7 +49,7 @@ export function fillTileSheet(sheet: HTMLElement, session: Session, panelView: V
 
 /** The sheets that hold something of the plate on view. */
 function plateTiles(session: Session, panelView: View, plateName: string): PrintedTile[] {
-  const measuring = document.createElement('canvas').getContext('2d')!;
+  const measuring = crispText(document.createElement('canvas').getContext('2d')!);
   measuring.font = `8px ${FONT_FAMILY}`;
   const combInfo = (item: { module: Parameters<Session['resolve']>[0]; widthUnits?: number }) => {
     const def = session.resolve(item.module);

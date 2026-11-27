@@ -34,6 +34,7 @@ another library under it is refused. Edit a copy of the bundled library instead.
 | `kind` | enum | `breaker`, `rcd`, `rcbo`, `contactor`, `spd`, `fuse`, `meter`, `psu`, `terminal`, `busbar`, `comb`, `switch`, `relay`, `softstarter`, `vfd`, `plc`, `transformer`, `other` |
 | `name` | string | required; the name in the palette, the search and the parts list |
 | `shortName` | string | optional, 1 to 16 characters on one line; what the face of the module shows in place of `name`, which is too long there |
+| `refCode` | string | optional, 1 to 4 capital Latin letters; what *Number the devices* starts the designation of a placed copy with, such as `HL` for a pilot light. When absent the kind decides (`QF` for a breaker, `KM` for a contactor and so on), and a bar, comb or terminal block gets none |
 | `widthUnits` | number | width in 17.5 mm units, from 0.1; a fraction is fine, so a relay of 22.5 mm is `1.2857` and a block of 29 mm `1.6571`. The designer takes the width in millimetres |
 | `heightMm` | number | required; height of the face in mm, from 20 to 600. A standard DIN module is 90; a soft starter or a drive is taller. The module is centred on its rail, and the terminals sit near its top and bottom edge |
 | `mounting` | `rail`, `plate` or `both` | required; where the device is fixed: clipped on a DIN rail, screwed to the mounting plate, or either |

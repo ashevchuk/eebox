@@ -3,6 +3,7 @@ import { energy, type Energy } from '../electrical/energy';
 import { formatAmps, wireCurrents } from '../electrical/loads';
 import { combContacts } from '../electrical/nets';
 import { t } from '../i18n';
+import { designated } from '../layout/designations';
 import { withNoteBounds } from '../layout/annotations';
 import { drawAnnotations } from '../view/annotationDraw';
 import { chainNodes, feedFrom, type AutowireResult } from '../schematic/autowire';
@@ -14,7 +15,6 @@ import {
   hitNode,
   hitPort,
   hitWire,
-  pathMidpoint,
   portOf,
   WIRE_LABEL_HEIGHT,
   WIRE_LABEL_PADDING,
@@ -31,6 +31,7 @@ import { laneTargets, snapLane, type SnapTarget } from '../schematic/laneSnap';
 import { moveLane, type Lanes } from '../schematic/manualRoute';
 import { spreadOverlaps } from '../schematic/overlaps';
 import { routeWires } from '../schematic/router';
+import { placeWireLabels, type WireLabel } from '../schematic/wireLabels';
 import { beginDrag, companionsOf, dragLanes, hitSegment, laneValue, segmentsOf, wiresInRect, type Companion, type Segment, type WireDrag } from '../schematic/wireEditing';
 import {
   addNode,
@@ -101,6 +102,7 @@ const ERROR_TEXT: Record<SchematicError['kind'], string> = {
   'invalid-section': 'That cross-section is not in the table.',
   'invalid-route': 'That route cannot be used.',
   'invalid-earthing': 'That is not an earthing system.',
+  'invalid-icon': 'That is not an icon.',
 };
 const COLORS = {
   selection: '#f5c518',
@@ -117,7 +119,12 @@ const NODE_FILL = { module: '#e5e7eb', source: '#f5c518', load: '#a7f3d0' } as c
 
 const TERMINAL_LABEL_WIDTH = 24;
 
-function wireLabelText(label: string | undefined, amps: number | undefined, texts: TextVisibility): string {
+interface PlacedLabels {
+  labels: WireLabel[];
+  spots: Map<string, Point>;
+}
+
+export function wireLabelText(label: string | undefined, amps: number | undefined, texts: TextVisibility): string {
   return [texts.wireLabels ? label : undefined, texts.currents && amps !== undefined ? `${formatAmps(amps)} A` : undefined].filter(Boolean).join(' \u00b7 ');
 }
 
@@ -174,12 +181,24 @@ export class SchematicView implements View {
     const { schematic, layout } = this.frame();
     const routes = routeWires(schematic, layout);
     const { currents } = this.analysis();
-    const labels = schematic.wires.flatMap((wire) => {
+    const { labels, spots } = this.placedLabels(schematic, layout, routes, currents);
+    const boxes = labels.map((label) => wireLabelBox(label.text, spots.get(label.wireId)!));
+    return withNoteBounds(boundsWithBoxes(boundsWithRoutes(schematicBounds(layout), routes), boxes), schematic.annotations);
+  }
+
+  /** The router hands back the same routes while nothing moved, so the labels are placed again only when it or a label changed. */
+  private placedLabels(schematic: Schematic, layout: Layout, routes: Map<string, Point[]>, currents: Map<string, number>): PlacedLabels {
+    const texts = this.session.texts;
+    const cached = this.labelCache;
+    if (cached && cached.routes === routes && cached.wires === schematic.wires && cached.currents === currents && cached.texts === texts) return cached.value;
+    const labels: WireLabel[] = schematic.wires.flatMap((wire) => {
       const path = routes.get(wire.id);
-      const text = wireLabelText(wire.label, currents.get(wire.id), this.session.texts);
-      return path && text ? [wireLabelBox(text, pathMidpoint(path))] : [];
+      const text = wireLabelText(wire.label, currents.get(wire.id), texts);
+      return path && text ? [{ wireId: wire.id, text, path }] : [];
     });
-    return withNoteBounds(boundsWithBoxes(boundsWithRoutes(schematicBounds(layout), routes), labels), schematic.annotations);
+    const value = { labels, spots: placeWireLabels(labels, layout) };
+    this.labelCache = { routes, wires: schematic.wires, currents, texts, value };
+    return value;
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number): void {
@@ -233,12 +252,8 @@ export class SchematicView implements View {
       }
     }
     // Drawn after the nodes so that a label whose midpoint falls on a node is not half hidden by it.
-    for (const wire of frame.schematic.wires) {
-      const path = routes.get(wire.id);
-      const amps = currents.get(wire.id);
-      const text = wireLabelText(wire.label, amps, this.session.texts);
-      if (path && text) this.drawWireLabel(ctx, text, pathMidpoint(path));
-    }
+    const { labels, spots } = this.placedLabels(frame.schematic, frame.layout, routes, currents);
+    for (const label of labels) this.drawWireLabel(ctx, label.text, spots.get(label.wireId)!);
     drawAnnotations(ctx, this.session.notesOf('schematic'), this.session.selection.annotationId ?? null, this.session.texts.annotations);
     this.drawPreview(ctx, frame);
   }
@@ -830,6 +845,8 @@ export class SchematicView implements View {
   };
 
   /** Currents and voltage are worth recomputing only when the project, its modules or the libraries changed. */
+  private labelCache: { routes: Map<string, Point[]>; wires: Schematic['wires']; currents: Map<string, number>; texts: TextVisibility; value: PlacedLabels } | null = null;
+
   private analysis(): { currents: Map<string, number>; power: Energy } {
     const { project, snapshot, libraries } = this.session;
     const cached = this.analysisCache;
@@ -880,8 +897,10 @@ export class SchematicView implements View {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = orphan
-      ? `${shelved?.label ?? node.label} (${t(shelved ? 'on the shelf' : 'missing')})`
-      : (placement?.label ?? node.label);
+      ? `${shelved ? designated(shelved, shelved.label ?? node.label) : node.label} (${t(shelved ? 'on the shelf' : 'missing')})`
+      : placement
+        ? designated(placement, placement.label ?? node.label)
+        : node.label;
     let fontSize = 12;
     ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     while (fontSize > MIN_LABEL_FONT && ctx.measureText(label).width > r.width - 16) {

@@ -4,6 +4,7 @@ import type { Project } from '../project';
 
 /** A label for one module, as wide as the module on its rail. */
 export interface StripCell {
+  placementId: string;
   /** Distance from the start of its line, in module units. */
   offsetUnits: number;
   widthUnits: number;
@@ -41,6 +42,7 @@ export function labelStrips(
         lines.push(line);
       }
       line.cells.push({
+        placementId: placement.id,
         offsetUnits: placement.slot - line.start,
         widthUnits,
         text: placement.label ?? def?.name ?? placement.module.moduleId,

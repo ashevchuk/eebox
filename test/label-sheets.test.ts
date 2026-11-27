@@ -11,7 +11,7 @@ describe('labelStrips', () => {
   it('gives every module a cell as wide as the module, placed by its distance from the line start', () => {
     const panel = panelOf([place('p1', 'mcb1', 0, 2), place('p2', 'mcb3', 0, 5)]);
     expect(labelStrips(panel, resolve)).toEqual([
-      { rail: 0, cells: [{ offsetUnits: 0, widthUnits: 1, text: 'MCB 1P' }, { offsetUnits: 3, widthUnits: 3, text: 'MCB 3P' }] },
+      { rail: 0, cells: [{ placementId: 'p1', offsetUnits: 0, widthUnits: 1, text: 'MCB 1P' }, { placementId: 'p2', offsetUnits: 3, widthUnits: 3, text: 'MCB 3P' }] },
     ]);
   });
 

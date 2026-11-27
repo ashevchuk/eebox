@@ -1,4 +1,5 @@
 import genericIecText from '../libraries/generic-iec.json?raw';
+import { crispText } from './view/crispText';
 import { createPanel } from './layout/panel';
 import type { ModuleRef } from './layout/placement';
 import {
@@ -25,7 +26,7 @@ import { clearAllData } from './project/clearData';
 import { IndexedDbProjectStore, MemoryProjectStore, SNAPSHOT_INTERVAL_MS, newProjectId, newSnapshotId, planProjectImport, savedProjects, snapshotsToDrop, type ProjectStore } from './project/projectStore';
 import { SETTING_KEYS, buildWorkspace, parseWorkspace, workspaceToText } from './project/workspace';
 import { openProjectsDialog } from './ui/projectsDialog';
-import { cutTable, ioTable, summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
+import { cutTable, ioTable, legendTable, summaryTable, tablesOf, terminalTable, type Table } from './ui/tables';
 import { applyEdit } from './ui/inspector';
 import { openTablesDialog } from './ui/tablesDialog';
 import { drawHint } from './view/hint';
@@ -33,7 +34,7 @@ import { problemEntries, focusOf, focusOfObjects, objectsOfSelection, type Focus
 import { loadFlag, saveFlag } from './project/flagStorage';
 import { arrangeModules, duplicateRow, type ArrangeHow } from './layout/arrangeModules';
 import { MAX_RAILS } from './layout/limits';
-import { LANGUAGES, LANGUAGE_NAMES, startLanguage, t, type Language } from './i18n';
+import { iconLabel, LANGUAGES, LANGUAGE_NAMES, startLanguage, t, type Language } from './i18n';
 import { loadLanguage, saveLanguage } from './i18n/language';
 import { TOUR_DONE_KEY } from './ui/tour';
 import { TourView } from './ui/tourView';
@@ -48,7 +49,7 @@ import { SearchView } from './ui/searchView';
 import { checkState, shouldPulse, type CheckState } from './ui/checkState';
 import { ProblemsView } from './ui/problemsView';
 import type { Finding } from './electrical/problems';
-import { moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
+import { iconKeysUsed, moduleKey, parseProjectJson, projectWarnings, type ProjectFile, type ProjectParseResult } from './project/file';
 import { planModuleSwap, planModuleUpdate } from './project/sync';
 import { loadCableSettings, saveCableSettings } from './project/cableSettingsStorage';
 import { loadColourChoice, saveColourChoice } from './project/colourSchemeStorage';
@@ -63,6 +64,16 @@ import { DEFAULT_COLOUR_CHOICE, coloursOf, type ColourChoice } from './view/colo
 import { SHARE_PREFIX, decodeShare, encodeShare } from './project/share';
 import { emptySchematic, removeOrphanNodes } from './schematic/model';
 import { confirmDialog } from './ui/dialog';
+import { openLegendDialog } from './ui/legendDialog';
+import { fillLegendSheet } from './ui/legendSheet';
+import { legendOf, setLegend } from './layout/legend';
+import { legendRows, legendToCsv } from './project/legend';
+import { pickIcon } from './ui/iconPicker';
+import { iconCategories, iconEntries } from './ui/iconCatalog';
+import { freeIconId, loadOwnIcons, MAX_OWN_ICONS, saveOwnIcons } from './project/iconStorage';
+import { iconFromSvg, iconKey, OWN_ICON_CATEGORY, OWN_ICON_SOURCE } from './library/icons';
+import { MAX_ART_SHAPES } from './library/art';
+import { normalizeLabel } from './layout/labels';
 import { InspectorView } from './ui/inspectorView';
 import { copyLibrary, duplicateModule, newLibrary, removeModule, uniqueId } from './ui/libraryEditor';
 import { openLibraryEditor, type EditorOptions } from './ui/libraryEditorView';
@@ -98,6 +109,7 @@ import { SKIPPED_SHOWN, importTerminalLabels } from './project/terminalLabelsImp
 import { contextMenuEntries, type MenuItem } from './ui/contextMenu';
 import { ContextMenuView } from './ui/contextMenuView';
 import { DEFAULT_WIRE_PATTERN, numberWires } from './schematic/numbering';
+import { numberDevices } from './layout/designations';
 import { PlateTabs } from './ui/plateTabs';
 import { fillTileSheet } from './ui/tileSheet';
 import { ShelfView } from './ui/shelfView';
@@ -119,7 +131,7 @@ const statusEl = byId<HTMLElement>('status');
 const undoButton = byId<HTMLButtonElement>('undo');
 const redoButton = byId<HTMLButtonElement>('redo');
 const deleteButton = byId<HTMLButtonElement>('delete-selection');
-const ctx = canvas.getContext('2d')!;
+const ctx = crispText(canvas.getContext('2d')!);
 
 const bundledLibraryId = GENERIC_LIBRARY_ID;
 const storage: LibraryStorage =
@@ -1093,6 +1105,16 @@ async function numberTheWires(): Promise<void> {
   showStatus(`${result.numbered} wire${result.numbered === 1 ? '' : 's'} numbered.`);
 }
 
+function numberTheDevices(): void {
+  const result = numberDevices(session.project.panel, session.resolve);
+  if (result.numbered === 0) {
+    showStatus('Every device already has a designation.');
+    return;
+  }
+  session.commit({ ...session.project, panel: result.panel });
+  showStatus(`${result.numbered} device${result.numbered === 1 ? '' : 's'} numbered.`);
+}
+
 function removeOrphans(): void {
   const { project } = session;
   const { schematic, removed, keptWired } = removeOrphanNodes(project.schematic, project.panel);
@@ -1152,6 +1174,43 @@ function exportTerminals(): void {
   }
   const stem = fileStem(session.project.panel.title, 'panel');
   downloadBlob(new Blob(['\uFEFF', terminalScheduleToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `${stem}-terminals.csv`);
+}
+
+/** The name of an icon in the language of the page, for the legend. */
+const iconNameOf = (key: string): string => {
+  const icon = session.resolveIcon(key);
+  return icon ? iconLabel(icon.name) : key;
+};
+
+async function printLegend(): Promise<void> {
+  const chosen = await openLegendDialog(legendOf(session.project.panel));
+  if (!chosen) return;
+  const kept = setLegend(session.project.panel, chosen);
+  if (!kept.ok) {
+    showStatus(kept.message, true);
+    return;
+  }
+  if (canonicalJson(kept.panel.legend ?? null) !== canonicalJson(session.project.panel.legend ?? null)) session.commit({ ...session.project, panel: kept.panel });
+  const sheet = byId('print-sheet');
+  const pageStyle = document.createElement('style');
+  pageStyle.textContent = `@media print { ${pageRule(chosen)} }`;
+  document.head.append(pageStyle);
+  fillLegendSheet(sheet, session, chosen, iconNameOf);
+  window.addEventListener('afterprint', () => {
+    sheet.replaceChildren();
+    pageStyle.remove();
+  }, { once: true });
+  window.print();
+}
+
+function exportLegend(): void {
+  const rows = legendRows(session.project, session.resolve);
+  if (rows.length === 0) {
+    showStatus('There are no devices on the rails yet.');
+    return;
+  }
+  const stem = fileStem(session.project.panel.title, 'panel');
+  downloadBlob(new Blob(['\uFEFF', legendToCsv(rows, iconNameOf)], { type: 'text/csv;charset=utf-8' }), `${stem}-legend.csv`);
 }
 
 function exportCuts(): void {
@@ -1408,7 +1467,17 @@ const palette = new PaletteView(byId('palette'), byId<HTMLInputElement>('palette
 
 new ShelfView(byId('shelf'), session, (e, item) => panelView.startShelfDrag(e, item, worldPoint(e)));
 
-const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit));
+const inspector = new InspectorView(byId('inspector-content'), session, (message) => confirmDialog(message, 'Continue'), designModuleOf, (unit) => autosaveStore && saveLengthUnit(autosaveStore, unit), (current, forDevice) =>
+  pickIcon({
+    current,
+    forDevice,
+    entries: () => iconEntries(session.ownIcons, session.projectIcons),
+    categories: () => iconCategories([...session.ownIcons, ...session.projectIcons]),
+    importFiles: importIconFiles,
+    deleteIcon: deleteOwnIcon,
+    canDelete: (key) => session.ownIcons.some((icon) => iconKey(OWN_ICON_SOURCE, icon.id) === key),
+  }),
+);
 
 // Commit a typed value before a click elsewhere changes the selection under it.
 window.addEventListener(
@@ -1469,6 +1538,8 @@ byId('open-example').addEventListener('click', async () => {
 byId('print').addEventListener('click', () => void printProject());
 byId('new-module').addEventListener('click', designNewModule);
 byId('print-labels').addEventListener('click', printLabels);
+byId('print-legend').addEventListener('click', () => void printLegend());
+byId('export-legend').addEventListener('click', exportLegend);
 byId('print-full-size').addEventListener('click', printFullSize);
 byId('new-library').addEventListener('click', () =>
   openEditor(newLibrary(uniqueId('my-library', session.libraries.map((l) => l.id)), 'My library'), {
@@ -1591,6 +1662,7 @@ const currentTables = () => [
   ...(terminalSchedule(session.project, session.resolve).length > 0 ? [terminalTable(session.project, session.resolve)] : []),
   ...(ioSchedule(session.project, session.resolve).length > 0 ? [ioTable(session.project, session.resolve)] : []),
   ...(cutList(session.project, session.resolve).length > 0 ? [cutTable(session.project, session.resolve)] : []),
+  ...(legendRows(session.project, session.resolve).length > 0 ? [legendTable(session.project, session.resolve, iconNameOf)] : []),
 ];
 
 /** A typed value in a cell is an edit in the inspector of the object the row stands for. */
@@ -1640,6 +1712,7 @@ byId('route-automatically').addEventListener('click', () => schematicView.routeA
 byId('spread-wires').addEventListener('click', () => schematicView.spreadWires());
 byId('remove-orphans').addEventListener('click', removeOrphans);
 byId('number-wires').addEventListener('click', () => void numberTheWires());
+byId('number-devices').addEventListener('click', numberTheDevices);
 byId<HTMLInputElement>('import-terminal-labels').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -1798,7 +1871,50 @@ async function restoreInitialProject(stored: ProjectParseResult | null): Promise
 }
 
 /** Takes the settings kept in the browser into use; also after a backup has put new ones there. */
+/** Adds SVG files to the person's own icons and says how many came in, which were refused and what was left out of them. */
+async function importIconFiles(files: File[]): Promise<string> {
+  const icons = [...session.ownIcons];
+  const refused: string[] = [];
+  let withNotes = 0;
+  for (const file of files) {
+    if (icons.length >= MAX_OWN_ICONS) {
+      refused.push(`${file.name}: there are already ${MAX_OWN_ICONS} icons`);
+      continue;
+    }
+    const name = normalizeLabel(file.name.replace(/\.svg$/i, '').replace(/[_]+/g, ' ').slice(0, 60));
+    const result = iconFromSvg(await file.text(), freeIconId([...icons, ...session.projectIcons], file.name), name.ok && name.label ? name.label : 'Icon', OWN_ICON_CATEGORY, MAX_ART_SHAPES);
+    if (!result.ok) {
+      refused.push(`${file.name}: ${result.message}`);
+      continue;
+    }
+    if (result.notes.length > 0) withNotes++;
+    icons.push(result.icon);
+  }
+  const added = icons.length - session.ownIcons.length;
+  if (added > 0) {
+    if (autosaveStore && !saveOwnIcons(autosaveStore, icons)) return 'The browser refused to keep the icons.';
+    session.ownIcons = icons;
+    session.changed();
+  }
+  return [`${added} icon${added === 1 ? '' : 's'} imported.`, withNotes > 0 ? `${withNotes} with parts left out that cannot be drawn.` : '', ...refused].filter(Boolean).join('\n');
+}
+
+/** Takes one of the person's own icons away, unless the project on the screen uses it. */
+async function deleteOwnIcon(key: string): Promise<string> {
+  if (iconKeysUsed(session.project).includes(key)) return 'This project uses the icon; give those modules and loads another one first.';
+  const icon = session.resolveIcon(key);
+  if (!icon || !(await confirmDialog(`Delete the icon "${icon.name}" from My icons?`, 'Delete'))) return '';
+  const icons = session.ownIcons.filter((i) => iconKey(OWN_ICON_SOURCE, i.id) !== key);
+  if (autosaveStore && !saveOwnIcons(autosaveStore, icons)) return 'The browser refused to keep the icons.';
+  session.ownIcons = icons;
+  session.changed();
+  return 'Icon deleted.';
+}
+
 function applyStoredSettings(store: KeyValueStore): void {
+  const ownIcons = loadOwnIcons(store);
+  session.ownIcons = ownIcons.icons;
+  if (ownIcons.problem) showStatus(ownIcons.problem, true);
   const { settings, problem } = loadCableSettings(store);
   session.cableSettings = settings;
   if (problem) showStatus(problem, true);
