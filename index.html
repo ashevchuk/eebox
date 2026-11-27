@@ -328,13 +328,14 @@
         body > *:not(#print-sheet) { display: none !important; }
         #print-sheet { display: block; }
         #print-sheet h1 { font-size: 18pt; margin: 0 0 6mm; break-after: avoid; }
-        #print-sheet h2 { font-size: 14pt; margin: 7mm 0 3mm; }
+        #print-sheet h2 { font-size: 14pt; margin: 7mm 0 3mm; break-after: avoid; }
         #print-sheet h2:first-child { margin-top: 0; }
         #print-sheet figure { margin: 0; break-after: page; break-inside: avoid; }
         #print-sheet svg { width: 100%; height: auto; max-height: var(--drawing-max-height, 150mm); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         #print-sheet figcaption { font-size: 9pt; margin-top: 2mm; }
-        #print-sheet table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-        #print-sheet th, #print-sheet td { border: 1px solid #000; padding: 1mm 2mm; text-align: left; }
+        #print-sheet table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+        #print-sheet th, #print-sheet td { border: 1px solid #000; padding: 1mm 1mm; text-align: left; }
+        #print-sheet .long-word { overflow-wrap: anywhere; }
         #print-sheet tr { break-inside: avoid; }
         #print-sheet .tile { position: relative; width: 276mm; height: 188mm; overflow: hidden; break-after: page; break-inside: avoid; outline: 0.2mm solid #000; }
         #print-sheet .tile-drawing { position: absolute; }
@@ -363,14 +364,17 @@
         .mark-ruler-tick { position: absolute; bottom: 0; height: 3mm; border-left: 0.3mm solid #000; }
         .mark-ruler-caption { font-size: 8pt; margin-top: 1mm; }
         #print-sheet .legend-table th, #print-sheet .legend-table td { padding: 0.6mm 1.5mm; vertical-align: middle; }
-        #print-sheet .legend-table .legend-number, #print-sheet .legend-table .legend-ref, #print-sheet .legend-table .legend-icon, #print-sheet .legend-table .legend-rating, #print-sheet .legend-table .legend-section { width: 1%; white-space: nowrap; }
+        #print-sheet .legend-table .legend-number, #print-sheet .legend-table .legend-ref, #print-sheet .legend-table .legend-icon, #print-sheet .legend-table .legend-rating, #print-sheet .legend-table .legend-section { width: 1%; }
+        #print-sheet .legend-table td.legend-number, #print-sheet .legend-table td.legend-ref, #print-sheet .legend-table td.legend-icon, #print-sheet .legend-table td.legend-rating, #print-sheet .legend-table td.legend-section { white-space: nowrap; }
+        #print-sheet .legend-table th { font-size: 0.6em; }
+        #print-sheet .legend-table td.legend-text, #print-sheet .legend-table td.legend-group { overflow-wrap: anywhere; }
         #print-sheet .legend-table td.legend-text { white-space: pre-line; }
         #print-sheet .legend-table td.legend-number { font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        #print-sheet .legend-icon { display: flex; justify-content: center; }
-        #print-sheet .legend-icon svg { width: auto; height: 100%; max-height: none; display: block; }
-        #print-sheet .legend-icon text { font-family: 'eebox-sans', sans-serif; }
+        #print-sheet .legend-picture { display: flex; justify-content: center; }
+        #print-sheet .legend-picture svg { width: auto; height: 100%; max-height: none; display: block; }
+        #print-sheet .legend-picture text { font-family: 'eebox-sans', sans-serif; }
         .marker-grid { display: flex; flex-wrap: wrap; gap: 3mm; }
-        .marker { box-sizing: border-box; width: 42mm; height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .marker { box-sizing: border-box; width: 42mm; min-height: 10mm; padding: 0.8mm 1.5mm; border: 0.3mm dashed #000; font-size: 8pt; line-height: 1.2; overflow-wrap: anywhere; display: flex; flex-direction: column; justify-content: center; }
         .marker-detail { font-size: 6.5pt; }
       }
       .app-dialog p { margin: 0 0 14px; white-space: pre-line; }

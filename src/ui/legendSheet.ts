@@ -3,6 +3,7 @@ import type { IconDef } from '../library/icons';
 import { shapesToSvg } from '../library/svgExport';
 import { LEGEND_HEADINGS, legendCell, legendRows } from '../project/legend';
 import { FONT_FAMILY } from '../view/font';
+import { fillCell } from './printSheet';
 import type { Session } from './session';
 
 /** An icon in a row is as tall as two lines of its letters. */
@@ -26,9 +27,8 @@ export function fillLegendSheet(sheet: HTMLElement, session: Session, settings: 
   table.className = 'legend-table';
   table.style.fontFamily = FONT_FAMILY;
   table.style.fontSize = `${settings.fontMm}mm`;
-  const head = document.createElement('tr');
+  const head = table.createTHead().insertRow();
   for (const column of settings.columns) head.append(element('th', `legend-${column}`, LEGEND_HEADINGS[column]));
-  table.append(head);
   for (const row of rows) {
     const line = document.createElement('tr');
     for (const column of settings.columns) {
@@ -36,7 +36,7 @@ export function fillLegendSheet(sheet: HTMLElement, session: Session, settings: 
       if (column === 'icon') {
         const icon: IconDef | undefined = row.icon === undefined ? undefined : session.resolveIcon(row.icon);
         if (icon) {
-          const picture = element('div', 'legend-icon');
+          const picture = element('div', 'legend-picture');
           picture.style.height = `${settings.fontMm * ICON_LINES}mm`;
           picture.title = iconName(row.icon!);
           // The shapes passed the art validator (colours, path grammar, numbers) and their text is escaped, so the markup holds nothing else.
@@ -44,7 +44,7 @@ export function fillLegendSheet(sheet: HTMLElement, session: Session, settings: 
           td.append(picture);
         }
       } else {
-        td.textContent = legendCell(row, column, iconName);
+        fillCell(td, legendCell(row, column, iconName));
       }
       if (column === 'number') {
         td.style.background = row.colour;

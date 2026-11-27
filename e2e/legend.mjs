@@ -72,7 +72,19 @@ try {
     await browser.evaluate(`[...document.querySelectorAll('dialog.print-dialog label')].filter((l) => /Designation|Icon/.test(l.textContent)).forEach((l) => { const c = l.querySelector('input'); c.checked = true; c.dispatchEvent(new Event('change')); })`);
     await pressPrint();
     expectTrue((await table())[0].join() === 'No.,Designation,Icon,Description,A,mm²', `heading ${(await table())[0].join()}`);
-    expectTrue((await browser.evaluate(`document.querySelectorAll('#print-sheet .legend-icon svg').length`)) === 3, 'the three load icons are not drawn');
+    await browser.media('print');
+    const layout = await browser.evaluate(`(() => {
+      const cells = [...document.querySelectorAll('#print-sheet .legend-table th, #print-sheet .legend-table td')];
+      return {
+        displays: [...new Set(cells.map((c) => getComputedStyle(c).display))],
+        spilling: cells.filter((c) => c.scrollWidth > c.clientWidth + 1).map((c) => c.textContent),
+        icons: [...document.querySelectorAll('#print-sheet .legend-table svg')].map((i) => { const r = i.getBoundingClientRect(); const c = i.closest('td').getBoundingClientRect(); return r.width > 10 && r.height > 10 && r.left >= c.left && r.right <= c.right && r.top >= c.top && r.bottom <= c.bottom; }),
+      };
+    })()`);
+    await browser.media('');
+    expectTrue(layout.displays.join() === 'table-cell', `the cells are laid out as ${layout.displays.join()}`);
+    expectTrue(layout.spilling.length === 0, `text spills out of its cell: ${layout.spilling.join(' | ')}`);
+    expectTrue(layout.icons.length === 3 && layout.icons.every(Boolean), `the three load icons are not drawn inside their cells: ${JSON.stringify(layout.icons)}`);
     await browser.evaluate(`window.dispatchEvent(new Event('afterprint'))`);
     await openDialog();
     expectTrue((await ticked()).join() === 'Number,Designation,Icon,Description,Rating,Cross-section', `kept: ${(await ticked()).join()}`);

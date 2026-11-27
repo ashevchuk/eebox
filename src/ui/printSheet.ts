@@ -56,6 +56,14 @@ export function totalsText(rows: BomRow[]): string[] {
   ];
 }
 
+/** A word longer than this may be broken to keep a table on the page; shorter words stay whole. */
+const LONG_WORD = 20;
+
+export function fillCell(cell: HTMLElement, text: string): void {
+  cell.textContent = text;
+  if (text.split(/\s+/).some((word) => word.length > LONG_WORD)) cell.classList.add('long-word');
+}
+
 function drawingOf(view: View, session: Session, caption: string, idPrefix: string): HTMLElement {
   const figure = document.createElement('figure');
   const parsed = new DOMParser().parseFromString(renderToSvg(view, session, LIGHT_THEME, idPrefix), 'image/svg+xml');
@@ -95,7 +103,7 @@ function titleBlock(info: ProjectInfo | undefined): HTMLElement[] {
     const body = element.createTBody().insertRow();
     for (const [label, text] of fields) {
       head.append(Object.assign(document.createElement('th'), { textContent: label }));
-      body.insertCell().textContent = text;
+      fillCell(body.insertCell(), text);
     }
     out.push(element);
   }
@@ -115,7 +123,7 @@ function table(header: readonly string[], rows: string[][]): HTMLTableElement {
   const body = element.createTBody();
   for (const row of rows) {
     const tr = body.insertRow();
-    for (const text of row) tr.insertCell().textContent = text;
+    for (const text of row) fillCell(tr.insertCell(), text);
   }
   return element;
 }
