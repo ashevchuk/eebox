@@ -120,6 +120,11 @@ try {
     expectTrue(cut.length === 0, `${cut.length} markers cut off, such as ${cut[0]}`);
   });
 
+  await step('the print sheet is set in the bundled font, so its tables are as wide on every machine', async () => {
+    const family = await printed('print', setUp(5), `(sheet) => getComputedStyle(sheet.querySelector('td')).fontFamily`);
+    expectTrue(family.replaceAll('"', '').startsWith('eebox-sans'), `the cells are set in ${family}`);
+  });
+
   await step('the page raised no errors', async () => {
     expectTrue(browser.problems.length === 0, browser.problems.join('; '));
   });
